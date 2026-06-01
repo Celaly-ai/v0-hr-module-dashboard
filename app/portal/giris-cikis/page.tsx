@@ -1,14 +1,26 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
-const SERVIS_MESAFE_SINIRI_METRE = 20
-const GECICI_SERVIS_LAT = 37.940611
-const GECICI_SERVIS_LNG = 40.151167
+const YEMEK_MOLASI_DAKIKA = 60
+const ONAY_SINIRI_DAKIKA = 60
+const VARSAYILAN_MESAFE_SINIRI_METRE = 50
 
-type Mesaj = { tip: "basari" | "hata"; metin: string }
+type Mesaj = {
+  tip: "basari" | "hata"
+  metin: string
+}
+
+type Kayit = Record<string, any>
+
+type ServisKonumu = {
+  lat: number
+  lng: number
+  mesafeSiniri: number
+  kaynak: string
+}
 
 function startOfToday() {
   const d = new Date()
@@ -28,6 +40,59 @@ function temizSaat(value?: string | null) {
   return String(value).slice(0, 5)
 }
 
+function saatToDakika(saat?: string | null) {
+  const temiz = temizSaat(saat)
+  if (!temiz) return 0
+  const [h, m] = temiz.split(":").map(Number)
+  return h * 60 + m
+}
+
+function dateDakika(date: Date) {
+  return date.getHours() * 60 + date.getMinutes()
+}
+
+function dakikaYaz(dakika: number) {
+  if (dakika <= 0) return "-"
+  const saat = Math.floor(dakika / 60)
+  const dk = dakika % 60
+  if (saat > 0 && dk > 0) return `${saat}s ${dk}d`
+  if (saat > 0) return `${saat}s`
+  return `${dk}d`
+}
+
+function formatSaat(value?: string | null) {
+  if (!value) return "-"
+  return new Date(value).toLocaleTimeString("tr-TR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
+function durumEtiketi(durum?: string | null) {
+  switch (durum) {
+    case "calisma":
+      return "Çalışma"
+    case "izinli":
+      return "İzinli"
+    case "raporlu":
+      return "Raporlu"
+    case "egitim":
+      return "Eğitim"
+    case "hafta_tatili":
+      return "Hafta Tatili"
+    case "resmi_tatil":
+      return "Resmi Tatil"
+    default:
+      return "Plan Yok"
+  }
+}
+
+function durumClass(durum: string) {
+  if (durum === "Çalışıyor") return "bg-green-100 text-green-900 border-green-300"
+  if (durum === "Zamanında") return "bg-emerald-100 text-emerald-900 border-emerald-300"
+  return "bg-gray-100 text-gray-900 border-gray-300"
+}
+
 function konumAl(): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
@@ -43,239 +108,346 @@ function konumAl(): Promise<GeolocationPosition> {
   })
 }
 
-function mesafeHesapla(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number,
-) {
+function mesafeHesapla(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 6371000
-
-  const dLat = ((lat1 - lat2) * Math.PI) / 180
-  const dLng = ((lng1 - lng2) * Math.PI) / 180
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLng = ((lng2 - lng1) * Math.PI) / 180
 
   const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat2 * Math.PI) / 180) *
-      Math.cos((lat1 * Math.PI) / 180) *
-      Math.sin(dLng / 2) ** 2
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2)
 
-  return Math.round(
-    R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)),
-  )
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)))
+}
+
+function sayi(value: any) {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
+function konumCikar(kayit: Kayit | null, kaynak: string): ServisKonumu | null {
+  if (!kayit) return null
+
+  const lat =
+    sayi(kayit.lat) ??
+    sayi(kayit.latitude) ??
+    sayi(kayit.merkez_lat) ??
+    sayi(kayit.konum_lat) ??
+    sayi(kayit.servis_lat) ??
+    sayi(kayit.giris_cikis_lat)
+
+  const lng =
+    sayi(kayit.lng) ??
+    sayi(kayit.longitude) ??
+    sayi(kayit.merkez_lng) ??
+    sayi(kayit.konum_lng) ??
+    sayi(kayit.servis_lng) ??
+    sayi(kayit.giris_cikis_lng)
+
+  if (lat === null || lng === null) return null
+
+  const mesafeSiniri =
+    sayi(kayit.giris_cikis_mesafe_limiti) ??
+    sayi(kayit.mesafe_limiti) ??
+    sayi(kayit.gps_mesafe_limiti) ??
+    VARSAYILAN_MESAFE_SINIRI_METRE
+
+  return {
+    lat,
+    lng,
+    mesafeSiniri,
+    kaynak,
+  }
 }
 
 export default function GirisCikisPage() {
   const router = useRouter()
 
-  const [personel, setPersonel] = useState<any>(null)
-  const [sonKayit, setSonKayit] = useState<any>(null)
-  const [vardiyalar, setVardiyalar] = useState<any[]>([])
-  const [yukleniyor, setYukleniyor] = useState(true)
+  const [loading, setLoading] = useState(true)
   const [islem, setIslem] = useState(false)
+  const [personel, setPersonel] = useState<Kayit | null>(null)
+  const [vardiya, setVardiya] = useState<Kayit | null>(null)
+  const [kayitlar, setKayitlar] = useState<Kayit[]>([])
+  const [sonKayit, setSonKayit] = useState<Kayit | null>(null)
+  const [servisKonumu, setServisKonumu] = useState<ServisKonumu | null>(null)
   const [mesaj, setMesaj] = useState<Mesaj | null>(null)
 
-  const verileriYukle = useCallback(async () => {
+  async function servisKonumuGetir(p: Kayit) {
     const supabase = createClient()
 
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
+    const personelKonumu = konumCikar(p, "personel")
+    if (personelKonumu) return personelKonumu
 
-    const user = session?.user
-
-    if (!user) {
-      router.replace("/portal/giris")
-      return
+    if (p.sube_id) {
+      const { data } = await supabase.from("subeler").select("*").eq("id", p.sube_id).maybeSingle()
+      const subeKonumu = konumCikar(data, "sube")
+      if (subeKonumu) return subeKonumu
     }
 
-    const { data: p } = await supabase
-      .from("personeller")
-      .select("id")
-      .or(`auth_id.eq.${user.id},kullanici_id.eq.${user.id}`)
-      .maybeSingle()
+    if (p.sirket_id) {
+      const { data } = await supabase.from("sirketler").select("*").eq("id", p.sirket_id).maybeSingle()
+      const sirketKonumu = konumCikar(data, "sirket")
+      if (sirketKonumu) return sirketKonumu
+    }
 
-    if (!p) {
+    return null
+  }
+
+  async function verileriYukle() {
+    setLoading(true)
+    setMesaj(null)
+
+    try {
+      const supabase = createClient()
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      const user = session?.user
+
+      if (!user) {
+        router.replace("/portal/giris")
+        return
+      }
+
+      const { data: personelData, error: personelError } = await supabase
+        .from("personeller")
+        .select("*")
+        .or(`auth_id.eq.${user.id},kullanici_id.eq.${user.id}`)
+        .maybeSingle()
+
+      if (personelError || !personelData) {
+        setMesaj({
+          tip: "hata",
+          metin: "Personel kaydı bulunamadı.",
+        })
+        setLoading(false)
+        return
+      }
+
+      setPersonel(personelData)
+
+      const konum = await servisKonumuGetir(personelData)
+      setServisKonumu(konum)
+
+      const bugun = localISO(new Date())
+
+      const { data: vardiyaData } = await supabase
+        .from("vardiya_planlari")
+        .select("*")
+        .eq("personel_id", personelData.id)
+        .eq("tarih", bugun)
+        .maybeSingle()
+
+      setVardiya(vardiyaData)
+
+      const { data: kayitData } = await supabase
+        .from("giris_cikis_kayitlari")
+        .select("*")
+        .eq("personel_id", personelData.id)
+        .gte("created_at", startOfToday().toISOString())
+        .order("created_at", { ascending: false })
+
+      const liste = kayitData || []
+
+      setKayitlar(liste)
+      setSonKayit(liste[0] || null)
+    } catch (err: any) {
       setMesaj({
         tip: "hata",
-        metin: "Personel kaydı bulunamadı.",
+        metin: err?.message || "Giriş/çıkış ekranı yüklenemedi.",
       })
-
-      setYukleniyor(false)
-      return
     }
 
-    setPersonel(p)
-
-    const bugun = localISO(startOfToday())
-
-    const { data: liste } = await supabase
-      .from("giris_cikis_kayitlari")
-      .select("id, tip, created_at")
-      .eq("personel_id", p.id)
-      .gte("created_at", `${bugun}T00:00:00`)
-      .lte("created_at", `${bugun}T23:59:59`)
-      .order("created_at", { ascending: false })
-      .limit(1)
-
-    const { data: vardiyaListe } = await supabase
-      .from("vardiya_planlari")
-      .select("tarih, durum, baslangic_saati, bitis_saati")
-      .eq("personel_id", p.id)
-      .eq("tarih", bugun)
-
-    setVardiyalar(vardiyaListe ?? [])
-    setSonKayit(liste?.[0] ?? null)
-
-    setYukleniyor(false)
-  }, [router])
+    setLoading(false)
+  }
 
   useEffect(() => {
-    void verileriYukle()
-  }, [verileriYukle])
+    verileriYukle()
+  }, [])
 
-  const bugunkuVardiya = useMemo(() => {
-    const tarih = localISO(startOfToday())
-
-    return vardiyalar.find((v) => v.tarih === tarih) ?? null
-  }, [vardiyalar])
-
-  const aktifDurum =
-    sonKayit?.tip === "giris" ? "giris" : "cikis"
+  const aktifDurum = useMemo(() => {
+    return sonKayit?.tip === "giris" ? "giris" : "cikis"
+  }, [sonKayit])
 
   async function handleKayit(tip: "giris" | "cikis") {
     if (!personel) return
 
-    setIslem(true)
     setMesaj(null)
+    setIslem(true)
 
     try {
-      const pos = await konumAl()
+      if (!vardiya) {
+        setMesaj({
+          tip: "hata",
+          metin: "Bugün için vardiya planınız bulunmuyor.",
+        })
+        setIslem(false)
+        return
+      }
 
+      if (vardiya.durum !== "calisma" || !vardiya.calisma_gunu) {
+        setMesaj({
+          tip: "hata",
+          metin: `Bugünkü durumunuz: ${durumEtiketi(vardiya.durum)}. Giriş/çıkış yapılamaz.`,
+        })
+        setIslem(false)
+        return
+      }
+
+      if (!servisKonumu) {
+        setMesaj({
+          tip: "hata",
+          metin: "Şirket/şube servis konumu bulunamadı. Lütfen şirket veya şube lokasyon bilgisini tanımlayın.",
+        })
+        setIslem(false)
+        return
+      }
+
+      const pos = await konumAl()
       const lat = pos.coords.latitude
       const lng = pos.coords.longitude
 
-      const mesafe = mesafeHesapla(
-        lat,
-        lng,
-        GECICI_SERVIS_LAT,
-        GECICI_SERVIS_LNG,
-      )
+      const mesafe = mesafeHesapla(lat, lng, servisKonumu.lat, servisKonumu.lng)
 
-      if (mesafe > SERVIS_MESAFE_SINIRI_METRE) {
+      if (mesafe > servisKonumu.mesafeSiniri) {
         setMesaj({
           tip: "hata",
-          metin: `Şirkete çok uzaktasınız (${mesafe}m)`,
+          metin: `Servise uzaklık ${mesafe} metre. Limit: ${servisKonumu.mesafeSiniri} metre.`,
         })
-
         setIslem(false)
         return
       }
 
       const supabase = createClient()
+      const now = new Date()
 
-      const { error } = await supabase
-        .from("giris_cikis_kayitlari")
-        .insert([
-          {
-            personel_id: personel.id,
-            tip,
-            lat,
-            lng,
-            mesafe_metre: mesafe,
-            basarili: true,
-          },
-        ])
+      const vardiyaBas = saatToDakika(vardiya.baslangic_saati)
+      const vardiyaBit = saatToDakika(vardiya.bitis_saati)
+      const simdi = dateDakika(now)
+
+      let bilgiMesaji = tip === "giris" ? "Giriş kaydedildi." : "Çıkış kaydedildi."
+
+      if (tip === "giris" && simdi > vardiyaBas) {
+        const gecikme = simdi - vardiyaBas
+        bilgiMesaji = `${gecikme} dakika geç başlandı.`
+
+        await supabase.from("uyumsuzluklar").insert({
+          personel_id: personel.id,
+          tur: "gec_baslama",
+          aciklama: bilgiMesaji,
+        })
+      }
+
+      if (tip === "cikis" && simdi - vardiyaBit >= ONAY_SINIRI_DAKIKA) {
+        bilgiMesaji = `Fazla mesai: ${dakikaYaz(simdi - vardiyaBit)}`
+      }
+
+      const { error } = await supabase.from("giris_cikis_kayitlari").insert({
+        personel_id: personel.id,
+        tip,
+        lat,
+        lng,
+        mesafe_metre: mesafe,
+        basarili: true,
+        created_at: now.toISOString(),
+      })
 
       if (error) {
         setMesaj({
           tip: "hata",
           metin: error.message,
         })
-
         setIslem(false)
         return
       }
 
       setMesaj({
         tip: "basari",
-        metin:
-          tip === "giris"
-            ? "✅ Giriş kaydedildi"
-            : "✅ Çıkış kaydedildi",
+        metin: bilgiMesaji,
       })
 
       await verileriYukle()
     } catch {
       setMesaj({
         tip: "hata",
-        metin: "Konum alınamadı",
+        metin: "Konum alınamadı. Lütfen konum iznini açın.",
       })
     }
 
     setIslem(false)
   }
 
-  if (yukleniyor) {
+  if (loading) {
     return (
-      <div className="min-h-[100dvh] bg-gray-100 flex items-center justify-center">
-        <p className="font-bold text-gray-800">
-          Yükleniyor...
-        </p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <p className="font-bold text-gray-800">Yükleniyor...</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-[100dvh] bg-gray-100">
-      <div className="sticky top-0 z-50 bg-white border-b shadow-sm px-4 pt-[calc(env(safe-area-inset-top)+14px)] pb-3 flex items-center gap-3">
+    <div className="min-h-screen bg-gray-100 text-gray-900">
+      <div className="bg-white border-b shadow-sm px-4 py-3 flex items-center gap-3">
         <button
+          type="button"
           onClick={() => router.push("/portal")}
-          className="text-2xl font-bold text-gray-800"
+          className="text-2xl font-bold"
         >
           ←
         </button>
 
-        <h1 className="text-2xl font-bold text-gray-900">
-          Giriş / Çıkış
-        </h1>
+        <div>
+          <h1 className="text-xl font-black">Giriş / Çıkış</h1>
+          <p className="text-xs font-semibold text-gray-600">
+            Personel devam kontrol sistemi
+          </p>
+        </div>
       </div>
 
       <div className="max-w-md mx-auto p-4 space-y-4">
         <div
-          className={`rounded-3xl p-5 text-white text-center shadow-lg ${
-            aktifDurum === "giris"
-              ? "bg-green-600"
-              : "bg-gray-700"
+          className={`rounded-2xl p-4 text-white text-center ${
+            aktifDurum === "giris" ? "bg-green-600" : "bg-gray-700"
           }`}
         >
-          <p className="text-5xl mb-2">
-            {aktifDurum === "giris" ? "🟢" : "⚫"}
+          <p className="text-3xl">{aktifDurum === "giris" ? "🟢" : "⚫"}</p>
+
+          <p className="mt-2 text-lg font-black">
+            {aktifDurum === "giris" ? "Serviste" : "Dışarıda"}
           </p>
 
-          <p className="text-3xl font-bold">
-            {aktifDurum === "giris"
-              ? "Serviste"
-              : "Dışarıda"}
+          <p className="text-xs font-semibold mt-2">
+            {personel?.ad_soyad || `${personel?.ad || ""} ${personel?.soyad || ""}`}
           </p>
 
-          <p className="mt-3 text-lg font-semibold">
-            {bugunkuVardiya?.durum === "calisma"
-              ? `${temizSaat(
-                  bugunkuVardiya.baslangic_saati,
-                )} - ${temizSaat(
-                  bugunkuVardiya.bitis_saati,
-                )}`
-              : "Plan Yok"}
+          <p className="text-xs font-semibold mt-1">
+            Bugünkü Durum: {vardiya ? durumEtiketi(vardiya.durum) : "Plan Yok"}
           </p>
+
+          {vardiya?.durum === "calisma" && (
+            <p className="text-xs font-semibold mt-1">
+              {temizSaat(vardiya.baslangic_saati)} - {temizSaat(vardiya.bitis_saati)}
+            </p>
+          )}
+
+          {servisKonumu && (
+            <p className="text-xs font-semibold mt-2 opacity-90">
+              Konum kaynağı: {servisKonumu.kaynak} · Limit: {servisKonumu.mesafeSiniri} m
+            </p>
+          )}
         </div>
 
         {mesaj && (
           <div
-            className={`rounded-2xl p-4 text-center font-bold ${
+            className={`rounded-xl border p-3 text-sm font-bold ${
               mesaj.tip === "basari"
-                ? "bg-green-100 text-green-900"
-                : "bg-red-100 text-red-900"
+                ? "bg-green-50 border-green-300 text-green-900"
+                : "bg-red-50 border-red-300 text-red-900"
             }`}
           >
             {mesaj.metin}
@@ -283,30 +455,70 @@ export default function GirisCikisPage() {
         )}
 
         <button
+          type="button"
           onClick={() => handleKayit("giris")}
           disabled={islem || aktifDurum === "giris"}
-          className="w-full rounded-3xl bg-green-600 text-white py-5 text-2xl font-bold shadow-lg disabled:opacity-40"
+          className="w-full rounded-xl bg-green-600 py-4 text-white font-black disabled:opacity-40"
         >
-          {islem ? "⏳ İşleniyor..." : "📍 Giriş Yap"}
+          {islem ? "İşleniyor..." : "📍 Giriş Yap"}
         </button>
 
         <button
+          type="button"
           onClick={() => handleKayit("cikis")}
           disabled={islem || aktifDurum === "cikis"}
-          className="w-full rounded-3xl bg-red-600 text-white py-5 text-2xl font-bold shadow-lg disabled:opacity-40"
+          className="w-full rounded-xl bg-red-600 py-4 text-white font-black disabled:opacity-40"
         >
-          {islem ? "⏳ İşleniyor..." : "🚪 Çıkış Yap"}
+          {islem ? "İşleniyor..." : "🚪 Çıkış Yap"}
         </button>
 
-        <div className="bg-white rounded-3xl p-4 shadow border">
-          <p className="text-sm font-bold text-gray-800">
-            📍 Konum zorunludur
-          </p>
+        <div className="rounded-2xl border border-gray-300 bg-white p-4 shadow-sm">
+          <div className="mb-3">
+            <h2 className="text-sm font-black">Bugünkü Hareketler</h2>
+            <p className="text-xs text-gray-600 font-semibold">
+              Gün içi giriş / çıkış kayıtları
+            </p>
+          </div>
 
-          <p className="text-sm text-gray-700 mt-1">
-            Şirket konumuna maksimum{" "}
-            {SERVIS_MESAFE_SINIRI_METRE} metre yakınlık
-            gereklidir.
+          {kayitlar.length === 0 ? (
+            <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 text-center text-sm font-bold text-gray-600">
+              Kayıt bulunmuyor.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {kayitlar.map((kayit) => (
+                <div
+                  key={kayit.id}
+                  className="rounded-xl border border-gray-200 p-3 flex items-center justify-between"
+                >
+                  <div>
+                    <p className="text-sm font-black">
+                      {kayit.tip === "giris" ? "📍 Giriş" : "🚪 Çıkış"}
+                    </p>
+
+                    <p className="text-xs text-gray-600 font-semibold">
+                      {formatSaat(kayit.created_at)}
+                    </p>
+                  </div>
+
+                  <div
+                    className={`rounded-lg border px-2 py-1 text-xs font-black ${
+                      kayit.tip === "giris"
+                        ? durumClass("Çalışıyor")
+                        : durumClass("Zamanında")
+                    }`}
+                  >
+                    {kayit.tip === "giris" ? "Giriş" : "Çıkış"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-xl bg-blue-50 border border-blue-200 p-3">
+          <p className="text-xs font-bold text-blue-900">
+            📍 Servis lokasyonu artık sabit değildir. Personel, şube veya şirket kayıtlarından dinamik okunur.
           </p>
         </div>
       </div>

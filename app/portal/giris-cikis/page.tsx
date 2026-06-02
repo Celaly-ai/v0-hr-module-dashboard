@@ -104,7 +104,7 @@ function analizRenk(value: number) {
   if (value <= 15) return "text-yellow-700"
   return "text-red-700"
 }
-\nfunction konumAl(): Promise<GeolocationPosition> {
+function konumAl(): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error("Konum desteklenmiyor"))

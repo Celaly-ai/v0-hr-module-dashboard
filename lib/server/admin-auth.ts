@@ -1,4 +1,4 @@
-import { cookies } from "next/headers"
+import { cookies, headers } from "next/headers"
 import { NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js"
@@ -18,7 +18,7 @@ type AdminAuthResult =
       response: NextResponse
     }
 
-const DEFAULT_ALLOWED_ROLES = ["admin", "ik_yoneticisi"]
+const DEFAULT_ALLOWED_ROLES = ["admin", "ik_yoneticisi", "servis_yoneticisi"]
 
 function serviceRoleKey() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
@@ -28,6 +28,15 @@ function serviceRoleKey() {
 function metadataRole(user: User) {
   const role = (user.user_metadata as { role?: unknown } | null)?.role
   return typeof role === "string" ? role : null
+}
+
+async function bearerToken() {
+  const h = await headers()
+  const authHeader = h.get("authorization") || h.get("Authorization") || ""
+
+  if (!authHeader.toLowerCase().startsWith("bearer ")) return null
+
+  return authHeader.slice(7).trim() || null
 }
 
 async function findUserContext(supabaseAdmin: SupabaseClient, user: User) {
@@ -40,7 +49,7 @@ async function findUserContext(supabaseAdmin: SupabaseClient, user: User) {
   const { data: personel } = await supabaseAdmin
     .from("personeller")
     .select("id, rol, sirket_id")
-    .or(`auth_id.eq.${user.id},kullanici_id.eq.${user.id}`)
+    .or(`auth_id.eq.${user.id},kullanici_id.eq.${user.id},email.eq.${user.email}`)
     .limit(1)
     .maybeSingle()
 
@@ -76,28 +85,51 @@ export async function requireAdminAuth(
     }
   }
 
-  const cookieStore = await cookies()
-
-  const supabase = createServerClient(supabaseUrl, anonKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll()
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) => {
-          try {
-            cookieStore.set(name, value, options)
-          } catch {
-            // Route handlers can still authenticate with existing cookies.
-          }
-        })
-      },
+  const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
     },
   })
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  let user: User | null = null
+
+  const token = await bearerToken()
+
+  if (token) {
+    const { data, error } = await supabaseAdmin.auth.getUser(token)
+
+    if (!error && data?.user) {
+      user = data.user
+    }
+  }
+
+  if (!user) {
+    const cookieStore = await cookies()
+
+    const supabase = createServerClient(supabaseUrl, anonKey, {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            try {
+              cookieStore.set(name, value, options)
+            } catch {
+              // Route handlers can still authenticate with existing cookies.
+            }
+          })
+        },
+      },
+    })
+
+    const {
+      data: { user: cookieUser },
+    } = await supabase.auth.getUser()
+
+    user = cookieUser || null
+  }
 
   if (!user) {
     return {
@@ -109,13 +141,6 @@ export async function requireAdminAuth(
     }
   }
 
-  const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  })
-
   const userContext = await findUserContext(supabaseAdmin, user)
   const role = userContext.role
 
@@ -123,7 +148,7 @@ export async function requireAdminAuth(
     return {
       ok: false,
       response: NextResponse.json(
-        { error: "Bu işlem için yetkiniz yok." },
+        { error: `Bu işlem için yetkiniz yok. Rol: ${role}` },
         { status: 403 },
       ),
     }

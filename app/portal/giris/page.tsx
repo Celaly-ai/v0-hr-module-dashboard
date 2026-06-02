@@ -145,7 +145,7 @@ export default function PortalGirisPage() {
       }
 
       setBilgi("Giriş başarılı. Portala yönlendiriliyorsunuz...")
-      window.location.assign("/portal")
+      window.location.href = "/portal"
     } catch (err) {
       setHata(err instanceof Error ? err.message : "Beklenmeyen giriş hatası oluştu.")
       setYukleniyor(false)

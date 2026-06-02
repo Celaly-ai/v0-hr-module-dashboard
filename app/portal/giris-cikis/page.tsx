@@ -93,7 +93,18 @@ function durumClass(durum: string) {
   return "bg-gray-100 text-gray-900 border-gray-300"
 }
 
-function konumAl(): Promise<GeolocationPosition> {
+
+function kayitDakika(kayit: Kayit | null) {
+  if (!kayit?.created_at) return null
+  return dateDakika(new Date(kayit.created_at))
+}
+
+function analizRenk(value: number) {
+  if (value <= 0) return "text-green-700"
+  if (value <= 15) return "text-yellow-700"
+  return "text-red-700"
+}
+\nfunction konumAl(): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error("Konum desteklenmiyor"))
@@ -274,6 +285,68 @@ export default function GirisCikisPage() {
     return sonKayit?.tip === "giris" ? "giris" : "cikis"
   }, [sonKayit])
 
+  const gunAnalizi = useMemo(() => {
+    if (!vardiya) {
+      return {
+        ilkGiris: null,
+        sonCikis: null,
+        calismaDakika: 0,
+        gecGirisDakika: 0,
+        erkenCikisDakika: 0,
+        fazlaMesaiDakika: 0,
+      }
+    }
+
+    const sirali = [...kayitlar].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+    )
+
+    const girisler = sirali.filter((k) => k.tip === "giris")
+    const cikislar = sirali.filter((k) => k.tip === "cikis")
+
+    const ilkGiris = girisler[0] || null
+    const sonCikis = cikislar[cikislar.length - 1] || null
+
+    const vardiyaBas = saatToDakika(vardiya.baslangic_saati)
+    const vardiyaBit = saatToDakika(vardiya.bitis_saati)
+
+    const ilkGirisDakika = kayitDakika(ilkGiris)
+    const sonCikisDakika = kayitDakika(sonCikis)
+
+    const gecGirisDakika =
+      ilkGirisDakika !== null ? Math.max(0, ilkGirisDakika - vardiyaBas) : 0
+
+    const erkenCikisDakika =
+      sonCikisDakika !== null ? Math.max(0, vardiyaBit - sonCikisDakika) : 0
+
+    const fazlaMesaiDakika =
+      sonCikisDakika !== null ? Math.max(0, sonCikisDakika - vardiyaBit) : 0
+
+    let calismaDakika = 0
+    for (let i = 0; i < sirali.length; i += 1) {
+      const mevcut = sirali[i]
+      const sonraki = sirali[i + 1]
+
+      if (mevcut?.tip === "giris" && sonraki?.tip === "cikis") {
+        const giris = kayitDakika(mevcut)
+        const cikis = kayitDakika(sonraki)
+        if (giris !== null && cikis !== null && cikis > giris) {
+          calismaDakika += cikis - giris
+        }
+      }
+    }
+
+    return {
+      ilkGiris,
+      sonCikis,
+      calismaDakika,
+      gecGirisDakika,
+      erkenCikisDakika,
+      fazlaMesaiDakika,
+    }
+  }, [kayitlar, vardiya])
+
+
   async function handleKayit(tip: "giris" | "cikis") {
     if (!personel) return
 
@@ -442,7 +515,68 @@ export default function GirisCikisPage() {
           )}
         </div>
 
-        {mesaj && (
+
+        <div className="rounded-2xl border border-gray-300 bg-white p-4 shadow-sm">
+          <div className="mb-3">
+            <h2 className="text-sm font-black">Bugünkü Vardiya Analizi</h2>
+            <p className="text-xs text-gray-600 font-semibold">
+              Plan, giriş/çıkış ve puantaj özeti
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 text-xs font-bold">
+            <div className="rounded-xl bg-gray-50 border p-3">
+              <p className="text-gray-500">Vardiya</p>
+              <p className="text-gray-900">
+                {vardiya ? `${temizSaat(vardiya.baslangic_saati)} - ${temizSaat(vardiya.bitis_saati)}` : "Plan yok"}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-gray-50 border p-3">
+              <p className="text-gray-500">Durum</p>
+              <p className="text-gray-900">
+                {vardiya ? durumEtiketi(vardiya.durum) : "Plan Yok"}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-gray-50 border p-3">
+              <p className="text-gray-500">İlk Giriş</p>
+              <p className="text-gray-900">{formatSaat(gunAnalizi.ilkGiris?.created_at)}</p>
+            </div>
+
+            <div className="rounded-xl bg-gray-50 border p-3">
+              <p className="text-gray-500">Son Çıkış</p>
+              <p className="text-gray-900">{formatSaat(gunAnalizi.sonCikis?.created_at)}</p>
+            </div>
+
+            <div className="rounded-xl bg-gray-50 border p-3">
+              <p className="text-gray-500">Çalışılan Süre</p>
+              <p className="text-gray-900">{dakikaYaz(gunAnalizi.calismaDakika)}</p>
+            </div>
+
+            <div className="rounded-xl bg-gray-50 border p-3">
+              <p className="text-gray-500">Geç Giriş</p>
+              <p className={analizRenk(gunAnalizi.gecGirisDakika)}>
+                {dakikaYaz(gunAnalizi.gecGirisDakika)}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-gray-50 border p-3">
+              <p className="text-gray-500">Erken Çıkış</p>
+              <p className={analizRenk(gunAnalizi.erkenCikisDakika)}>
+                {dakikaYaz(gunAnalizi.erkenCikisDakika)}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-gray-50 border p-3">
+              <p className="text-gray-500">Fazla Mesai</p>
+              <p className={gunAnalizi.fazlaMesaiDakika > 0 ? "text-blue-700" : "text-green-700"}>
+                {dakikaYaz(gunAnalizi.fazlaMesaiDakika)}
+              </p>
+            </div>
+          </div>
+        </div>
+\n        {mesaj && (
           <div
             className={`rounded-xl border p-3 text-sm font-bold ${
               mesaj.tip === "basari"

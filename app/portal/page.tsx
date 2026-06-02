@@ -54,8 +54,18 @@ export default function PortalPage() {
       const user = session?.user
 
       if (!user) {
-        router.replace("/portal/giris")
-        return
+        await new Promise((resolve) => setTimeout(resolve, 800))
+
+        const {
+          data: { session: retrySession },
+        } = await supabase.auth.getSession()
+
+        const retryUser = retrySession?.user
+
+        if (!retryUser) {
+          router.replace("/portal/giris")
+          return
+        }
       }
 
       const { data: personelData, error: personelError } = await supabase

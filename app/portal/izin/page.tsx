@@ -242,7 +242,7 @@ export default function IzinPage() {
 
       const { data: p, error: personelError } = await supabase
         .from("personeller")
-        .select("id, sirket_id, yillik_izin_devir_gunu, dogum_tarihi, ise_giris, ise_giris_tarihi, giris_tarihi, baslama_tarihi, created_at")
+        .select("id, sirket_id, yillik_izin_devir_gunu, dogum_tarihi, ise_giris, ise_giris_tarihi, created_at")
         .or(`auth_id.eq.${user.id},kullanici_id.eq.${user.id},email.eq.${user.email}`)
         .maybeSingle()
 

@@ -51,19 +51,20 @@ export default function PortalPage() {
         return
       }
 
-      const user = session?.user
+      let aktifUser = session?.user || null
 
-      if (!user) {
-        await new Promise((resolve) => setTimeout(resolve, 800))
+      if (!aktifUser) {
+        await new Promise((resolve) => setTimeout(resolve, 1200))
 
         const {
           data: { session: retrySession },
         } = await supabase.auth.getSession()
 
-        const retryUser = retrySession?.user
+        aktifUser = retrySession?.user || null
 
-        if (!retryUser) {
-          router.replace("/portal/giris")
+        if (!aktifUser) {
+          setHata("Oturum oluşmadı. Lütfen çıkış yapıp tekrar giriş deneyin.")
+          setLoading(false)
           return
         }
       }
@@ -71,7 +72,7 @@ export default function PortalPage() {
       const { data: personelData, error: personelError } = await supabase
         .from("personeller")
         .select("id, ad, soyad, email, tel, rol, durum, auth_id, kullanici_id")
-        .or(`auth_id.eq.${user.id},kullanici_id.eq.${user.id},email.eq.${user.email}`)
+        .or(`auth_id.eq.${aktifUser.id},kullanici_id.eq.${aktifUser.id},email.eq.${aktifUser.email}`)
         .maybeSingle()
 
       if (personelError) {
@@ -97,8 +98,8 @@ export default function PortalPage() {
         await supabase
           .from("personeller")
           .update({
-            auth_id: user.id,
-            kullanici_id: user.id,
+            auth_id: aktifUser.id,
+            kullanici_id: aktifUser.id,
           })
           .eq("id", personelData.id)
       }

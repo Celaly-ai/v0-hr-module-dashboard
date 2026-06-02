@@ -35,9 +35,18 @@ export default function PersonelHesaplariPage() {
     setHata("")
 
     try {
+      const tokenKey = Object.keys(localStorage).find((key) =>
+        key.includes("supabase") || key.includes("auth-token"),
+      )
+      const tokenData = tokenKey ? JSON.parse(localStorage.getItem(tokenKey) || "null") : null
+      const accessToken = tokenData?.access_token || ""
+
       const response = await fetch("/api/admin/personel-listesi", {
         method: "GET",
         cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
       })
 
       const data = await response.json().catch(() => null)
@@ -107,10 +116,17 @@ export default function PersonelHesaplariPage() {
     setSonuc(null)
 
     try {
+      const tokenKey = Object.keys(localStorage).find((key) =>
+        key.includes("supabase") || key.includes("auth-token"),
+      )
+      const tokenData = tokenKey ? JSON.parse(localStorage.getItem(tokenKey) || "null") : null
+      const accessToken = tokenData?.access_token || ""
+
       const response = await fetch("/api/admin/personel-hesap-olustur", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ personelId }),
       })

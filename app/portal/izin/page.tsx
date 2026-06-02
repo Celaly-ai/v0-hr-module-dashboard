@@ -235,18 +235,23 @@ export default function IzinPage() {
       const user = session?.user
 
       if (!user) {
-        router.replace("/portal/giris")
+        setMesaj({ tip: "hata", metin: "Oturum bulunamadı. Lütfen portaldan tekrar giriş yapın." })
+        setYukleniyor(false)
         return
       }
 
       const { data: p, error: personelError } = await supabase
         .from("personeller")
         .select("id, sirket_id, yillik_izin_devir_gunu, dogum_tarihi, ise_giris, ise_giris_tarihi, giris_tarihi, baslama_tarihi, created_at")
-        .or(`auth_id.eq.${user.id},kullanici_id.eq.${user.id}`)
+        .or(`auth_id.eq.${user.id},kullanici_id.eq.${user.id},email.eq.${user.email}`)
         .maybeSingle()
 
       if (personelError || !p) {
-        router.replace("/portal/giris")
+        setMesaj({
+          tip: "hata",
+          metin: "İzin sayfası için personel kaydı bulunamadı: " + (personelError?.message || user.email || user.id),
+        })
+        setYukleniyor(false)
         return
       }
 

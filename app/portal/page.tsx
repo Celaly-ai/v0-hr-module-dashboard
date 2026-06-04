@@ -1,260 +1,191 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
+import { useMemo } from "react"
+import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { CheckCircle2, Clock, Loader2, RefreshCw, ShieldCheck } from "lucide-react"
+import { useAiLiveOperations } from "@/components/ai-live-operations/use-ai-live-operations"
 
-type Kayit = Record<string, any>
+const DURUM_BUTONLARI = [
+  { label: "Açık", value: "acik" },
+  { label: "İnceleniyor", value: "inceleniyor" },
+  { label: "Tamamlandı", value: "tamamlandi" },
+  { label: "Arşivlendi", value: "arsivlendi" },
+] as const
 
-function rolNormalize(value?: string | null) {
-  return String(value || "").toLocaleLowerCase("tr-TR").trim()
+function tarih(value: string | null) {
+  if (!value) return "-"
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return value
+  return d.toLocaleString("tr-TR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
 }
 
-function aktifDurumMu(value?: string | null) {
-  const durum = String(value || "").toLocaleLowerCase("tr-TR")
-  return durum === "aktif" || durum === "active" || durum === "izinli"
+function durumEtiketi(value: string) {
+  if (value === "acik") return "Açık"
+  if (value === "inceleniyor") return "İnceleniyor"
+  if (value === "tamamlandi") return "Tamamlandı"
+  if (value === "arsivlendi") return "Arşivlendi"
+  if (value === "devam_ediyor") return "Devam Ediyor"
+  return value
 }
 
-export default function PortalPage() {
-  const router = useRouter()
+export default function AiGorevMerkeziPage() {
+  const {
+    veri,
+    loading,
+    error,
+    guncellenenKayitId,
+    verileriYenile,
+    gorevDurumuGuncelle,
+  } = useAiLiveOperations()
 
-  const [personel, setPersonel] = useState<Kayit | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [hata, setHata] = useState("")
-
-  const aktifRol = rolNormalize(personel?.rol)
-
-  const yoneticiMi = [
-    "admin",
-    "yonetici",
-    "yönetici",
-    "servis_yoneticisi",
-    "ik_yoneticisi",
-    "muhasebe",
-  ].includes(aktifRol)
-
-  useEffect(() => {
-    async function kontrolEt() {
-      setLoading(true)
-      setHata("")
-
-      const supabase = createClient()
-
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession()
-
-      if (sessionError) {
-        setHata("Oturum kontrol hatası: " + sessionError.message)
-        setLoading(false)
-        return
-      }
-
-      let aktifUser = session?.user || null
-
-      if (!aktifUser) {
-        await new Promise((resolve) => setTimeout(resolve, 1200))
-
-        const {
-          data: { session: retrySession },
-        } = await supabase.auth.getSession()
-
-        aktifUser = retrySession?.user || null
-
-        if (!aktifUser) {
-          setHata("Oturum oluşmadı. Lütfen çıkış yapıp tekrar giriş deneyin.")
-          setLoading(false)
-          return
-        }
-      }
-
-      const { data: personelData, error: personelError } = await supabase
-        .from("personeller")
-        .select("id, ad, soyad, email, tel, rol, durum, auth_id, kullanici_id")
-        .or(`auth_id.eq.${aktifUser.id},kullanici_id.eq.${aktifUser.id},email.eq.${aktifUser.email}`)
-        .maybeSingle()
-
-      if (personelError) {
-        setHata("Personel sorgu hatası: " + personelError.message)
-        setLoading(false)
-        return
-      }
-
-      if (!personelData) {
-        setHata("Giriş başarılı fakat bağlı personel kaydı bulunamadı.")
-        setLoading(false)
-        return
-      }
-
-      if (!aktifDurumMu(personelData.durum)) {
-        await supabase.auth.signOut()
-        setHata("Personel aktif değil. Durum: " + (personelData.durum || "-"))
-        setLoading(false)
-        return
-      }
-
-      if (!personelData.auth_id || !personelData.kullanici_id) {
-        await supabase
-          .from("personeller")
-          .update({
-            auth_id: aktifUser.id,
-            kullanici_id: aktifUser.id,
-          })
-          .eq("id", personelData.id)
-      }
-
-      setPersonel(personelData)
-      setLoading(false)
-    }
-
-    kontrolEt()
-  }, [router])
-
-  async function cikisYap() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    window.location.href = "/portal/giris"
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-600 text-lg font-bold">Portal yükleniyor...</p>
-      </div>
-    )
-  }
-
-  if (hata) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-        <div className="max-w-md w-full rounded-2xl border border-red-300 bg-white p-5 shadow-sm space-y-4">
-          <h1 className="text-xl font-black text-red-900">Portal açılamadı</h1>
-          <p className="text-sm font-semibold text-red-800">{hata}</p>
-
-          <button
-            type="button"
-            onClick={cikisYap}
-            className="w-full rounded-xl bg-red-600 py-3 text-sm font-black text-white"
-          >
-            Çıkış Yap ve Tekrar Giriş Dene
-          </button>
-        </div>
-      </div>
-    )
-  }
+  const gorevler = useMemo(() => {
+    return veri.kayitlar
+      .filter((kayit) => kayit.kayit_tipi === "AI Görev Merkezi")
+      .sort((a, b) => {
+        const at = a.created_at ? new Date(a.created_at).getTime() : 0
+        const bt = b.created_at ? new Date(b.created_at).getTime() : 0
+        return bt - at
+      })
+  }, [veri.kayitlar])
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white shadow-sm px-4 py-4 flex items-center justify-between">
+    <div className="space-y-6 p-4 md:p-6">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="text-xs text-gray-500">Hoş geldin</p>
-          <p className="text-lg font-bold text-gray-800">
-            {personel?.ad} {personel?.soyad}
-          </p>
-          <p className="text-xs font-semibold text-gray-500">
-            Rol: {personel?.rol || "-"}
+          <h1 className="text-2xl font-black tracking-tight text-foreground">
+            AI Görev Merkezi
+          </h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+            AI tarafından oluşturulan görevler burada izlenir ve durumları güncellenir.
           </p>
         </div>
 
         <button
           type="button"
-          onClick={cikisYap}
-          className="text-sm text-red-500 font-bold"
+          onClick={verileriYenile}
+          disabled={loading}
+          className="inline-flex w-fit items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-bold hover:bg-muted disabled:opacity-60"
         >
-          Çıkış
+          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+          Yenile
         </button>
       </div>
 
-      <div className="p-4 space-y-3 max-w-lg mx-auto">
-        {yoneticiMi && (
-          <>
-            <button
-              type="button"
-              onClick={() => router.push("/portal/yonetim/talepler")}
-              className="w-full bg-indigo-600 text-white rounded-2xl p-5 flex items-center gap-4 shadow-md active:scale-95 transition-transform"
-            >
-              <span className="text-4xl">🛡️</span>
-              <div className="text-left">
-                <p className="text-lg font-bold">Yönetici Paneli</p>
-                <p className="text-sm opacity-80">Talepleri onayla / reddet</p>
-              </div>
-            </button>
+      {error && (
+        <Card className="border-amber-300 bg-amber-50 p-4 text-sm font-bold text-amber-900">
+          {error}
+        </Card>
+      )}
 
-            <button
-              type="button"
-              onClick={() => router.push("/portal/yonetim/vardiya")}
-              className="w-full bg-blue-700 text-white rounded-2xl p-5 flex items-center gap-4 shadow-md active:scale-95 transition-transform"
-            >
-              <span className="text-4xl">📅</span>
-              <div className="text-left">
-                <p className="text-lg font-bold">Vardiya Yönetimi</p>
-                <p className="text-sm opacity-80">Personel vardiyalarını planla</p>
-              </div>
-            </button>
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="p-5">
+          <p className="text-sm text-muted-foreground">Toplam Görev</p>
+          <p className="mt-2 text-3xl font-black">{gorevler.length}</p>
+        </Card>
 
-            <button
-              type="button"
-              onClick={() => router.push("/portal/personel-hesaplari")}
-              className="w-full bg-slate-800 text-white rounded-2xl p-5 flex items-center gap-4 shadow-md active:scale-95 transition-transform"
-            >
-              <span className="text-4xl">👤</span>
-              <div className="text-left">
-                <p className="text-lg font-bold">Personel Giriş Hesapları</p>
-                <p className="text-sm opacity-80">Portal hesabı oluştur / kontrol et</p>
-              </div>
-            </button>
-          </>
+        <Card className="p-5">
+          <p className="text-sm text-muted-foreground">Açık / İnceleniyor</p>
+          <p className="mt-2 text-3xl font-black">
+            {gorevler.filter((g) => g.durum !== "tamamlandi" && g.durum !== "arsivlendi").length}
+          </p>
+        </Card>
+
+        <Card className="p-5">
+          <p className="text-sm text-muted-foreground">Tamamlanan</p>
+          <p className="mt-2 text-3xl font-black">
+            {gorevler.filter((g) => g.durum === "tamamlandi").length}
+          </p>
+        </Card>
+      </div>
+
+      <Card className="p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <ShieldCheck className="h-4 w-4 text-primary" />
+          <h2 className="font-black">Görev Listesi</h2>
+        </div>
+
+        {loading ? (
+          <div className="flex h-40 items-center justify-center text-sm font-bold text-muted-foreground">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Görevler okunuyor...
+          </div>
+        ) : gorevler.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+            AI görev kaydı bulunamadı.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {gorevler.map((gorev) => {
+              const isUpdating = guncellenenKayitId === gorev.id
+
+              return (
+                <div key={gorev.id} className="rounded-2xl border border-border p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">AI Görev Merkezi</Badge>
+                    <Badge variant="outline">{durumEtiketi(gorev.durum)}</Badge>
+                    <Badge variant="outline">{gorev.seviye}</Badge>
+                  </div>
+
+                  <h3 className="mt-3 text-sm font-black">{gorev.baslik}</h3>
+
+                  {gorev.aciklama && (
+                    <p className="mt-2 whitespace-pre-line text-xs leading-5 text-muted-foreground">
+                      {gorev.aciklama}
+                    </p>
+                  )}
+
+                  <div className="mt-4 grid gap-3 md:grid-cols-3">
+                    <div className="rounded-xl bg-muted/30 p-3">
+                      <p className="text-[11px] font-bold text-muted-foreground">Personel</p>
+                      <p className="mt-1 text-xs font-semibold">{gorev.personel_adi || "-"}</p>
+                      <p className="text-[11px] text-muted-foreground">{gorev.personel_kodu || "-"}</p>
+                    </div>
+
+                    <div className="rounded-xl bg-muted/30 p-3">
+                      <p className="text-[11px] font-bold text-muted-foreground">Planlanan</p>
+                      <p className="mt-1 text-xs font-semibold">{tarih(gorev.planlanan_baslangic)}</p>
+                    </div>
+
+                    <div className="rounded-xl bg-muted/30 p-3">
+                      <p className="text-[11px] font-bold text-muted-foreground">Oluşturulma</p>
+                      <p className="mt-1 text-xs font-semibold">{tarih(gorev.created_at)}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-border bg-muted/20 p-3">
+                    <p className="mb-2 flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-muted-foreground">
+                      <Clock className="h-3.5 w-3.5" />
+                      Görev Durumu
+                    </p>
+
+                    <div className="flex flex-wrap gap-2">
+                      {DURUM_BUTONLARI.map((buton) => (
+                        <button
+                          key={buton.value}
+                          type="button"
+                          disabled={isUpdating}
+                          onClick={() => void gorevDurumuGuncelle(gorev.id, buton.value)}
+                          className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-bold hover:bg-muted disabled:opacity-60"
+                        >
+                          {isUpdating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                          {buton.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         )}
-
-        <button
-          type="button"
-          onClick={() => router.push("/portal/giris-cikis")}
-          className="w-full bg-green-500 text-white rounded-2xl p-5 flex items-center gap-4 shadow-md active:scale-95 transition-transform"
-        >
-          <span className="text-4xl">📍</span>
-          <div className="text-left">
-            <p className="text-lg font-bold">Çalışma Paneli</p>
-            <p className="text-sm opacity-80">Giriş/çıkış, vardiya ve puantaj</p>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => router.push("/portal/izin")}
-          className="w-full bg-purple-500 text-white rounded-2xl p-5 flex items-center gap-4 shadow-md active:scale-95 transition-transform"
-        >
-          <span className="text-4xl">🏖️</span>
-          <div className="text-left">
-            <p className="text-lg font-bold">İzin Talebi</p>
-            <p className="text-sm opacity-80">İzin iste veya durumunu gör</p>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => router.push("/portal/malzeme")}
-          className="w-full bg-cyan-600 text-white rounded-2xl p-5 flex items-center gap-4 shadow-md active:scale-95 transition-transform"
-        >
-          <span className="text-4xl">🧰</span>
-          <div className="text-left">
-            <p className="text-lg font-bold">Malzeme / Avadanlık</p>
-            <p className="text-sm opacity-80">Malzeme veya ekipman talebi</p>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => router.push("/portal/talepler")}
-          className="w-full bg-gray-700 text-white rounded-2xl p-5 flex items-center gap-4 shadow-md active:scale-95 transition-transform"
-        >
-          <span className="text-4xl">📋</span>
-          <div className="text-left">
-            <p className="text-lg font-bold">Taleplerim</p>
-            <p className="text-sm opacity-80">Tüm taleplerim ve durumları</p>
-          </div>
-        </button>
-      </div>
+      </Card>
     </div>
   )
 }

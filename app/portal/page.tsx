@@ -1,191 +1,220 @@
 "use client"
 
-import { useMemo } from "react"
-import { Card } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { CheckCircle2, Clock, Loader2, RefreshCw, ShieldCheck } from "lucide-react"
-import { useAiLiveOperations } from "@/components/ai-live-operations/use-ai-live-operations"
+import { useRouter } from "next/navigation"
+import {
+  Activity,
+  BarChart3,
+  Bot,
+  Boxes,
+  CalendarDays,
+  Car,
+  ClipboardList,
+  FileSpreadsheet,
+  LogIn,
+  Package,
+  ShieldCheck,
+  UserCog,
+  Users,
+  WalletCards,
+} from "lucide-react"
 
-const DURUM_BUTONLARI = [
-  { label: "Açık", value: "acik" },
-  { label: "İnceleniyor", value: "inceleniyor" },
-  { label: "Tamamlandı", value: "tamamlandi" },
-  { label: "Arşivlendi", value: "arsivlendi" },
-] as const
-
-function tarih(value: string | null) {
-  if (!value) return "-"
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return value
-  return d.toLocaleString("tr-TR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
+type PortalKart = {
+  baslik: string
+  aciklama: string
+  yol: string
+  ikon: any
+  renk: string
+  grup: "Yönetim" | "Operasyon" | "AI" | "Personel" | "Finans"
 }
 
-function durumEtiketi(value: string) {
-  if (value === "acik") return "Açık"
-  if (value === "inceleniyor") return "İnceleniyor"
-  if (value === "tamamlandi") return "Tamamlandı"
-  if (value === "arsivlendi") return "Arşivlendi"
-  if (value === "devam_ediyor") return "Devam Ediyor"
-  return value
-}
+const KARTLAR: PortalKart[] = [
+  {
+    baslik: "Yönetim Talepleri",
+    aciklama: "Personel taleplerini yönet, onayla veya reddet.",
+    yol: "/portal/yonetim/talepler",
+    ikon: ShieldCheck,
+    renk: "border-blue-200 bg-blue-50 text-blue-900",
+    grup: "Yönetim",
+  },
+  {
+    baslik: "Vardiya Yönetimi",
+    aciklama: "Personel vardiya planlarını ve çalışma düzenini yönet.",
+    yol: "/portal/yonetim/vardiya",
+    ikon: CalendarDays,
+    renk: "border-violet-200 bg-violet-50 text-violet-900",
+    grup: "Yönetim",
+  },
+  {
+    baslik: "Ekip Yönetimi",
+    aciklama: "Ekipleri, görev dağılımını ve personel gruplarını yönet.",
+    yol: "/portal/yonetim/ekipler",
+    ikon: Users,
+    renk: "border-cyan-200 bg-cyan-50 text-cyan-900",
+    grup: "Yönetim",
+  },
+  {
+    baslik: "Personel Giriş Hesapları",
+    aciklama: "Portal giriş hesaplarını oluştur ve yönet.",
+    yol: "/portal/personel-hesaplari",
+    ikon: UserCog,
+    renk: "border-slate-200 bg-slate-50 text-slate-900",
+    grup: "Yönetim",
+  },
+  {
+    baslik: "Personel Yükle",
+    aciklama: "Personel kayıtlarını toplu veya tekil şekilde yönet.",
+    yol: "/portal/personel-yukle",
+    ikon: FileSpreadsheet,
+    renk: "border-emerald-200 bg-emerald-50 text-emerald-900",
+    grup: "Yönetim",
+  },
+  {
+    baslik: "Giriş / Çıkış",
+    aciklama: "Personel günlük giriş ve çıkış kayıtları.",
+    yol: "/portal/giris-cikis",
+    ikon: LogIn,
+    renk: "border-green-200 bg-green-50 text-green-900",
+    grup: "Personel",
+  },
+  {
+    baslik: "İzin Talebi",
+    aciklama: "İzin talepleri oluştur ve takip et.",
+    yol: "/portal/izin",
+    ikon: ClipboardList,
+    renk: "border-orange-200 bg-orange-50 text-orange-900",
+    grup: "Personel",
+  },
+  {
+    baslik: "Taleplerim",
+    aciklama: "Kendi taleplerini ve süreçlerini görüntüle.",
+    yol: "/portal/talepler",
+    ikon: ClipboardList,
+    renk: "border-yellow-200 bg-yellow-50 text-yellow-900",
+    grup: "Personel",
+  },
+  {
+    baslik: "Malzeme / Avadanlık",
+    aciklama: "Malzeme ve avadanlık taleplerini yönet.",
+    yol: "/portal/malzeme",
+    ikon: Package,
+    renk: "border-lime-200 bg-lime-50 text-lime-900",
+    grup: "Operasyon",
+  },
+  {
+    baslik: "Araçlar",
+    aciklama: "Araç kayıtları ve operasyon araç yönetimi.",
+    yol: "/portal/araclar",
+    ikon: Car,
+    renk: "border-zinc-200 bg-zinc-50 text-zinc-900",
+    grup: "Operasyon",
+  },
+  {
+    baslik: "Varlıklar",
+    aciklama: "Demirbaş, zimmet, fotoğraf ve varlık yönetimi.",
+    yol: "/portal/varliklar",
+    ikon: Boxes,
+    renk: "border-indigo-200 bg-indigo-50 text-indigo-900",
+    grup: "Operasyon",
+  },
+  {
+    baslik: "Muhasebe",
+    aciklama: "Kasa, ödeme ve muhasebe hareketleri.",
+    yol: "/portal/muhasebe",
+    ikon: WalletCards,
+    renk: "border-teal-200 bg-teal-50 text-teal-900",
+    grup: "Finans",
+  },
+  {
+    baslik: "Anket İş Havuzu",
+    aciklama: "Tamamlanmış fişleri tekil veya Excel ile anket havuzuna al.",
+    yol: "/portal/anket-is-havuzu",
+    ikon: FileSpreadsheet,
+    renk: "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-900",
+    grup: "Operasyon",
+  },
+  {
+    baslik: "Müşteri Anketi",
+    aciklama: "AI destekli müşteri görüşmesi, anketör notu ve sonuç analizi.",
+    yol: "/portal/anket",
+    ikon: Bot,
+    renk: "border-pink-200 bg-pink-50 text-pink-900",
+    grup: "Operasyon",
+  },
+  {
+    baslik: "AI Görev Merkezi",
+    aciklama: "AI tarafından oluşturulan görevleri izle ve durumlarını yönet.",
+    yol: "/portal/ai-gorev-merkezi",
+    ikon: Activity,
+    renk: "border-red-200 bg-red-50 text-red-900",
+    grup: "AI",
+  },
+  {
+    baslik: "AI Canlı Operasyon Merkezi",
+    aciklama: "Canlı operasyon, risk, iletişim ve AI karar ekranı.",
+    yol: "/portal/ai-canli-operasyon-merkezi",
+    ikon: BarChart3,
+    renk: "border-purple-200 bg-purple-50 text-purple-900",
+    grup: "AI",
+  },
+]
 
-export default function AiGorevMerkeziPage() {
-  const {
-    veri,
-    loading,
-    error,
-    guncellenenKayitId,
-    verileriYenile,
-    gorevDurumuGuncelle,
-  } = useAiLiveOperations()
+const GRUPLAR: PortalKart["grup"][] = ["Yönetim", "Operasyon", "AI", "Personel", "Finans"]
 
-  const gorevler = useMemo(() => {
-    return veri.kayitlar
-      .filter((kayit) => kayit.kayit_tipi === "AI Görev Merkezi")
-      .sort((a, b) => {
-        const at = a.created_at ? new Date(a.created_at).getTime() : 0
-        const bt = b.created_at ? new Date(b.created_at).getTime() : 0
-        return bt - at
-      })
-  }, [veri.kayitlar])
+export default function PortalPage() {
+  const router = useRouter()
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-foreground">
-            AI Görev Merkezi
+    <div className="min-h-screen bg-slate-50 p-4 md:p-6">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <div className="rounded-3xl border bg-white p-6 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-wide text-blue-700">
+            Admin Portal
+          </p>
+          <h1 className="mt-2 text-3xl font-black text-slate-950">
+            Yönetim ve Operasyon Paneli
           </h1>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            AI tarafından oluşturulan görevler burada izlenir ve durumları güncellenir.
+          <p className="mt-2 max-w-3xl text-sm text-slate-600">
+            Admin hesabı tüm yönetim, operasyon, AI, finans ve personel panellerine buradan erişir.
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={verileriYenile}
-          disabled={loading}
-          className="inline-flex w-fit items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-bold hover:bg-muted disabled:opacity-60"
-        >
-          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-          Yenile
-        </button>
+        {GRUPLAR.map((grup) => {
+          const kartlar = KARTLAR.filter((kart) => kart.grup === grup)
+
+          return (
+            <div key={grup} className="space-y-3">
+              <h2 className="text-sm font-black uppercase tracking-wide text-slate-600">
+                {grup}
+              </h2>
+
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {kartlar.map((kart) => {
+                  const Ikon = kart.ikon
+
+                  return (
+                    <button
+                      key={kart.yol}
+                      type="button"
+                      onClick={() => router.push(kart.yol)}
+                      className={`rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${kart.renk}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="text-lg font-black">{kart.baslik}</h3>
+                          <p className="mt-2 text-sm opacity-80">{kart.aciklama}</p>
+                        </div>
+                        <div className="rounded-2xl bg-white/70 p-3">
+                          <Ikon className="h-6 w-6" />
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
       </div>
-
-      {error && (
-        <Card className="border-amber-300 bg-amber-50 p-4 text-sm font-bold text-amber-900">
-          {error}
-        </Card>
-      )}
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="p-5">
-          <p className="text-sm text-muted-foreground">Toplam Görev</p>
-          <p className="mt-2 text-3xl font-black">{gorevler.length}</p>
-        </Card>
-
-        <Card className="p-5">
-          <p className="text-sm text-muted-foreground">Açık / İnceleniyor</p>
-          <p className="mt-2 text-3xl font-black">
-            {gorevler.filter((g) => g.durum !== "tamamlandi" && g.durum !== "arsivlendi").length}
-          </p>
-        </Card>
-
-        <Card className="p-5">
-          <p className="text-sm text-muted-foreground">Tamamlanan</p>
-          <p className="mt-2 text-3xl font-black">
-            {gorevler.filter((g) => g.durum === "tamamlandi").length}
-          </p>
-        </Card>
-      </div>
-
-      <Card className="p-5">
-        <div className="mb-4 flex items-center gap-2">
-          <ShieldCheck className="h-4 w-4 text-primary" />
-          <h2 className="font-black">Görev Listesi</h2>
-        </div>
-
-        {loading ? (
-          <div className="flex h-40 items-center justify-center text-sm font-bold text-muted-foreground">
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Görevler okunuyor...
-          </div>
-        ) : gorevler.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-            AI görev kaydı bulunamadı.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {gorevler.map((gorev) => {
-              const isUpdating = guncellenenKayitId === gorev.id
-
-              return (
-                <div key={gorev.id} className="rounded-2xl border border-border p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline">AI Görev Merkezi</Badge>
-                    <Badge variant="outline">{durumEtiketi(gorev.durum)}</Badge>
-                    <Badge variant="outline">{gorev.seviye}</Badge>
-                  </div>
-
-                  <h3 className="mt-3 text-sm font-black">{gorev.baslik}</h3>
-
-                  {gorev.aciklama && (
-                    <p className="mt-2 whitespace-pre-line text-xs leading-5 text-muted-foreground">
-                      {gorev.aciklama}
-                    </p>
-                  )}
-
-                  <div className="mt-4 grid gap-3 md:grid-cols-3">
-                    <div className="rounded-xl bg-muted/30 p-3">
-                      <p className="text-[11px] font-bold text-muted-foreground">Personel</p>
-                      <p className="mt-1 text-xs font-semibold">{gorev.personel_adi || "-"}</p>
-                      <p className="text-[11px] text-muted-foreground">{gorev.personel_kodu || "-"}</p>
-                    </div>
-
-                    <div className="rounded-xl bg-muted/30 p-3">
-                      <p className="text-[11px] font-bold text-muted-foreground">Planlanan</p>
-                      <p className="mt-1 text-xs font-semibold">{tarih(gorev.planlanan_baslangic)}</p>
-                    </div>
-
-                    <div className="rounded-xl bg-muted/30 p-3">
-                      <p className="text-[11px] font-bold text-muted-foreground">Oluşturulma</p>
-                      <p className="mt-1 text-xs font-semibold">{tarih(gorev.created_at)}</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 rounded-xl border border-border bg-muted/20 p-3">
-                    <p className="mb-2 flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-muted-foreground">
-                      <Clock className="h-3.5 w-3.5" />
-                      Görev Durumu
-                    </p>
-
-                    <div className="flex flex-wrap gap-2">
-                      {DURUM_BUTONLARI.map((buton) => (
-                        <button
-                          key={buton.value}
-                          type="button"
-                          disabled={isUpdating}
-                          onClick={() => void gorevDurumuGuncelle(gorev.id, buton.value)}
-                          className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-bold hover:bg-muted disabled:opacity-60"
-                        >
-                          {isUpdating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                          {buton.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </Card>
     </div>
   )
 }

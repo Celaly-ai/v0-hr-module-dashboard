@@ -385,9 +385,14 @@ export default function AiGorevMerkeziPage() {
 
 
                   {gorev.aciklama && (
-                    <p className="mt-2 whitespace-pre-line text-xs leading-5 text-muted-foreground">
-                      {gorev.aciklama}
-                    </p>
+                    <div className="mt-3 rounded-xl border border-border bg-muted/20 p-3">
+                      <p className="mb-2 text-[11px] font-black uppercase tracking-wide text-muted-foreground">
+                        Görev Detayı / AI Analiz Özeti
+                      </p>
+                      <p className="whitespace-pre-line text-xs leading-5 text-muted-foreground">
+                        {gorev.aciklama}
+                      </p>
+                    </div>
                   )}
 
                   <div className="mt-4 grid gap-3 md:grid-cols-3">

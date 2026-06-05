@@ -199,6 +199,7 @@ export default function PortalPage() {
     bekleyenAnket: 0,
     acikTalep: 0,
     aiGorev: 0,
+    yoneticiBildirim: 0,
     kritikRisk: 0,
     varlik: 0,
   })
@@ -242,14 +243,16 @@ export default function PortalPage() {
       bekleyenAnketCount,
       acikTalepCount,
       aiGorevCount,
+      yoneticiBildirimCount,
       kritikRiskCount,
       varlikCount,
     ] = await Promise.all([
       supabase.from("personeller").select("id", { count: "exact", head: true }).eq("durum", "aktif"),
       supabase.from("ai_anket_is_havuzu").select("id", { count: "exact", head: true }).in("anket_durumu", ["bekliyor", "devam_ediyor"]),
       supabase.from("talepler").select("id", { count: "exact", head: true }).in("durum", ["bekliyor", "acik", "incelemede"]),
-      supabase.from("ai_operasyon_aksiyonlari").select("id", { count: "exact", head: true }).neq("durum", "tamamlandi"),
-      supabase.from("ai_operasyon_aksiyonlari").select("id", { count: "exact", head: true }).in("seviye", ["kritik", "Kritik"]),
+      supabase.from("ai_gorev_merkezi").select("id", { count: "exact", head: true }).not("durum", "in", "(tamamlandi,arsivlendi,iptal)"),
+      supabase.from("yonetici_bildirimleri").select("id", { count: "exact", head: true }).not("durum", "in", "(tamamlandi,kapandi,arsivlendi)"),
+      supabase.from("ai_gorev_merkezi").select("id", { count: "exact", head: true }).in("oncelik", ["kritik", "Kritik", "yüksek", "yuksek", "riskli"]),
       supabase.from("varliklar").select("id", { count: "exact", head: true }),
     ])
 
@@ -258,6 +261,7 @@ export default function PortalPage() {
       bekleyenAnket: bekleyenAnketCount.count || 0,
       acikTalep: acikTalepCount.count || 0,
       aiGorev: aiGorevCount.count || 0,
+      yoneticiBildirim: yoneticiBildirimCount.count || 0,
       kritikRisk: kritikRiskCount.count || 0,
       varlik: varlikCount.count || 0,
     })
@@ -310,7 +314,11 @@ export default function PortalPage() {
             <p className="mt-2 text-2xl font-black text-red-900">{kpi.aiGorev}</p>
           </div>
           <div className="rounded-2xl border bg-white p-4 shadow-sm">
-            <p className="text-xs font-bold text-slate-500">Kritik Risk</p>
+            <p className="text-xs font-bold text-slate-500">Yönetici Bildirimi</p>
+            <p className="mt-2 text-2xl font-black text-orange-900">{kpi.yoneticiBildirim}</p>
+          </div>
+          <div className="rounded-2xl border bg-white p-4 shadow-sm">
+            <p className="text-xs font-bold text-slate-500">Kritik / Riskli Görev</p>
             <p className="mt-2 text-2xl font-black text-rose-900">{kpi.kritikRisk}</p>
           </div>
           <div className="rounded-2xl border bg-white p-4 shadow-sm">

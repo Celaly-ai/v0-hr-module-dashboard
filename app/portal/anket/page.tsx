@@ -476,7 +476,7 @@ export default function AnketPage() {
       {hata && <Card className="border-red-300 bg-red-50 p-4 text-sm font-bold text-red-900">{hata}</Card>}
       {bilgi && <Card className="border-emerald-300 bg-emerald-50 p-4 text-sm font-bold text-emerald-900">{bilgi}</Card>}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         <Card className="p-5">
           <p className="text-sm text-muted-foreground">Bekleyen İş</p>
           <p className="mt-2 text-3xl font-black">{bekleyenIsler.length}</p>
@@ -499,6 +499,13 @@ export default function AnketPage() {
         <Card className="p-5">
           <p className="text-sm text-muted-foreground">NPS Hazır</p>
           <p className="mt-2 text-3xl font-black">{npsHazir}</p>
+        </Card>
+
+        <Card className="p-5 border-orange-300 bg-orange-50">
+          <p className="text-sm text-orange-800">Tekrar Aranacak</p>
+          <p className="mt-2 text-3xl font-black text-orange-900">
+            {tekrarAranacaklar.length}
+          </p>
         </Card>
       </div>
 

@@ -155,29 +155,61 @@ export default function AiCanliOperasyonMerkeziPage() {
     return kayitlariFiltrele(siraliKayitlar, aktifFiltre)
   }, [siraliKayitlar, aktifFiltre])
 
+  const aiGorevleri = veri.kayitlar.filter(
+    (kayit) => kayit.kayit_tipi === "AI Görev Merkezi",
+  )
+
+  const acikAiGorev = aiGorevleri.filter(
+    (kayit) =>
+      kayit.durum !== "tamamlandi" &&
+      kayit.durum !== "arsivlendi" &&
+      kayit.durum !== "iptal",
+  ).length
+
+  const atanmamisAiGorev = aiGorevleri.filter((kayit) => !kayit.personel_kodu).length
+
+  const kritikRiskliAiGorev = aiGorevleri.filter(
+    (kayit) => kayit.seviye === "kritik" || kayit.seviye === "riskli",
+  ).length
+
+  const bugunText = new Date().toLocaleDateString("tr-TR")
+
+  const bugunTamamlananAiGorev = aiGorevleri.filter((kayit) => {
+    if (kayit.durum !== "tamamlandi" || !kayit.created_at) return false
+    const tarih = new Date(kayit.created_at)
+    if (Number.isNaN(tarih.getTime())) return false
+    return tarih.toLocaleDateString("tr-TR") === bugunText
+  }).length
+
   const kpiListesi = [
     {
-      baslik: "Aktif Görev",
+      baslik: "Aktif Operasyon",
       deger: veri.kpi.aktifGorev,
-      aciklama: "Tamamlanmamış açık operasyon kayıtları",
+      aciklama: "Tüm canlı operasyon kayıtlarında açık işler",
       icon: Activity,
     },
     {
-      baslik: "Sahadaki Ekip",
-      deger: veri.kpi.sahadakiEkip,
-      aciklama: "Devam eden işlerde görünen ekip/personel",
+      baslik: "Açık AI Görev",
+      deger: acikAiGorev,
+      aciklama: "AI Görev Merkezi’nde tamamlanmamış görevler",
+      icon: Radio,
+    },
+    {
+      baslik: "Atanmamış AI Görev",
+      deger: atanmamisAiGorev,
+      aciklama: "Henüz personele atanmamış AI görevleri",
       icon: Users,
     },
     {
-      baslik: "Riskli İş",
-      deger: veri.kpi.riskliIs,
-      aciklama: "Riskli veya kritik seviyedeki kayıtlar",
+      baslik: "Kritik / Riskli AI Görev",
+      deger: kritikRiskliAiGorev,
+      aciklama: "Kritik veya riskli seviyedeki AI görevleri",
       icon: AlertTriangle,
     },
     {
-      baslik: "Tamamlanan",
-      deger: veri.kpi.tamamlanan,
-      aciklama: "Tamamlandı/çözüldü durumundaki kayıtlar",
+      baslik: "Bugün Tamamlanan AI Görev",
+      deger: bugunTamamlananAiGorev,
+      aciklama: "Bugün tamamlanan AI görev kayıtları",
       icon: CheckCircle2,
     },
   ]
@@ -244,7 +276,7 @@ export default function AiCanliOperasyonMerkeziPage() {
         </Card>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {kpiListesi.map((item) => {
           const Icon = item.icon
 

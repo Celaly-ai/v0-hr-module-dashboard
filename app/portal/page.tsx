@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import {
   Activity,
+  AlertTriangle,
   BarChart3,
   Bell,
   Bot,
@@ -164,6 +165,15 @@ const KARTLAR: PortalKart[] = [
     yol: "/portal/anket",
     ikon: Bot,
     renk: "border-pink-200 bg-pink-50 text-pink-900",
+    grup: "Operasyon",
+    roller: ["admin", "yonetici", "yönetici", "servis_yoneticisi", "anketor", "anketör", "buro", "büro", "buro_personeli", "büro_personeli"],
+  },
+  {
+    baslik: "Riskli Anket Takibi",
+    aciklama: "Tekrar aranacak, riskli veya yönetici aksiyonu gerektiren müşteri anketlerini takip et.",
+    yol: "/portal/anket",
+    ikon: AlertTriangle,
+    renk: "border-orange-200 bg-orange-50 text-orange-900",
     grup: "Operasyon",
     roller: ["admin", "yonetici", "yönetici", "servis_yoneticisi", "anketor", "anketör", "buro", "büro", "buro_personeli", "büro_personeli"],
   },

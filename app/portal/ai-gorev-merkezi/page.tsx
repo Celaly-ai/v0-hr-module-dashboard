@@ -361,9 +361,7 @@ export default function AiGorevMerkeziPage() {
                   </div>
 
                   <h3 className="mt-3 text-sm font-black">{gorev.baslik}</h3>
-                  <p className="mt-1 text-xs font-black text-red-700">
-                    DEBUG ID: {gorev.id}
-                  </p>
+
 
                   {gorev.aciklama && (
                     <p className="mt-2 whitespace-pre-line text-xs leading-5 text-muted-foreground">

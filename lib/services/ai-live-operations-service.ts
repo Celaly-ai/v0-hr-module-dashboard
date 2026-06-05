@@ -476,7 +476,10 @@ export async function aiEnUygunPersonellerGetir(
       risk_skoru: riskliIs + gecikenIs,
       ai_oncelik: v5,
       atanabilir: riskliIs < 3,
-      ai_aciklama: `Performans: ${performans} | Güven: ${guven} | Riskli iş: ${riskliIs} | Geciken iş: ${gecikenIs} | Aktif görev: ${aktifGorev} | V5 Skor: ${v5}`,
+      ai_aciklama:
+        riskliIs > 0 || gecikenIs > 0
+          ? `Dikkatli ata: ${riskliIs} riskli iş, ${gecikenIs} geciken iş var. Performans ${performans}, güven ${guven}, aktif görev ${aktifGorev}, AI skor ${v5}.`
+          : `Önerilir: riskli/geciken iş görünmüyor. Performans ${performans}, güven ${guven}, aktif görev ${aktifGorev}, AI skor ${v5}.`,
     }
   })
 

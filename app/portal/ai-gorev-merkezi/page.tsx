@@ -139,6 +139,8 @@ export default function AiGorevMerkeziPage() {
   const [acikGecmisler, setAcikGecmisler] = useState<Record<string, boolean>>({})
   const [aktifFiltre, setAktifFiltre] = useState<GorevFiltresi>("tum")
   const [arama, setArama] = useState("")
+  const [lokalBilgi, setLokalBilgi] = useState<string | null>(null)
+  const [lokalHata, setLokalHata] = useState<string | null>(null)
 
   const gorevler = useMemo<AiCanliOperasyonKayit[]>(() => {
     return veri.kayitlar
@@ -161,6 +163,20 @@ export default function AiGorevMerkeziPage() {
   const atanmamisGorevSayisi = gorevler.filter((gorev) => !gorev.personel_kodu).length
   const kritiklikOrani =
     toplamGorevSayisi > 0 ? Math.round((kritikGorevSayisi / toplamGorevSayisi) * 100) : 0
+
+  async function durumDegistir(kayitId: string, yeniDurum: GuncellemeDurumu) {
+    setLokalBilgi(null)
+    setLokalHata(null)
+
+    const basarili = await gorevDurumuGuncelle(kayitId, yeniDurum)
+
+    if (!basarili) {
+      setLokalHata("Görev durumu güncellenemedi. Üstte sistem hatası varsa kontrol edin.")
+      return
+    }
+
+    setLokalBilgi(`Görev durumu güncellendi: ${durumEtiketi(yeniDurum)}`)
+  }
 
   async function personelAta(kayitId: string) {
     const personelKodu = seciliPersoneller[kayitId] || ""
@@ -214,6 +230,18 @@ export default function AiGorevMerkeziPage() {
       {error && (
         <Card className="border-amber-300 bg-amber-50 p-4 text-sm font-bold text-amber-900">
           {error}
+        </Card>
+      )}
+
+      {lokalHata && (
+        <Card className="border-red-300 bg-red-50 p-4 text-sm font-bold text-red-900">
+          {lokalHata}
+        </Card>
+      )}
+
+      {lokalBilgi && (
+        <Card className="border-emerald-300 bg-emerald-50 p-4 text-sm font-bold text-emerald-900">
+          {lokalBilgi}
         </Card>
       )}
 
@@ -312,6 +340,7 @@ export default function AiGorevMerkeziPage() {
                 <div key={gorev.id} className="rounded-2xl border border-border p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="outline">AI Görev Merkezi</Badge>
+                    <Badge variant="outline">ID: {gorev.id}</Badge>
                     <Badge variant="outline">{durumEtiketi(gorev.durum)}</Badge>
                     <Badge variant="outline">{seviyeEtiketi(gorev.seviye)}</Badge>
                     {atanmis ? (
@@ -479,7 +508,7 @@ export default function AiGorevMerkeziPage() {
                           key={buton.value}
                           type="button"
                           disabled={isUpdating}
-                          onClick={() => void gorevDurumuGuncelle(gorev.id, buton.value)}
+                          onClick={() => void durumDegistir(gorev.id, buton.value)}
                           className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-bold hover:bg-muted disabled:opacity-60"
                         >
                           {isUpdating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}

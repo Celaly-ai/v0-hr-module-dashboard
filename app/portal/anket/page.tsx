@@ -415,6 +415,20 @@ export default function AnketPage() {
     setTekrarAramaIslemId(null)
   }
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("odak") !== "tekrar-aranacaklar") return
+
+    const timer = window.setTimeout(() => {
+      document.getElementById("tekrar-aranacaklar")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      })
+    }, 400)
+
+    return () => window.clearTimeout(timer)
+  }, [])
+
   async function cevapGonder() {
     if (!aktifSoru) return
 
@@ -439,7 +453,26 @@ export default function AnketPage() {
     if (data.devam) {
       setBilgi(`AI sonraki soruyu oluşturdu: ${data.sonraki_soru_no}/6`)
     } else {
-      setBilgi(`Anket tamamlandı. Sonuç: ${data.ai_sonuc} | Puan: ${data.ai_puan}`)
+      let ekBilgi = ""
+
+      if (aktifIs?.anket_id && ["kritik", "riskli"].includes(metin(data.ai_risk_seviyesi))) {
+        const { data: bildirimData, error: bildirimError } = await supabase.rpc(
+          "ai_anket_risk_bildirimi_olustur",
+          {
+            p_anket_id: Number(aktifIs.anket_id),
+          },
+        )
+
+        if (bildirimError || bildirimData?.success === false) {
+          ekBilgi = " | Yönetici bildirimi oluşturulamadı."
+        } else if (bildirimData?.created) {
+          ekBilgi = ` | Yönetici bildirimi oluşturuldu: ${bildirimData.bildirim_kodu || ""}`
+        } else {
+          ekBilgi = " | Yönetici bildirimi zaten mevcut veya gerekli değil."
+        }
+      }
+
+      setBilgi(`Anket tamamlandı. Sonuç: ${data.ai_sonuc} | Puan: ${data.ai_puan}${ekBilgi}`)
     }
 
     if (aktifIs?.anket_id) {
@@ -509,7 +542,7 @@ export default function AnketPage() {
         </Card>
       </div>
 
-      <div className="rounded-2xl border border-orange-300 bg-orange-50 p-5">
+      <div id="tekrar-aranacaklar" className="rounded-2xl border border-orange-300 bg-orange-50 p-5">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <h2 className="font-black text-orange-950">Tekrar Aranacaklar</h2>

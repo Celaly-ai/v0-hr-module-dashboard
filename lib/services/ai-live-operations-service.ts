@@ -444,11 +444,12 @@ export async function aiEnUygunPersonellerGetir(
   limit = 5,
 ): Promise<{ personeller: AiOnerilenPersonel[]; error: string | null }> {
   const { data, error } = await supabase
-    .from("v_ai_personel_akilli_skor_v5")
+    .from("v_ai_gorev_bazli_personel_oneri_v1")
     .select(
-      "personel_id, personel_kodu, personel_adi, ortalama_performans_skoru, ai_guven_skoru, geciken_is_sayisi, riskli_is_sayisi, aktif_gorev_sayisi, musait, tahmini_mesafe_km, tahmini_varis_dk, ai_akilli_skor_v5",
+      "personel_id, personel_kodu, personel_adi, rol, urun_grubu, islem, oneri_kategorisi, ortalama_performans_skoru, ai_guven_skoru, geciken_is_sayisi, riskli_is_sayisi, aktif_gorev_sayisi, ai_akilli_skor_v5, gorev_bazli_oneri_skoru",
     )
-    .order("ai_akilli_skor_v5", { ascending: false, nullsFirst: false })
+    .eq("yapabilir", true)
+    .order("gorev_bazli_oneri_skoru", { ascending: false, nullsFirst: false })
     .limit(limit)
 
   if (error) {
@@ -463,7 +464,7 @@ export async function aiEnUygunPersonellerGetir(
     const guven = Number(item.ai_guven_skoru ?? 50)
     const riskliIs = Number(item.riskli_is_sayisi ?? 0)
     const gecikenIs = Number(item.geciken_is_sayisi ?? 0)
-    const v5 = Number(item.ai_akilli_skor_v5 ?? 50)
+    const v5 = Number(item.gorev_bazli_oneri_skoru ?? item.ai_akilli_skor_v5 ?? 50)
     const aktifGorev = Number(item.aktif_gorev_sayisi ?? 0)
 
     return {
@@ -478,8 +479,8 @@ export async function aiEnUygunPersonellerGetir(
       atanabilir: riskliIs < 3,
       ai_aciklama:
         riskliIs > 0 || gecikenIs > 0
-          ? `Dikkatli ata: ${riskliIs} riskli iş, ${gecikenIs} geciken iş var. Performans ${performans}, güven ${guven}, aktif görev ${aktifGorev}, AI skor ${v5}.`
-          : `Önerilir: riskli/geciken iş görünmüyor. Performans ${performans}, güven ${guven}, aktif görev ${aktifGorev}, AI skor ${v5}.`,
+          ? `Dikkatli ata: ${riskliIs} riskli iş, ${gecikenIs} geciken iş var. Rol: ${item.rol || "-"} | Ürün: ${item.urun_grubu || "-"} | İş: ${item.islem || "-"} | Kategori: ${item.oneri_kategorisi || "-"} | Performans ${performans}, güven ${guven}, aktif görev ${aktifGorev}, görev bazlı skor ${v5}.`
+          : `Önerilir: Rol: ${item.rol || "-"} | Ürün: ${item.urun_grubu || "-"} | İş: ${item.islem || "-"} | Kategori: ${item.oneri_kategorisi || "-"} | Riskli/geciken iş görünmüyor. Performans ${performans}, güven ${guven}, aktif görev ${aktifGorev}, görev bazlı skor ${v5}.`,
     }
   })
 

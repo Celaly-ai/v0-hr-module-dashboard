@@ -427,10 +427,26 @@ export default function AiGorevMerkeziPage() {
                   </div>
 
                   <div className="mt-4 rounded-xl border border-border bg-muted/20 p-3">
-                    <p className="mb-2 flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-muted-foreground">
-                      <UserCheck className="h-3.5 w-3.5" />
-                      AI Önerilen Personeller
-                    </p>
+                    <div className="mb-2 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                      <p className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-muted-foreground">
+                        <UserCheck className="h-3.5 w-3.5" />
+                        AI Önerilen Personeller
+                      </p>
+
+                      <button
+                        type="button"
+                        disabled={onerilenPersonellerLoading}
+                        onClick={() =>
+                          void onerilenPersonelleriYenile({
+                            baslik: gorev.baslik,
+                            aciklama: gorev.aciklama,
+                          })
+                        }
+                        className="inline-flex min-h-8 items-center justify-center rounded-lg border border-border bg-background px-3 py-1.5 text-[11px] font-black hover:bg-muted disabled:opacity-60"
+                      >
+                        Bu Göreve Göre Yenile
+                      </button>
+                    </div>
 
                     {onerilenPersonellerLoading ? (
                       <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">

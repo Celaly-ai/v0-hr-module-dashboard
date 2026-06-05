@@ -94,10 +94,10 @@ function gorevMetniAnalizEt(baslik?: string | null, aciklama?: string | null) {
   let urunGrubu: string | null = null
   let oneriKategorisi: string | null = null
 
-  if (text.includes("klima")) urunGrubu = "klima"
-  else if (text.includes("buzdolabı") || text.includes("buzdolabi")) urunGrubu = "buzdolabı"
-  else if (text.includes("bulaşık") || text.includes("bulasik") || text.includes("bul.mak")) urunGrubu = "bul.mak"
-  else if (text.includes("çamaşır") || text.includes("camasir") || text.includes("çm")) urunGrubu = "çm"
+  if (text.includes("klima") || text.includes("klıma")) urunGrubu = "klima"
+  else if (text.includes("buzdolabı") || text.includes("buzdolabi") || text.includes("buz dolabı") || text.includes("buz dolabi")) urunGrubu = "buzdolabı"
+  else if (text.includes("bulaşık") || text.includes("bulasik") || text.includes("bul.mak") || text.includes("bulaşık mak") || text.includes("bulasik mak")) urunGrubu = "bul.mak"
+  else if (text.includes("çamaşır") || text.includes("camasir") || text.includes("çm") || text.includes("çamaşır mak") || text.includes("camasir mak") || text.includes("çamaşır makinası") || text.includes("camasir makinasi")) urunGrubu = "çm"
   else if (text.includes("ocak")) urunGrubu = "ocak"
   else if (text.includes("davlumbaz")) urunGrubu = "davlumbaz"
 
@@ -483,7 +483,7 @@ export async function aiEnUygunPersonellerGetir(
     query = query.eq("oneri_kategorisi", analiz.oneriKategorisi)
   }
 
-  const { data, error } = await query
+  let { data, error } = await query
     .order("gorev_bazli_oneri_skoru", { ascending: false, nullsFirst: false })
     .limit(limit)
 
@@ -494,11 +494,35 @@ export async function aiEnUygunPersonellerGetir(
     }
   }
 
+  let temizData = (data || []).filter((item: any) => String(item.personel_kodu || "").trim().length > 0)
+
+  if (temizData.length === 0 && analiz.urunGrubu && analiz.oneriKategorisi === "gaz_sarji") {
+    let fallbackQuery = supabase
+      .from("v_ai_gorev_bazli_personel_oneri_v1")
+      .select(
+        "personel_id, personel_kodu, personel_adi, rol, urun_grubu, islem, oneri_kategorisi, ortalama_performans_skoru, ai_guven_skoru, geciken_is_sayisi, riskli_is_sayisi, aktif_gorev_sayisi, ai_akilli_skor_v5, gorev_bazli_oneri_skoru",
+      )
+      .eq("yapabilir", true)
+      .ilike("urun_grubu", `%${analiz.urunGrubu}%`)
+      .eq("oneri_kategorisi", "ariza")
+
+    const fallback = await fallbackQuery
+      .order("gorev_bazli_oneri_skoru", { ascending: false, nullsFirst: false })
+      .limit(limit)
+
+    if (fallback.error) {
+      return {
+        personeller: [],
+        error: fallback.error.message,
+      }
+    }
+
+    temizData = (fallback.data || []).filter((item: any) => String(item.personel_kodu || "").trim().length > 0)
+  }
+
   const tekilKayitlar = Array.from(
     new Map(
-      (data || [])
-        .filter((item: any) => String(item.personel_kodu || "").trim().length > 0)
-        .map((item: any) => [String(item.personel_kodu || "").trim(), item]),
+      temizData.map((item: any) => [String(item.personel_kodu || "").trim(), item]),
     ).values(),
   )
 

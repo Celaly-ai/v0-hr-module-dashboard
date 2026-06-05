@@ -440,6 +440,22 @@ export default function AiGorevMerkeziPage() {
                               {personel.personel_kodu}
                             </p>
 
+                            <div className="mt-2">
+                              {String(personel.ai_aciklama || "").toLocaleLowerCase("tr-TR").includes("önerilir") ? (
+                                <span className="rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-black text-emerald-800">
+                                  Güçlü Aday
+                                </span>
+                              ) : String(personel.ai_aciklama || "").toLocaleLowerCase("tr-TR").includes("dikkatli") ? (
+                                <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-black text-amber-800">
+                                  Dikkatli Ata
+                                </span>
+                              ) : (
+                                <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-700">
+                                  Standart Aday
+                                </span>
+                              )}
+                            </div>
+
                             {personel.ai_aciklama && (
                               <p className="mt-2 text-[11px] leading-4 text-muted-foreground">
                                 {personel.ai_aciklama}

@@ -439,7 +439,6 @@ export default function AnketPage() {
     const { data, error } = await supabase.rpc("ai_anket_cevap_kaydet_ve_sonraki_soru_uret", {
       p_cevap_id: Number(aktifSoru.id),
       p_musteri_cevabi: musteriCevabi,
-      p_anketor_notu: anketorNotu,
     })
 
     if (error || !data?.success) {

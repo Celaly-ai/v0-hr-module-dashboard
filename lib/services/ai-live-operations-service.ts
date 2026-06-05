@@ -88,6 +88,28 @@ function metin(value: any): string | null {
   return text.length > 0 ? text : null
 }
 
+function gorevMetniAnalizEt(baslik?: string | null, aciklama?: string | null) {
+  const text = `${baslik || ""} ${aciklama || ""}`.toLocaleLowerCase("tr-TR")
+
+  let urunGrubu: string | null = null
+  let oneriKategorisi: string | null = null
+
+  if (text.includes("klima")) urunGrubu = "klima"
+  else if (text.includes("buzdolabı") || text.includes("buzdolabi")) urunGrubu = "buzdolabı"
+  else if (text.includes("bulaşık") || text.includes("bulasik") || text.includes("bul.mak")) urunGrubu = "bul.mak"
+  else if (text.includes("çamaşır") || text.includes("camasir") || text.includes("çm")) urunGrubu = "çm"
+  else if (text.includes("ocak")) urunGrubu = "ocak"
+  else if (text.includes("davlumbaz")) urunGrubu = "davlumbaz"
+
+  if (text.includes("montaj")) oneriKategorisi = "montaj"
+  else if (text.includes("nakliye") || text.includes("naklıye")) oneriKategorisi = "nakliye"
+  else if (text.includes("gaz")) oneriKategorisi = "gaz_sarji"
+  else if (text.includes("bakım") || text.includes("bakim")) oneriKategorisi = "bakim"
+  else if (text.length > 0) oneriKategorisi = "ariza"
+
+  return { urunGrubu, oneriKategorisi }
+}
+
 function kayitTipiBul(item: Record<string, any>): string {
   const id = String(item.id || "")
 

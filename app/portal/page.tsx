@@ -171,7 +171,7 @@ const KARTLAR: PortalKart[] = [
   {
     baslik: "Riskli Anket Takibi",
     aciklama: "Tekrar aranacak, riskli veya yönetici aksiyonu gerektiren müşteri anketlerini takip et.",
-    yol: "/portal/anket",
+    yol: "/portal/anket?odak=tekrar-aranacaklar",
     ikon: AlertTriangle,
     renk: "border-orange-200 bg-orange-50 text-orange-900",
     grup: "Operasyon",

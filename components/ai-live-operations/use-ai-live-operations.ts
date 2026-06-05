@@ -97,11 +97,11 @@ export function useAiLiveOperations() {
     }
   }, [supabase])
 
-  const onerilenPersonelleriYenile = useCallback(async () => {
+  const onerilenPersonelleriYenile = useCallback(async (gorev?: { baslik?: string | null; aciklama?: string | null }) => {
     setOnerilenPersonellerLoading(true)
 
     try {
-      const sonuc = await aiEnUygunPersonellerGetir(supabase, 5)
+      const sonuc = await aiEnUygunPersonellerGetir(supabase, 5, gorev)
 
       if (sonuc.error) {
         setError(sonuc.error)

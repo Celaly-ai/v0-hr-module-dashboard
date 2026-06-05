@@ -133,6 +133,7 @@ export default function AiGorevMerkeziPage() {
     gorevGecmisiGetir,
     gorevDurumuGuncelle,
     gorevPersonelAta,
+    onerilenPersonelleriYenile,
   } = useAiLiveOperations()
 
   const [seciliPersoneller, setSeciliPersoneller] = useState<Record<string, string>>({})
@@ -196,13 +197,21 @@ export default function AiGorevMerkeziPage() {
     }
   }
 
-  async function gecmisiAcKapat(kayitId: string) {
+  async function gecmisiAcKapat(gorev: AiCanliOperasyonKayit) {
+    const kayitId = gorev.id
     const acikMi = Boolean(acikGecmisler[kayitId])
 
     setAcikGecmisler((onceki) => ({
       ...onceki,
       [kayitId]: !acikMi,
     }))
+
+    if (!acikMi) {
+      await onerilenPersonelleriYenile({
+        baslik: gorev.baslik,
+        aciklama: gorev.aciklama,
+      })
+    }
 
     if (!acikMi && !gorevGecmisleri[kayitId]) {
       await gorevGecmisiGetir(kayitId)
@@ -574,7 +583,7 @@ export default function AiGorevMerkeziPage() {
 
                       <button
                         type="button"
-                        onClick={() => void gecmisiAcKapat(gorev.id)}
+                        onClick={() => void gecmisiAcKapat(gorev)}
                         disabled={gecmisLoading}
                         className="inline-flex min-h-8 items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-bold hover:bg-muted disabled:opacity-60"
                       >

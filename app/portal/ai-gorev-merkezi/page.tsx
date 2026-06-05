@@ -346,9 +346,21 @@ export default function AiGorevMerkeziPage() {
                 <div key={gorev.id} className="rounded-2xl border border-border p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="outline">AI Görev Merkezi</Badge>
-                    <Badge variant="outline">ID: {gorev.id}</Badge>
                     <Badge variant="outline">{durumEtiketi(gorev.durum)}</Badge>
-                    <Badge variant="outline">{seviyeEtiketi(gorev.seviye)}</Badge>
+
+                    {gorev.seviye === "kritik" ? (
+                      <span className="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-xs font-black text-red-800">
+                        Kritik Görev
+                      </span>
+                    ) : gorev.seviye === "riskli" ? (
+                      <span className="inline-flex items-center rounded-full bg-orange-100 px-3 py-1 text-xs font-black text-orange-800">
+                        Riskli Görev
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800">
+                        Normal Görev
+                      </span>
+                    )}
                     {atanmis ? (
                       <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-800">
                         Atandı: {gorev.personel_kodu}

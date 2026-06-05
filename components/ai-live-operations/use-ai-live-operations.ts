@@ -151,6 +151,7 @@ export function useAiLiveOperations() {
     async (
       kayitId: string,
       yeniDurum: "acik" | "inceleniyor" | "tamamlandi" | "arsivlendi",
+      not?: string,
     ) => {
       setGuncellenenKayitId(kayitId)
       setError(null)
@@ -161,6 +162,7 @@ export function useAiLiveOperations() {
           supabase,
           kayitId,
           yeniDurum,
+          not,
         )
 
         if (!sonuc.success) {

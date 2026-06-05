@@ -254,6 +254,7 @@ export async function aiCanliOperasyonGorevDurumuGuncelle(
   supabase: SupabaseClient,
   kayitId: string,
   yeniDurum: "acik" | "inceleniyor" | "tamamlandi" | "arsivlendi",
+  not?: string,
 ): Promise<{ success: boolean; error: string | null }> {
   const gorevId = gorevIdCoz(kayitId)
 
@@ -269,6 +270,7 @@ export async function aiCanliOperasyonGorevDurumuGuncelle(
     {
       p_gorev_id: gorevId,
       p_yeni_durum: yeniDurum,
+      p_not: not || null,
     },
   )
 

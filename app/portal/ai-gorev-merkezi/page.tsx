@@ -141,6 +141,7 @@ export default function AiGorevMerkeziPage() {
   const [arama, setArama] = useState("")
   const [lokalBilgi, setLokalBilgi] = useState<string | null>(null)
   const [lokalHata, setLokalHata] = useState<string | null>(null)
+  const [takipNotlari, setTakipNotlari] = useState<Record<string, string>>({})
 
   const gorevler = useMemo<AiCanliOperasyonKayit[]>(() => {
     return veri.kayitlar
@@ -168,13 +169,18 @@ export default function AiGorevMerkeziPage() {
     setLokalBilgi(null)
     setLokalHata(null)
 
-    const basarili = await gorevDurumuGuncelle(kayitId, yeniDurum)
+    const not = takipNotlari[kayitId] || ""
+    const basarili = await gorevDurumuGuncelle(kayitId, yeniDurum, not)
 
     if (!basarili) {
       setLokalHata("Görev durumu güncellenemedi. Üstte sistem hatası varsa kontrol edin.")
       return
     }
 
+    setTakipNotlari((onceki) => ({
+      ...onceki,
+      [kayitId]: "",
+    }))
     setLokalBilgi(`Görev durumu güncellendi: ${durumEtiketi(yeniDurum)}`)
   }
 
@@ -355,6 +361,9 @@ export default function AiGorevMerkeziPage() {
                   </div>
 
                   <h3 className="mt-3 text-sm font-black">{gorev.baslik}</h3>
+                  <p className="mt-1 text-xs font-black text-red-700">
+                    DEBUG ID: {gorev.id}
+                  </p>
 
                   {gorev.aciklama && (
                     <p className="mt-2 whitespace-pre-line text-xs leading-5 text-muted-foreground">
@@ -499,8 +508,20 @@ export default function AiGorevMerkeziPage() {
                   <div className="mt-4 rounded-xl border border-border bg-muted/20 p-3">
                     <p className="mb-2 flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-muted-foreground">
                       <Clock className="h-3.5 w-3.5" />
-                      Görev Durumu
+                      Görev Durumu ve Takip Notu
                     </p>
+
+                    <textarea
+                      value={takipNotlari[gorev.id] || ""}
+                      onChange={(event) =>
+                        setTakipNotlari((onceki) => ({
+                          ...onceki,
+                          [gorev.id]: event.target.value,
+                        }))
+                      }
+                      placeholder="Takip notu yazın. Örn: Müşteri arandı, tekrar servis planlanacak, sorun çözüldü..."
+                      className="mb-3 min-h-20 w-full rounded-lg border border-border bg-background p-3 text-xs font-semibold text-foreground outline-none placeholder:text-muted-foreground"
+                    />
 
                     <div className="flex flex-wrap gap-2">
                       {DURUM_BUTONLARI.map((buton) => (

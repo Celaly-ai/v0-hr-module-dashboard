@@ -102,6 +102,9 @@ export default function AnketPage() {
   const [aktifSoru, setAktifSoru] = useState<Kayit | null>(null)
   const [musteriCevabi, setMusteriCevabi] = useState("")
   const [anketorNotu, setAnketorNotu] = useState("")
+  const [tekrarAramaNotlari, setTekrarAramaNotlari] = useState<Record<number, string>>({})
+  const [tekrarAramaIslemId, setTekrarAramaIslemId] = useState<number | null>(null)
+  const [yoneticiyeIletiliyorId, setYoneticiyeIletiliyorId] = useState<number | null>(null)
 
   const [loading, setLoading] = useState(true)
   const [isKaydediliyor, setIsKaydediliyor] = useState(false)
@@ -121,10 +124,14 @@ export default function AnketPage() {
   const riskli = anketler.filter((item) => item.ai_risk_seviyesi === "riskli").length
   const npsHazir = anketler.filter((item) => item.ai_sonuc === "NPS Hazır").length
   const tekrarAranacaklar = anketler.filter((item) =>
-    item.ai_tekrar_iletisim_gerekli === true ||
-    item.ai_tekrar_servis_gerekli === true ||
-    ["kritik", "riskli", "izleme"].includes(metin(item.ai_risk_seviyesi)) ||
-    ["Kritik", "Riskli", "İzleme"].includes(metin(item.ai_sonuc))
+    item.tekrar_arama_durumu !== "kapandi" &&
+    item.tekrar_arama_durumu !== "arandi_sonuc_alindi" &&
+    (
+      item.ai_tekrar_iletisim_gerekli === true ||
+      item.ai_tekrar_servis_gerekli === true ||
+      ["kritik", "riskli", "izleme"].includes(metin(item.ai_risk_seviyesi)) ||
+      ["kritik", "riskli", "izleme"].includes(metin(item.ai_sonuc))
+    )
   )
 
   const seciliIlce = ilceler.find((item) => adAl(item) === isForm.ilce)
@@ -178,7 +185,13 @@ export default function AnketPage() {
       hizmetSonuc.error ||
       personelSonuc.error
 
-    if (ilkHata) setHata(ilkHata.message)
+    if (ilkHata) {
+      setHata(
+        `Veri okuma hatası: ${ilkHata.message} | Anket hata: ${anketSonuc.error?.message || "yok"} | Anket kayıt sayısı: ${anketSonuc.data?.length || 0}`,
+      )
+    } else if ((anketSonuc.data || []).length === 0) {
+      setHata("Anket kayıtları okunamadı veya yetki/RLS nedeniyle boş geldi. ai_anket_kayitlari sorgusu 0 kayıt döndürdü.")
+    }
 
     setIsHavuzu(isSonuc.data || [])
     setAnketler(anketSonuc.data || [])
@@ -351,6 +364,57 @@ export default function AnketPage() {
     }
   }
 
+  async function yoneticiyeIlet(anketId: number) {
+    setYoneticiyeIletiliyorId(anketId)
+    setHata(null)
+    setBilgi(null)
+
+    const not = tekrarAramaNotlari[anketId] || ""
+
+    const { data, error } = await supabase.rpc("ai_anket_yoneticiye_ilet", {
+      p_anket_id: anketId,
+      p_not: not,
+    })
+
+    if (error || data?.success === false) {
+      setHata(error?.message || data?.error || "Yönetici bildirimi oluşturulamadı.")
+      setYoneticiyeIletiliyorId(null)
+      return
+    }
+
+    setBilgi(`Yönetici bildirimi oluşturuldu: ${data?.bildirim_kodu || ""}`)
+    setYoneticiyeIletiliyorId(null)
+  }
+
+  async function tekrarAramaGuncelle(anketId: number, durum: string) {
+    setTekrarAramaIslemId(anketId)
+    setHata(null)
+    setBilgi(null)
+
+    const not = tekrarAramaNotlari[anketId] || ""
+
+    const { data, error } = await supabase.rpc("ai_anket_tekrar_arama_guncelle", {
+      p_anket_id: anketId,
+      p_durum: durum,
+      p_not: not,
+    })
+
+    if (error || data?.success === false) {
+      setHata(error?.message || data?.error || "Tekrar arama durumu güncellenemedi.")
+      setTekrarAramaIslemId(null)
+      return
+    }
+
+    setBilgi("Tekrar arama durumu güncellendi.")
+    setTekrarAramaNotlari((onceki) => ({
+      ...onceki,
+      [anketId]: "",
+    }))
+
+    await verileriGetir()
+    setTekrarAramaIslemId(null)
+  }
+
   async function cevapGonder() {
     if (!aktifSoru) return
 
@@ -458,16 +522,90 @@ export default function AnketPage() {
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {tekrarAranacaklar.slice(0, 6).map((anket) => (
-              <div key={anket.id} className="rounded-xl border border-orange-200 bg-white p-4">
+              <div key={anket.id} className="rounded-xl border border-orange-300 bg-white p-4 text-slate-950">
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="outline">{anket.anket_kodu}</Badge>
                   <Badge variant="outline" className={riskRenk(anket.ai_risk_seviyesi)}>
                     {anket.ai_sonuc || "-"}
                   </Badge>
                 </div>
-                <p className="mt-3 text-sm font-black">{anket.musteri_adi || "-"}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{anket.musteri_telefon || "-"}</p>
-                <p className="mt-2 text-xs text-orange-900">{anket.ai_onerilen_aksiyon || "Takip gerekli."}</p>
+                <p className="mt-3 text-sm font-black text-slate-950">{anket.musteri_adi || "-"}</p>
+                <p className="mt-1 text-xs font-semibold text-slate-700">{anket.musteri_telefon || "-"}</p>
+                <p className="mt-2 text-xs font-semibold text-orange-950">{anket.ai_onerilen_aksiyon || "Takip gerekli."}</p>
+
+                <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50 p-2">
+                  <p className="text-[11px] font-black text-orange-950">Tekrar Arama Durumu</p>
+                  <p className="mt-1 text-xs font-semibold text-orange-900">
+                    {anket.tekrar_arama_durumu || "bekliyor"}
+                  </p>
+                  {anket.tekrar_arama_tarihi && (
+                    <p className="mt-1 text-[11px] text-orange-800">
+                      Son işlem: {tarih(anket.tekrar_arama_tarihi)}
+                    </p>
+                  )}
+                  {anket.tekrar_arama_notu && (
+                    <p className="mt-2 rounded bg-white p-2 text-xs text-orange-950">
+                      Son Not: {anket.tekrar_arama_notu}
+                    </p>
+                  )}
+                </div>
+
+                <textarea
+                  className="mt-3 min-h-20 w-full rounded-lg border border-orange-300 bg-white p-2 text-xs font-semibold text-slate-950 placeholder:text-slate-500"
+                  placeholder="Tekrar arama notu yaz..."
+                  value={tekrarAramaNotlari[Number(anket.id)] || ""}
+                  onChange={(e) =>
+                    setTekrarAramaNotlari((onceki) => ({
+                      ...onceki,
+                      [Number(anket.id)]: e.target.value,
+                    }))
+                  }
+                />
+
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={tekrarAramaIslemId === Number(anket.id)}
+                    onClick={() => void tekrarAramaGuncelle(Number(anket.id), "arandi_sonuc_alindi")}
+                    className="rounded-lg bg-emerald-600 px-2 py-2 text-xs font-black text-white disabled:opacity-60"
+                  >
+                    Arandı / Sonuç Alındı
+                  </button>
+                  <button
+                    type="button"
+                    disabled={tekrarAramaIslemId === Number(anket.id)}
+                    onClick={() => void tekrarAramaGuncelle(Number(anket.id), "ulasilamadi")}
+                    className="rounded-lg bg-amber-500 px-2 py-2 text-xs font-black text-white disabled:opacity-60"
+                  >
+                    Ulaşılamadı
+                  </button>
+                  <button
+                    type="button"
+                    disabled={tekrarAramaIslemId === Number(anket.id)}
+                    onClick={() => void tekrarAramaGuncelle(Number(anket.id), "tekrar_aranacak")}
+                    className="rounded-lg bg-orange-600 px-2 py-2 text-xs font-black text-white disabled:opacity-60"
+                  >
+                    Tekrar Ara
+                  </button>
+                  <button
+                    type="button"
+                    disabled={tekrarAramaIslemId === Number(anket.id)}
+                    onClick={() => void tekrarAramaGuncelle(Number(anket.id), "kapandi")}
+                    className="rounded-lg bg-slate-800 px-2 py-2 text-xs font-black text-white disabled:opacity-60"
+                  >
+                    Kapat
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={yoneticiyeIletiliyorId === Number(anket.id)}
+                  onClick={() => void yoneticiyeIlet(Number(anket.id))}
+                  className="mt-3 w-full rounded-lg bg-red-700 px-3 py-2 text-xs font-black text-white disabled:opacity-60"
+                >
+                  {yoneticiyeIletiliyorId === Number(anket.id) ? "Yöneticiye iletiliyor..." : "Yöneticiye İlet"}
+                </button>
+
                 {anket.anketor_notu && (
                   <p className="mt-2 rounded-lg bg-orange-50 p-2 text-xs font-semibold text-orange-950">
                     Anketör Notu: {anket.anketor_notu}
@@ -708,7 +846,7 @@ export default function AnketPage() {
                     {anket.durum || "-"}
                   </Badge>
                 </div>
-                <p className="mt-3 text-sm font-black">{anket.musteri_adi || "-"}</p>
+                <p className="mt-3 text-sm font-black text-slate-950">{anket.musteri_adi || "-"}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {anket.musteri_telefon || "-"} • {anket.urun_grubu || "-"} • {tarih(anket.created_at)}
                 </p>

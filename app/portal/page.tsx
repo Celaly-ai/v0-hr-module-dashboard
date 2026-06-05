@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 import {
   Activity,
   BarChart3,
+  Bell,
   Bot,
   Boxes,
   CalendarDays,
@@ -37,6 +38,15 @@ const KARTLAR: PortalKart[] = [
     yol: "/portal/yonetim/talepler",
     ikon: ShieldCheck,
     renk: "border-blue-200 bg-blue-50 text-blue-900",
+    grup: "Yönetim",
+    roller: ["admin", "yonetici", "yönetici", "servis_yoneticisi", "ik_yoneticisi"],
+  },
+  {
+    baslik: "Yönetici Bildirimleri",
+    aciklama: "Anket, AI ve operasyon modüllerinden gelen yönetici takip bildirimlerini izle.",
+    yol: "/portal/yonetici-bildirimleri",
+    ikon: Bell,
+    renk: "border-red-200 bg-red-50 text-red-900",
     grup: "Yönetim",
     roller: ["admin", "yonetici", "yönetici", "servis_yoneticisi", "ik_yoneticisi"],
   },

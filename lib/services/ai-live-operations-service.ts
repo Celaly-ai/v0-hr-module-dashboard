@@ -464,13 +464,26 @@ export async function aiCanliOperasyondanGorevOlustur(
 export async function aiEnUygunPersonellerGetir(
   supabase: SupabaseClient,
   limit = 5,
+  gorev?: { baslik?: string | null; aciklama?: string | null },
 ): Promise<{ personeller: AiOnerilenPersonel[]; error: string | null }> {
-  const { data, error } = await supabase
+  const analiz = gorevMetniAnalizEt(gorev?.baslik, gorev?.aciklama)
+
+  let query = supabase
     .from("v_ai_gorev_bazli_personel_oneri_v1")
     .select(
       "personel_id, personel_kodu, personel_adi, rol, urun_grubu, islem, oneri_kategorisi, ortalama_performans_skoru, ai_guven_skoru, geciken_is_sayisi, riskli_is_sayisi, aktif_gorev_sayisi, ai_akilli_skor_v5, gorev_bazli_oneri_skoru",
     )
     .eq("yapabilir", true)
+
+  if (analiz.urunGrubu) {
+    query = query.ilike("urun_grubu", `%${analiz.urunGrubu}%`)
+  }
+
+  if (analiz.oneriKategorisi) {
+    query = query.eq("oneri_kategorisi", analiz.oneriKategorisi)
+  }
+
+  const { data, error } = await query
     .order("gorev_bazli_oneri_skoru", { ascending: false, nullsFirst: false })
     .limit(limit)
 
@@ -481,7 +494,15 @@ export async function aiEnUygunPersonellerGetir(
     }
   }
 
-  const personeller = (data || []).map((item: any) => {
+  const tekilKayitlar = Array.from(
+    new Map(
+      (data || [])
+        .filter((item: any) => String(item.personel_kodu || "").trim().length > 0)
+        .map((item: any) => [String(item.personel_kodu || "").trim(), item]),
+    ).values(),
+  )
+
+  const personeller = tekilKayitlar.map((item: any) => {
     const performans = Number(item.ortalama_performans_skoru ?? 50)
     const guven = Number(item.ai_guven_skoru ?? 50)
     const riskliIs = Number(item.riskli_is_sayisi ?? 0)
@@ -501,8 +522,8 @@ export async function aiEnUygunPersonellerGetir(
       atanabilir: riskliIs < 3,
       ai_aciklama:
         riskliIs > 0 || gecikenIs > 0
-          ? `Dikkatli ata: ${riskliIs} riskli iş, ${gecikenIs} geciken iş var. Rol: ${item.rol || "-"} | Ürün: ${item.urun_grubu || "-"} | İş: ${item.islem || "-"} | Kategori: ${item.oneri_kategorisi || "-"} | Performans ${performans}, güven ${guven}, aktif görev ${aktifGorev}, görev bazlı skor ${v5}.`
-          : `Önerilir: Rol: ${item.rol || "-"} | Ürün: ${item.urun_grubu || "-"} | İş: ${item.islem || "-"} | Kategori: ${item.oneri_kategorisi || "-"} | Riskli/geciken iş görünmüyor. Performans ${performans}, güven ${guven}, aktif görev ${aktifGorev}, görev bazlı skor ${v5}.`,
+          ? `Görev Analizi: ürün=${analiz.urunGrubu || "belirsiz"}, kategori=${analiz.oneriKategorisi || "belirsiz"}. Dikkatli ata: ${riskliIs} riskli iş, ${gecikenIs} geciken iş var. Rol: ${item.rol || "-"} | Ürün: ${item.urun_grubu || "-"} | İş: ${item.islem || "-"} | Kategori: ${item.oneri_kategorisi || "-"} | Performans ${performans}, güven ${guven}, aktif görev ${aktifGorev}, görev bazlı skor ${v5}.`
+          : `Görev Analizi: ürün=${analiz.urunGrubu || "belirsiz"}, kategori=${analiz.oneriKategorisi || "belirsiz"}. Önerilir: Rol: ${item.rol || "-"} | Ürün: ${item.urun_grubu || "-"} | İş: ${item.islem || "-"} | Kategori: ${item.oneri_kategorisi || "-"} | Riskli/geciken iş görünmüyor. Performans ${performans}, güven ${guven}, aktif görev ${aktifGorev}, görev bazlı skor ${v5}.`,
     }
   })
 

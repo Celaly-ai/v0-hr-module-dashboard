@@ -431,15 +431,19 @@ export default function GirisCikisPage() {
         bilgiMesaji = `Fazla mesai: ${dakikaYaz(simdi - vardiyaBit)}`
       }
 
-      const { error } = await supabase.from("giris_cikis_kayitlari").insert({
-        personel_id: personel.id,
-        tip,
-        lat,
-        lng,
-        mesafe_metre: mesafe,
-        basarili: true,
-        created_at: kayitZamani.toISOString(),
-      })
+      const { data: mesaiKaydi, error } = await supabase
+        .from("giris_cikis_kayitlari")
+        .insert({
+          personel_id: personel.id,
+          tip,
+          lat,
+          lng,
+          mesafe_metre: mesafe,
+          basarili: true,
+          created_at: kayitZamani.toISOString(),
+        })
+        .select("id")
+        .single()
 
       if (error) {
         setMesaj({
@@ -448,6 +452,21 @@ export default function GirisCikisPage() {
         })
         setIslem(false)
         return
+      }
+
+      if (mesaiKaydi?.id) {
+        const { data: konumOturumuSonuc, error: konumOturumuError } = await supabase.rpc(
+          "personel_konum_oturumu_mesai_kaydi_isle",
+          {
+            p_mesai_kaydi_id: mesaiKaydi.id,
+          },
+        )
+
+        if (konumOturumuError) {
+          console.error("Konum oturumu işlenemedi:", konumOturumuError.message)
+        } else {
+          console.log("Konum oturumu sonucu:", konumOturumuSonuc)
+        }
       }
 
       setMesaj({

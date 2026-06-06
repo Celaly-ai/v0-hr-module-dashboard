@@ -29,6 +29,7 @@ type KonumKaydi = {
   uygulama_durumu: string | null
   kayit_zamani: string | null
   takip_durumu: string | null
+  siralama_onceligi: number | null
 }
 
 function zamanFormat(value?: string | null) {
@@ -95,6 +96,7 @@ export default function CanliKonumPage() {
     const { data, error } = await supabase
       .from("v_personel_son_konum_durumu")
       .select("*")
+      .order("siralama_onceligi", { ascending: true })
       .order("personel_adi", { ascending: true })
 
     if (error) {

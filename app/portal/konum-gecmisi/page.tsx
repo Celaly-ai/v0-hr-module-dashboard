@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import dynamic from "next/dynamic"
 import "leaflet/dist/leaflet.css"
 import { createClient } from "@/lib/supabase/client"
+import { konumAnaliziHesapla } from "@/lib/services/konum-analiz-service"
 
 type Personel = {
   id: string
@@ -231,53 +232,23 @@ export default function KonumGecmisiPage() {
   }, [])
 
   const ozet = useMemo(() => {
+    const analiz = konumAnaliziHesapla(kayitlar)
+
     const ilk = kayitlar[0]
     const son = kayitlar[kayitlar.length - 1]
 
-    const koordinatliKayitlar = kayitlar
-      .map((k) => {
-        const enlem = sayi(k.enlem)
-        const boylam = sayi(k.boylam)
-        if (enlem === null || boylam === null) return null
-        return {
-          ...k,
-          enlem,
-          boylam,
-          zaman: new Date(k.created_at || k.kayit_zamani || "").getTime(),
-        }
-      })
-      .filter(Boolean) as Array<KonumLog & { enlem: number; boylam: number; zaman: number }>
-
-    let toplamMesafe = 0
-    for (let i = 1; i < koordinatliKayitlar.length; i++) {
-      const onceki = koordinatliKayitlar[i - 1]
-      const simdiki = koordinatliKayitlar[i]
-      toplamMesafe += mesafeMetre(onceki.enlem, onceki.boylam, simdiki.enlem, simdiki.boylam)
-    }
-
-    const ilkZaman = ilk?.created_at || ilk?.kayit_zamani || null
-    const sonZaman = son?.created_at || son?.kayit_zamani || null
-    const sureDakika =
-      ilkZaman && sonZaman
-        ? Math.max(0, Math.floor((new Date(sonZaman).getTime() - new Date(ilkZaman).getTime()) / 60000))
-        : 0
-
-    const hizlar = kayitlar
-      .map((k) => sayi(k.hiz))
-      .filter((v): v is number => v !== null && v > 0)
-
-    const maksimumHiz = hizlar.length ? Math.max(...hizlar) : 0
-    const ortalamaHiz = sureDakika > 0 ? (toplamMesafe / 1000) / (sureDakika / 60) : 0
-
     return {
-      toplam: kayitlar.length,
-      ilk: ilkZaman,
-      son: sonZaman,
-      koordinatli: koordinatliKayitlar.length,
-      toplamMesafe,
-      sureDakika,
-      ortalamaHiz,
-      maksimumHiz,
+      toplam: analiz.toplam_kayit,
+      ilk: ilk?.created_at || ilk?.kayit_zamani || null,
+      son: son?.created_at || son?.kayit_zamani || null,
+      koordinatli: analiz.koordinatli_kayit,
+      toplamMesafe: analiz.toplam_mesafe_metre,
+      sureDakika: analiz.sure_dakika,
+      ortalamaHiz: analiz.ortalama_hiz_kmh,
+      maksimumHiz: analiz.maksimum_hiz_ms,
+      beklemeNoktalari: analiz.bekleme_noktalari,
+      toplamBeklemeDakika: analiz.toplam_bekleme_dakika,
+      enUzunBeklemeDakika: analiz.en_uzun_bekleme_dakika,
     }
   }, [kayitlar])
 
@@ -341,6 +312,9 @@ export default function KonumGecmisiPage() {
         <Kpi title="Süre" value={dakikaYaz(ozet.sureDakika)} />
         <Kpi title="Ortalama Hız" value={ozet.ortalamaHiz > 0 ? `${ozet.ortalamaHiz.toFixed(1)} km/s` : "-"} />
         <Kpi title="Maksimum Hız" value={ozet.maksimumHiz > 0 ? `${ozet.maksimumHiz.toFixed(1)} m/sn` : "-"} />
+        <Kpi title="Toplam Bekleme" value={dakikaYaz(ozet.toplamBeklemeDakika)} />
+        <Kpi title="En Uzun Bekleme" value={dakikaYaz(ozet.enUzunBeklemeDakika)} />
+        <Kpi title="Bekleme Noktası" value={ozet.beklemeNoktalari.length} />
         <Kpi title="İlk Konum" value={tarihSaat(ozet.ilk)} />
         <Kpi title="Son Konum" value={tarihSaat(ozet.son)} />
       </div>
@@ -360,6 +334,48 @@ export default function KonumGecmisiPage() {
             <KonumGecmisiHaritasi kayitlar={kayitlar} />
           )}
         </div>
+      </div>
+
+      <div className="rounded-2xl border bg-card p-4">
+        <h2 className="text-sm font-black">Bekleme Noktaları Analizi</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Aynı bölgede uzun süre kalan konum grupları otomatik tespit edilir. V1 kuralı: 30 metre içinde en az 10 dakika.
+        </p>
+
+        {ozet.beklemeNoktalari.length === 0 ? (
+          <div className="mt-3 rounded-xl border border-dashed p-5 text-center text-sm font-semibold text-muted-foreground">
+            Bekleme noktası tespit edilmedi.
+          </div>
+        ) : (
+          <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {ozet.beklemeNoktalari.map((b, index) => (
+              <div key={`${b.baslangic_zamani}-${index}`} className="rounded-xl border bg-background p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-black">Bekleme Noktası {index + 1}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {tarihSaat(b.baslangic_zamani)} - {tarihSaat(b.bitis_zamani)}
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-amber-300 bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-800">
+                    {dakikaYaz(b.sure_dakika)}
+                  </span>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-lg bg-muted/40 p-2">
+                    <p className="font-bold text-muted-foreground">Kayıt</p>
+                    <p className="font-black">{b.kayit_sayisi}</p>
+                  </div>
+                  <div className="rounded-lg bg-muted/40 p-2">
+                    <p className="font-bold text-muted-foreground">Konum</p>
+                    <p className="font-black">{b.enlem.toFixed(6)}, {b.boylam.toFixed(6)}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="overflow-hidden rounded-2xl border bg-card">

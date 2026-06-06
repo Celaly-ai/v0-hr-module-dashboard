@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
 const YEMEK_MOLASI_DAKIKA = 60
 const ONAY_SINIRI_DAKIKA = 60
 const VARSAYILAN_MESAFE_SINIRI_METRE = 50
+const KONUM_LOG_ARALIGI_MS = 120000
 
 type Mesaj = {
   tip: "basari" | "hata"
@@ -185,6 +186,7 @@ export default function GirisCikisPage() {
   const [sonKayit, setSonKayit] = useState<Kayit | null>(null)
   const [servisKonumu, setServisKonumu] = useState<ServisKonumu | null>(null)
   const [mesaj, setMesaj] = useState<Mesaj | null>(null)
+  const konumLogIsleniyorRef = useRef(false)
 
   async function servisKonumuGetir(p: Kayit) {
     const supabase = createClient()
@@ -280,6 +282,54 @@ export default function GirisCikisPage() {
   useEffect(() => {
     verileriYukle()
   }, [])
+
+  async function konumLoguKaydet() {
+    if (!personel?.id) return
+    if (konumLogIsleniyorRef.current) return
+
+    konumLogIsleniyorRef.current = true
+
+    try {
+      const pos = await konumAl()
+      const supabase = createClient()
+
+      const { error } = await supabase.rpc("personel_konum_logu_kaydet", {
+        p_personel_id: personel.id,
+        p_enlem: pos.coords.latitude,
+        p_boylam: pos.coords.longitude,
+        p_hiz: pos.coords.speed ?? null,
+        p_dogruluk: pos.coords.accuracy ?? null,
+        p_pil_yuzde: null,
+        p_kaynak: "pwa",
+        p_uygulama_durumu: document.visibilityState === "visible" ? "aktif" : "arka_plan",
+        p_cihaz_bilgisi: navigator.userAgent,
+      })
+
+      if (error) {
+        console.error("Konum logu kaydedilemedi:", error.message)
+      }
+    } catch (err) {
+      console.error("Konum logu için konum alınamadı:", err)
+    } finally {
+      konumLogIsleniyorRef.current = false
+    }
+  }
+
+  useEffect(() => {
+    if (!personel?.id) return
+    if (sonKayit?.tip !== "giris") return
+
+    void konumLoguKaydet()
+
+    const intervalId = window.setInterval(() => {
+      void konumLoguKaydet()
+    }, KONUM_LOG_ARALIGI_MS)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [personel?.id, sonKayit?.tip])
 
   const aktifDurum = useMemo(() => {
     return sonKayit?.tip === "giris" ? "giris" : "cikis"
@@ -435,6 +485,7 @@ export default function GirisCikisPage() {
         .from("giris_cikis_kayitlari")
         .insert({
           personel_id: personel.id,
+          sirket_id: personel.sirket_id || null,
           tip,
           lat,
           lng,

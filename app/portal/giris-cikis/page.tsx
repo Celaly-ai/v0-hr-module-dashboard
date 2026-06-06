@@ -403,7 +403,18 @@ export default function GirisCikisPage() {
       const vardiyaBit = saatToDakika(vardiya.bitis_saati)
       const simdi = dateDakika(now)
 
-      let bilgiMesaji = tip === "giris" ? "Giriş kaydedildi." : "Çıkış kaydedildi."
+      const kayitZamani = new Date(now)
+      let bilgiMesaji = tip === "giris" ? "Girişiniz başarıyla alındı." : "Çıkış kaydedildi."
+
+      if (tip === "giris" && simdi < vardiyaBas) {
+        const [saat = 0, dakika = 0] = String(vardiya.baslangic_saati || "00:00")
+          .split(":")
+          .map((value) => Number(value || 0))
+
+        kayitZamani.setHours(saat, dakika, 0, 0)
+
+        bilgiMesaji = `Girişiniz başarıyla alındı. Vardiyanız ${vardiya.baslangic_saati} - ${vardiya.bitis_saati} saatleri arasındadır. Mesai kaydınız vardiya başlangıç saatinizden itibaren oluşturulacaktır.`
+      }
 
       if (tip === "giris" && simdi > vardiyaBas) {
         const gecikme = simdi - vardiyaBas
@@ -427,7 +438,7 @@ export default function GirisCikisPage() {
         lng,
         mesafe_metre: mesafe,
         basarili: true,
-        created_at: now.toISOString(),
+        created_at: kayitZamani.toISOString(),
       })
 
       if (error) {
@@ -443,6 +454,10 @@ export default function GirisCikisPage() {
         tip: "basari",
         metin: bilgiMesaji,
       })
+
+      window.setTimeout(() => {
+        setMesaj(null)
+      }, 8000)
 
       await verileriYukle()
     } catch {

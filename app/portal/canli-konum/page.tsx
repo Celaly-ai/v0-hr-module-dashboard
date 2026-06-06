@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import dynamic from "next/dynamic"
+import "leaflet/dist/leaflet.css"
 import { createClient } from "@/lib/supabase/client"
 
 type KonumKaydi = {
@@ -75,10 +77,102 @@ function durumClass(value?: string | null) {
       return "bg-gray-100 text-gray-700 border-gray-300"
   }
 }
+function pinRenk(value?: string | null) {
+  switch (value) {
+    case "aktif":
+      return "#16a34a"
+    case "konum_gecikmis":
+      return "#f59e0b"
+    case "konum_bekleniyor":
+      return "#2563eb"
+    case "pasif":
+      return "#64748b"
+    case "oturum_yok":
+      return "#9ca3af"
+    default:
+      return "#6b7280"
+  }
+}
+
+
+function sayisalKoordinat(value: unknown) {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : null
+}
 
 function koordinatVar(k: KonumKaydi) {
-  return typeof k.enlem === "number" && typeof k.boylam === "number"
+  return sayisalKoordinat(k.enlem) !== null && sayisalKoordinat(k.boylam) !== null
 }
+
+const CanliKonumHaritasi = dynamic(
+  async () => {
+    const leaflet = await import("leaflet")
+    const reactLeaflet = await import("react-leaflet")
+
+    const { MapContainer, TileLayer, CircleMarker, Popup } = reactLeaflet
+
+    function Harita({ kayitlar }: { kayitlar: KonumKaydi[] }) {
+      const merkez = kayitlar.find(koordinatVar)
+      const merkezEnlem = sayisalKoordinat(merkez?.enlem)
+      const merkezBoylam = sayisalKoordinat(merkez?.boylam)
+
+      const center: [number, number] =
+        merkezEnlem !== null && merkezBoylam !== null
+          ? [merkezEnlem, merkezBoylam]
+          : [37.0, 35.321333]
+
+      return (
+        <MapContainer center={center} zoom={11} className="h-[420px] w-full rounded-2xl">
+          <TileLayer
+            attribution='&copy; OpenStreetMap'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+
+          {kayitlar.map((k) => {
+            const enlem = sayisalKoordinat(k.enlem)
+            const boylam = sayisalKoordinat(k.boylam)
+
+            if (enlem === null || boylam === null) return null
+
+            return (
+              <CircleMarker
+                key={k.personel_id}
+                center={[enlem, boylam]}
+                radius={k.takip_durumu === "aktif" ? 12 : 9}
+                pathOptions={{
+                  color: pinRenk(k.takip_durumu),
+                  fillColor: pinRenk(k.takip_durumu),
+                  fillOpacity: 0.85,
+                  weight: 3,
+                }}
+              >
+                <Popup>
+                  <div className="space-y-1 text-sm">
+                    <p className="font-bold">{k.personel_adi || "-"}</p>
+                    <p>Kod: {k.personel_kodu || "-"}</p>
+                    <p>Takip: {durumEtiketi(k.takip_durumu)}</p>
+                    <p>Oturum: {k.oturum_durumu || "-"}</p>
+                    <p>Son: {zamanFormat(k.kayit_zamani)}</p>
+                  </div>
+                </Popup>
+              </CircleMarker>
+            )
+          })}
+        </MapContainer>
+      )
+    }
+
+    return Harita
+  },
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-[420px] items-center justify-center rounded-2xl border bg-muted/30 text-sm font-semibold text-muted-foreground">
+        Harita yükleniyor...
+      </div>
+    ),
+  },
+)
 
 export default function CanliKonumPage() {
   const supabase = useMemo(() => createClient(), [])
@@ -220,38 +314,18 @@ export default function CanliKonumPage() {
       </div>
 
       <div className="rounded-2xl border bg-card p-4">
-        <h2 className="text-sm font-black">Harita Hazırlık Alanı</h2>
+        <h2 className="text-sm font-black">Canlı Harita</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Şimdilik koordinatı olan personeller listelenir. Harita kütüphanesi sonraki adımda bağlanacak.
+          Koordinatı olan personeller harita üzerinde gösterilir. Pin üzerine basınca personel detayı açılır.
         </p>
 
-        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {haritaListesi.slice(0, 12).map((k) => (
-            <div key={k.personel_id} className="rounded-xl border bg-background p-3">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-sm font-black">{k.personel_adi || "-"}</p>
-                  <p className="text-xs font-semibold text-muted-foreground">
-                    {k.personel_kodu || "-"}
-                  </p>
-                </div>
-                <span className={`rounded-full border px-2 py-1 text-[11px] font-black ${durumClass(k.takip_durumu)}`}>
-                  {durumEtiketi(k.takip_durumu)}
-                </span>
-              </div>
-              <p className="mt-2 text-xs font-semibold">
-                {k.enlem}, {k.boylam}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Son kayıt: {zamanFormat(k.kayit_zamani)}
-              </p>
-            </div>
-          ))}
-
-          {haritaListesi.length === 0 && (
+        <div className="mt-3">
+          {haritaListesi.length === 0 ? (
             <div className="rounded-xl border border-dashed p-5 text-center text-sm font-semibold text-muted-foreground">
               Koordinatlı personel kaydı bulunamadı.
             </div>
+          ) : (
+            <CanliKonumHaritasi kayitlar={haritaListesi} />
           )}
         </div>
       </div>

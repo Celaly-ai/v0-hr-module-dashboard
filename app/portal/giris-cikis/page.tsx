@@ -186,6 +186,9 @@ export default function GirisCikisPage() {
   const [sonKayit, setSonKayit] = useState<Kayit | null>(null)
   const [servisKonumu, setServisKonumu] = useState<ServisKonumu | null>(null)
   const [mesaj, setMesaj] = useState<Mesaj | null>(null)
+  const [konumTakipMesaji, setKonumTakipMesaji] = useState("Konum takibi beklemede.")
+  const [sonKonumGonderimSaati, setSonKonumGonderimSaati] = useState<string | null>(null)
+  const [konumGonderimSayisi, setKonumGonderimSayisi] = useState(0)
   const konumLogIsleniyorRef = useRef(false)
 
   async function servisKonumuGetir(p: Kayit) {
@@ -284,16 +287,24 @@ export default function GirisCikisPage() {
   }, [])
 
   async function konumLoguKaydet() {
-    if (!personel?.id) return
-    if (konumLogIsleniyorRef.current) return
+    if (!personel?.id) {
+      setKonumTakipMesaji("Personel bilgisi bulunamadı.")
+      return
+    }
+
+    if (konumLogIsleniyorRef.current) {
+      setKonumTakipMesaji("Konum gönderimi zaten devam ediyor.")
+      return
+    }
 
     konumLogIsleniyorRef.current = true
+    setKonumTakipMesaji("Konum alınıyor...")
 
     try {
       const pos = await konumAl()
       const supabase = createClient()
 
-      const { error } = await supabase.rpc("personel_konum_logu_kaydet", {
+      const { data, error } = await supabase.rpc("personel_konum_logu_kaydet", {
         p_personel_id: personel.id,
         p_enlem: pos.coords.latitude,
         p_boylam: pos.coords.longitude,
@@ -307,13 +318,41 @@ export default function GirisCikisPage() {
 
       if (error) {
         console.error("Konum logu kaydedilemedi:", error.message)
+        setKonumTakipMesaji(`Konum kaydedilemedi: ${error.message}`)
+        return
       }
-    } catch (err) {
+
+      const sonuc = data as {
+        success?: boolean
+        kaydedildi?: boolean
+        reason?: string
+        error?: string | null
+      } | null
+
+      if (sonuc?.kaydedildi) {
+        const saat = new Date().toLocaleTimeString("tr-TR", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        })
+
+        setSonKonumGonderimSaati(saat)
+        setKonumGonderimSayisi((value) => value + 1)
+        setKonumTakipMesaji("Konum başarıyla gönderildi.")
+        return
+      }
+
+      setKonumTakipMesaji(
+        sonuc?.reason || sonuc?.error || "Konum alınabildi ancak kayıt oluşturulmadı.",
+      )
+    } catch (err: any) {
       console.error("Konum logu için konum alınamadı:", err)
+      setKonumTakipMesaji(err?.message || "Konum alınamadı. Tarayıcı konum iznini kontrol edin.")
     } finally {
       konumLogIsleniyorRef.current = false
     }
   }
+
 
   useEffect(() => {
     if (!personel?.id) return
@@ -525,6 +564,10 @@ export default function GirisCikisPage() {
         metin: bilgiMesaji,
       })
 
+      if (tip === "giris") {
+        await konumLoguKaydet()
+      }
+
       window.setTimeout(() => {
         setMesaj(null)
       }, 8000)
@@ -690,6 +733,25 @@ export default function GirisCikisPage() {
         >
           {islem ? "İşleniyor..." : "🚪 Çıkış Yap"}
         </button>
+
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-black text-blue-950">Konum Takibi</h2>
+              <p className="mt-1 text-xs font-semibold text-blue-900">
+                {aktifDurum === "giris" ? "Aktif mesai sırasında konum takibi çalışır." : "Mesai kapalı olduğu için konum takibi pasiftir."}
+              </p>
+              <p className="mt-2 text-xs font-bold text-blue-950">
+                {konumTakipMesaji}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-white px-3 py-2 text-right text-xs font-black text-blue-950">
+              <p>Gönderim: {konumGonderimSayisi}</p>
+              <p>Son: {sonKonumGonderimSaati || "-"}</p>
+            </div>
+          </div>
+        </div>
 
         <div className="rounded-2xl border border-gray-300 bg-white p-4 shadow-sm">
           <div className="mb-3">

@@ -238,7 +238,9 @@ export default function CanliKonumPage() {
   }, [kayitlar])
 
   const haritaListesi = useMemo(() => {
-    return filtreli.filter(koordinatVar)
+    return filtreli.filter((k) => {
+      return koordinatVar(k) && k.oturum_durumu === "aktif"
+    })
   }, [filtreli])
 
   return (
@@ -305,7 +307,7 @@ export default function CanliKonumPage() {
         <div className="rounded-xl bg-muted/30 p-3">
           <p className="text-xs font-bold text-muted-foreground">Harita V1</p>
           <p className="mt-1 text-sm font-black">
-            Konumu olan kayıt: {haritaListesi.length}
+            Haritada aktif kayıt: {haritaListesi.length}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             Bir sonraki adımda bu kayıtlar harita üzerine işaretlenecek.
@@ -316,13 +318,13 @@ export default function CanliKonumPage() {
       <div className="rounded-2xl border bg-card p-4">
         <h2 className="text-sm font-black">Canlı Harita</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Koordinatı olan personeller harita üzerinde gösterilir. Pin üzerine basınca personel detayı açılır.
+          Mesai oturumu aktif olan ve koordinatı bulunan personeller harita üzerinde gösterilir. Pin üzerine basınca personel detayı açılır.
         </p>
 
         <div className="mt-3">
           {haritaListesi.length === 0 ? (
             <div className="rounded-xl border border-dashed p-5 text-center text-sm font-semibold text-muted-foreground">
-              Koordinatlı personel kaydı bulunamadı.
+              Aktif konum oturumu olan personel bulunamadı.
             </div>
           ) : (
             <CanliKonumHaritasi kayitlar={haritaListesi} />

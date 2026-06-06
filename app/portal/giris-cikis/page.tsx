@@ -187,6 +187,7 @@ export default function GirisCikisPage() {
   const [servisKonumu, setServisKonumu] = useState<ServisKonumu | null>(null)
   const [mesaj, setMesaj] = useState<Mesaj | null>(null)
   const [konumTakipMesaji, setKonumTakipMesaji] = useState("Konum takibi beklemede.")
+  const [yuklemeAdimi, setYuklemeAdimi] = useState("Başlatılıyor...")
   const [sonKonumGonderimSaati, setSonKonumGonderimSaati] = useState<string | null>(null)
   const [konumGonderimSayisi, setKonumGonderimSayisi] = useState(0)
   const konumLogIsleniyorRef = useRef(false)
@@ -219,6 +220,8 @@ export default function GirisCikisPage() {
     try {
       const supabase = createClient()
 
+      setYuklemeAdimi("Oturum kontrol ediliyor...")
+
       const {
         data: { session },
       } = await supabase.auth.getSession()
@@ -229,6 +232,8 @@ export default function GirisCikisPage() {
         router.replace("/portal/giris")
         return
       }
+
+      setYuklemeAdimi("Personel kaydı aranıyor...")
 
       const { data: personelData, error: personelError } = await supabase
         .from("personeller")
@@ -247,10 +252,14 @@ export default function GirisCikisPage() {
 
       setPersonel(personelData)
 
+      setYuklemeAdimi("Servis konumu alınıyor...")
+
       const konum = await servisKonumuGetir(personelData)
       setServisKonumu(konum)
 
       const bugun = localISO(new Date())
+
+      setYuklemeAdimi("Vardiya planı okunuyor...")
 
       const { data: vardiyaData } = await supabase
         .from("vardiya_planlari")
@@ -260,6 +269,8 @@ export default function GirisCikisPage() {
         .maybeSingle()
 
       setVardiya(vardiyaData)
+
+      setYuklemeAdimi("Giriş çıkış kayıtları okunuyor...")
 
       const { data: kayitData } = await supabase
         .from("giris_cikis_kayitlari")
@@ -586,7 +597,10 @@ export default function GirisCikisPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <p className="font-bold text-gray-800">Yükleniyor...</p>
+        <div className="rounded-2xl bg-white p-5 text-center shadow">
+          <p className="font-bold text-gray-800">Yükleniyor...</p>
+          <p className="mt-2 text-xs font-semibold text-gray-600">{yuklemeAdimi}</p>
+        </div>
       </div>
     )
   }
@@ -704,7 +718,7 @@ export default function GirisCikisPage() {
             </div>
           </div>
         </div>
-\n        {mesaj && (
+        {mesaj && (
           <div
             className={`rounded-xl border p-3 text-sm font-bold ${
               mesaj.tip === "basari"

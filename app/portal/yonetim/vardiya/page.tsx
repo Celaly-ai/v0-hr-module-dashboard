@@ -19,11 +19,13 @@ function formatISO(date: Date) {
 
 function getDaysArray(start: Date, count: number) {
   const arr: Date[] = []
+
   for (let i = 0; i < count; i++) {
     const d = new Date(start)
     d.setDate(start.getDate() + i)
     arr.push(d)
   }
+
   return arr
 }
 
@@ -46,9 +48,17 @@ function onayliMi(durum?: string | null) {
   return d === "onaylandi" || d === "approved"
 }
 
-function tarihAraligindaMi(tarih: string, baslangic?: string | null, bitis?: string | null) {
+function tarihAraligindaMi(
+  tarih: string,
+  baslangic?: string | null,
+  bitis?: string | null,
+) {
   if (!baslangic || !bitis) return false
-  return tarih >= String(baslangic).slice(0, 10) && tarih <= String(bitis).slice(0, 10)
+
+  const b1 = String(baslangic).slice(0, 10)
+  const b2 = String(bitis).slice(0, 10)
+
+  return tarih >= b1 && tarih <= b2
 }
 
 function durumClass(durum: string) {
@@ -56,6 +66,7 @@ function durumClass(durum: string) {
   if (durum === "izinli") return "bg-blue-100 text-blue-800 border-blue-300"
   if (durum === "raporlu") return "bg-red-100 text-red-800 border-red-300"
   if (durum === "hafta_tatili") return "bg-gray-200 text-gray-800 border-gray-300"
+  if (durum === "resmi_tatil") return "bg-yellow-100 text-yellow-800 border-yellow-300"
   return "bg-white text-gray-900 border-gray-300"
 }
 
@@ -72,10 +83,12 @@ export default function VardiyaPage() {
   const [seciliPersonel, setSeciliPersonel] = useState(TUM_PERSONELLER)
   const [baslangicTarih, setBaslangicTarih] = useState(formatISO(new Date()))
   const [gunSayisi, setGunSayisi] = useState(7)
+
   const [standartBaslangic, setStandartBaslangic] = useState("09:00")
   const [standartBitis, setStandartBitis] = useState("18:00")
   const [pazarTatil, setPazarTatil] = useState(true)
   const [ozelDurumUygula, setOzelDurumUygula] = useState(true)
+
   const [vardiyalar, setVardiyalar] = useState<Kayit[]>([])
   const [loading, setLoading] = useState(false)
   const [mesaj, setMesaj] = useState<Mesaj | null>(null)
@@ -89,11 +102,14 @@ export default function VardiyaPage() {
 
     const { data, error } = await supabase
       .from("personeller")
-      .select("id, ad, soyad, rol, durum, personel_kodu")
+      .select("id, ad, soyad, rol, durum, personel_kodu, sirket_id")
       .order("ad", { ascending: true })
 
     if (error) {
-      setMesaj({ tip: "hata", metin: "Personel listesi alınamadı: " + error.message })
+      setMesaj({
+        tip: "hata",
+        metin: "Personel listesi alınamadı: " + error.message,
+      })
       return
     }
 
@@ -118,12 +134,17 @@ export default function VardiyaPage() {
 
     const { data, error } = await supabase
       .from("calisan_talepler")
-      .select("id, personel_id, tip, baslik, izin_turu, durum, izin_baslangic, izin_bitis, devamsizlik_turu")
+      .select(
+        "id, personel_id, tip, baslik, izin_turu, durum, izin_baslangic, izin_bitis, devamsizlik_turu",
+      )
       .in("personel_id", personelIds)
       .eq("tip", "izin")
 
     if (error) {
-      setMesaj({ tip: "hata", metin: "İzin kayıtları okunamadı: " + error.message })
+      setMesaj({
+        tip: "hata",
+        metin: "İzin kayıtları okunamadı: " + error.message,
+      })
       return []
     }
 
@@ -147,60 +168,80 @@ export default function VardiyaPage() {
       return
     }
 
-    setLoading(true)
-
-    const start = new Date(`${baslangicTarih}T00:00:00`)
-    const days = getDaysArray(start, gunSayisi)
-    const personelIds = seciliPersoneller.map((p) => p.id)
-    const izinler = await izinleriGetir(personelIds)
-
-    const liste: Kayit[] = []
-
-    for (const personel of seciliPersoneller) {
-      for (const day of days) {
-        const tarih = formatISO(day)
-        const izin = izinBul(personel.id, tarih, izinler)
-
-        let durum = "calisma"
-        let baslangicSaati: string | null = standartBaslangic
-        let bitisSaati: string | null = standartBitis
-        let aciklama = ""
-
-        if (izin) {
-          const izinTuru = izin.izin_turu || izin.baslik || "İzin"
-          const devamsizlik = String(izin.devamsizlik_turu || "").toLocaleLowerCase("tr-TR")
-
-          durum = devamsizlik === "rapor" || izinTuru === "Hastalık / Rapor" ? "raporlu" : "izinli"
-          baslangicSaati = null
-          bitisSaati = null
-          aciklama = durum === "raporlu" ? `Onaylı rapor: ${izinTuru}` : `Onaylı izin: ${izinTuru}`
-        } else if (pazarTatil && pazarMi(day)) {
-          durum = "hafta_tatili"
-          baslangicSaati = null
-          bitisSaati = null
-          aciklama = "Pazar hafta tatili"
-        }
-
-        liste.push({
-          personel_id: personel.id,
-          personel_adi: adSoyad(personel),
-          personel_kodu: personel.personel_kodu || "",
-          rol: personel.rol || "",
-          tarih,
-          durum,
-          baslangic_saati: baslangicSaati,
-          bitis_saati: bitisSaati,
-          calisma_gunu: durum === "calisma",
-          aciklama,
-        })
-      }
+    if (!standartBaslangic || !standartBitis) {
+      setMesaj({ tip: "hata", metin: "Standart çalışma saatleri zorunludur." })
+      return
     }
 
-    setVardiyalar(liste)
-    setMesaj({
-      tip: "basari",
-      metin: `${seciliPersoneller.length} personel için ${gunSayisi} günlük vardiya planı hazırlandı. Okunan onaylı izin: ${izinler.length}`,
-    })
+    setLoading(true)
+
+    try {
+      const start = new Date(`${baslangicTarih}T00:00:00`)
+      const days = getDaysArray(start, gunSayisi)
+      const personelIds = seciliPersoneller.map((p) => p.id)
+      const izinler = await izinleriGetir(personelIds)
+
+      const liste: Kayit[] = []
+
+      for (const personel of seciliPersoneller) {
+        for (const day of days) {
+          const tarih = formatISO(day)
+          const izin = izinBul(personel.id, tarih, izinler)
+
+          let durum = "calisma"
+          let baslangicSaati: string | null = standartBaslangic
+          let bitisSaati: string | null = standartBitis
+          let aciklama = ""
+
+          if (izin) {
+            const izinTuru = izin.izin_turu || izin.baslik || "İzin"
+            const devamsizlik = String(izin.devamsizlik_turu || "").toLocaleLowerCase("tr-TR")
+
+            durum =
+              devamsizlik === "rapor" || izinTuru === "Hastalık / Rapor"
+                ? "raporlu"
+                : "izinli"
+
+            baslangicSaati = null
+            bitisSaati = null
+            aciklama =
+              durum === "raporlu"
+                ? `Onaylı rapor: ${izinTuru}`
+                : `Onaylı izin: ${izinTuru}`
+          } else if (pazarTatil && pazarMi(day)) {
+            durum = "hafta_tatili"
+            baslangicSaati = null
+            bitisSaati = null
+            aciklama = "Pazar hafta tatili"
+          }
+
+          liste.push({
+            personel_id: personel.id,
+            personel_adi: adSoyad(personel),
+            personel_kodu: personel.personel_kodu || "",
+            rol: personel.rol || "",
+            tarih,
+            durum,
+            baslangic_saati: baslangicSaati,
+            bitis_saati: bitisSaati,
+            calisma_gunu: durum === "calisma",
+            aciklama,
+          })
+        }
+      }
+
+      setVardiyalar(liste)
+
+      setMesaj({
+        tip: "basari",
+        metin: `${seciliPersoneller.length} personel için ${gunSayisi} günlük vardiya planı hazırlandı. Okunan onaylı izin: ${izinler.length}`,
+      })
+    } catch (err: any) {
+      setMesaj({
+        tip: "hata",
+        metin: err?.message || "Vardiya planı hazırlanamadı.",
+      })
+    }
 
     setLoading(false)
   }
@@ -225,10 +266,14 @@ export default function VardiyaPage() {
   }
 
   async function kaydet() {
-    if (vardiyalar.length === 0) return
+    setMesaj(null)
+
+    if (vardiyalar.length === 0) {
+      setMesaj({ tip: "hata", metin: "Kaydedilecek vardiya yok." })
+      return
+    }
 
     setLoading(true)
-    setMesaj(null)
 
     const supabase = createClient()
 
@@ -247,19 +292,30 @@ export default function VardiyaPage() {
     })
 
     if (error) {
-      setMesaj({ tip: "hata", metin: "Vardiya kaydedilemedi: " + error.message })
+      setMesaj({
+        tip: "hata",
+        metin: "Vardiya kaydedilemedi: " + error.message,
+      })
       setLoading(false)
       return
     }
 
-    setMesaj({ tip: "basari", metin: "Vardiya planı başarıyla kaydedildi." })
+    setMesaj({
+      tip: "basari",
+      metin: "Vardiya planı başarıyla kaydedildi.",
+    })
+
     setLoading(false)
   }
 
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900">
       <div className="bg-white border-b px-6 py-4 flex items-center gap-3 shadow-sm">
-        <button type="button" onClick={() => router.push("/portal")} className="text-2xl font-bold text-gray-700">
+        <button
+          type="button"
+          onClick={() => router.push("/portal")}
+          className="text-2xl font-bold text-gray-700"
+        >
           ←
         </button>
 
@@ -329,12 +385,20 @@ export default function VardiyaPage() {
 
           <div className="grid md:grid-cols-3 gap-3">
             <label className="flex items-center gap-2 rounded-xl border bg-gray-50 p-3 text-sm font-bold">
-              <input type="checkbox" checked={pazarTatil} onChange={(e) => setPazarTatil(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={pazarTatil}
+                onChange={(e) => setPazarTatil(e.target.checked)}
+              />
               Pazar tatil
             </label>
 
             <label className="flex items-center gap-2 rounded-xl border bg-gray-50 p-3 text-sm font-bold">
-              <input type="checkbox" checked={ozelDurumUygula} onChange={(e) => setOzelDurumUygula(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={ozelDurumUygula}
+                onChange={(e) => setOzelDurumUygula(e.target.checked)}
+              />
               İzin/rapor/eğitim
             </label>
 
@@ -397,6 +461,7 @@ export default function VardiyaPage() {
                         <option value="izinli">İzinli</option>
                         <option value="raporlu">Raporlu</option>
                         <option value="hafta_tatili">Hafta Tatili</option>
+                        <option value="resmi_tatil">Resmi Tatil</option>
                       </select>
                     </td>
 

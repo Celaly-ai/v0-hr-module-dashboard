@@ -277,15 +277,53 @@ export default function IzinPage() {
         return
       }
 
-      const { data: p, error: personelError } = await supabase
-        .from("personeller")
-        .select(
-          "id, sirket_id, yillik_izin_devir_gunu, dogum_tarihi, ise_giris, ise_giris_tarihi, giris_tarihi, baslama_tarihi, ise_baslama_tarihi, created_at",
-        )
-        .or(`auth_id.eq.${user.id},kullanici_id.eq.${user.id},email.eq.${user.email}`)
-        .maybeSingle()
+      const personelSelect =
+  "id, sirket_id, yillik_izin_devir_gunu, dogum_tarihi, ise_giris, ise_giris_tarihi, giris_tarihi, baslama_tarihi, ise_baslama_tarihi, created_at"
 
-      if (personelError || !p) {
+let p: any = null
+let personelError: any = null
+
+const authSonuc = await supabase
+  .from("personeller")
+  .select(personelSelect)
+  .eq("auth_id", user.id)
+  .maybeSingle()
+
+if (authSonuc.error) {
+  personelError = authSonuc.error
+} else {
+  p = authSonuc.data
+}
+
+if (!p) {
+  const kullaniciSonuc = await supabase
+    .from("personeller")
+    .select(personelSelect)
+    .eq("kullanici_id", user.id)
+    .maybeSingle()
+
+  if (kullaniciSonuc.error) {
+    personelError = kullaniciSonuc.error
+  } else {
+    p = kullaniciSonuc.data
+  }
+}
+
+if (!p && user.email) {
+  const emailSonuc = await supabase
+    .from("personeller")
+    .select(personelSelect)
+    .eq("email", user.email)
+    .maybeSingle()
+
+  if (emailSonuc.error) {
+    personelError = emailSonuc.error
+  } else {
+    p = emailSonuc.data
+  }
+}
+
+if (personelError || !p) {
         setMesaj({
           tip: "hata",
           metin:

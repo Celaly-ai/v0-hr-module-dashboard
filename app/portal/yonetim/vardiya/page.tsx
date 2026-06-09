@@ -1,7 +1,3 @@
-<h1 className="text-red-600 text-4xl font-black">
-TEST 999
-</h1>
-
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
@@ -13,18 +9,6 @@ type Mesaj = { tip: MesajTipi; metin: string }
 type Kayit = Record<string, any>
 
 const TUM_PERSONELLER = "__tum_personeller__"
-
-const DINI_TATILLER: Record<string, string> = {
-  "2026-03-19": "Ramazan Bayramı Arefesi",
-  "2026-03-20": "Ramazan Bayramı 1. Gün",
-  "2026-03-21": "Ramazan Bayramı 2. Gün",
-  "2026-03-22": "Ramazan Bayramı 3. Gün",
-  "2026-05-26": "Kurban Bayramı Arefesi",
-  "2026-05-27": "Kurban Bayramı 1. Gün",
-  "2026-05-28": "Kurban Bayramı 2. Gün",
-  "2026-05-29": "Kurban Bayramı 3. Gün",
-  "2026-05-30": "Kurban Bayramı 4. Gün",
-}
 
 function formatISO(date: Date) {
   const y = date.getFullYear()
@@ -43,50 +27,35 @@ function getDaysArray(start: Date, count: number) {
   return arr
 }
 
-function sabitResmiTatilAdi(tarih: string) {
-  const ayGun = tarih.slice(5)
-
-  const sabitler: Record<string, string> = {
-    "01-01": "Yılbaşı",
-    "04-23": "Ulusal Egemenlik ve Çocuk Bayramı",
-    "05-01": "Emek ve Dayanışma Günü",
-    "05-19": "Atatürk’ü Anma, Gençlik ve Spor Bayramı",
-    "07-15": "Demokrasi ve Millî Birlik Günü",
-    "08-30": "Zafer Bayramı",
-    "10-29": "Cumhuriyet Bayramı",
-  }
-
-  return sabitler[ayGun] || ""
-}
-
-function resmiTatilAdi(tarih: string) {
-  return DINI_TATILLER[tarih] || sabitResmiTatilAdi(tarih)
+function adSoyad(p: Kayit) {
+  return `${p.ad || ""} ${p.soyad || ""}`.trim() || "Personel"
 }
 
 function pazarMi(date: Date) {
   return date.getDay() === 0
 }
 
-function tarihAraligindaMi(tarih: string, baslangic?: string | null, bitis?: string | null) {
-  if (!baslangic || !bitis) return false
-  return tarih >= baslangic && tarih <= bitis
-}
-
-function adSoyad(p: Kayit) {
-  return `${p.ad || ""} ${p.soyad || ""}`.trim() || "Personel"
+function normalizeDurum(value?: string | null) {
+  return String(value || "")
+    .toLocaleLowerCase("tr-TR")
+    .replaceAll("ı", "i")
 }
 
 function onayliMi(durum?: string | null) {
-  return durum === "Onaylandı" || durum === "Onaylandi" || durum === "onaylandi"
+  const d = normalizeDurum(durum)
+  return d === "onaylandi" || d === "approved"
+}
+
+function tarihAraligindaMi(tarih: string, baslangic?: string | null, bitis?: string | null) {
+  if (!baslangic || !bitis) return false
+  return tarih >= String(baslangic).slice(0, 10) && tarih <= String(bitis).slice(0, 10)
 }
 
 function durumClass(durum: string) {
   if (durum === "calisma") return "bg-green-100 text-green-800 border-green-300"
   if (durum === "izinli") return "bg-blue-100 text-blue-800 border-blue-300"
   if (durum === "raporlu") return "bg-red-100 text-red-800 border-red-300"
-  if (durum === "egitim") return "bg-purple-100 text-purple-800 border-purple-300"
   if (durum === "hafta_tatili") return "bg-gray-200 text-gray-800 border-gray-300"
-  if (durum === "resmi_tatil") return "bg-yellow-100 text-yellow-800 border-yellow-300"
   return "bg-white text-gray-900 border-gray-300"
 }
 
@@ -103,13 +72,10 @@ export default function VardiyaPage() {
   const [seciliPersonel, setSeciliPersonel] = useState(TUM_PERSONELLER)
   const [baslangicTarih, setBaslangicTarih] = useState(formatISO(new Date()))
   const [gunSayisi, setGunSayisi] = useState(7)
-
   const [standartBaslangic, setStandartBaslangic] = useState("09:00")
   const [standartBitis, setStandartBitis] = useState("18:00")
   const [pazarTatil, setPazarTatil] = useState(true)
-  const [resmiTatilUygula, setResmiTatilUygula] = useState(true)
   const [ozelDurumUygula, setOzelDurumUygula] = useState(true)
-
   const [vardiyalar, setVardiyalar] = useState<Kayit[]>([])
   const [loading, setLoading] = useState(false)
   const [mesaj, setMesaj] = useState<Mesaj | null>(null)
@@ -123,7 +89,7 @@ export default function VardiyaPage() {
 
     const { data, error } = await supabase
       .from("personeller")
-      .select("id, ad, soyad, rol, durum, personel_kodu, sirket_id")
+      .select("id, ad, soyad, rol, durum, personel_kodu")
       .order("ad", { ascending: true })
 
     if (error) {
@@ -145,60 +111,33 @@ export default function VardiyaPage() {
     return personeller.filter((p) => p.id === seciliPersonel)
   }, [personeller, seciliPersonel])
 
-  async function izinleriGetir(personelIds: string[], baslangic: string, bitis: string) {
+  async function izinleriGetir(personelIds: string[]) {
     if (!ozelDurumUygula || personelIds.length === 0) return []
 
     const supabase = createClient()
 
     const { data, error } = await supabase
       .from("calisan_talepler")
-      .select(
-        "id, personel_id, tip, baslik, izin_turu, durum, izin_baslangic, izin_bitis, izin_gun_sayisi, devamsizlik_turu, yillik_izinden_duser",
-      )
+      .select("id, personel_id, tip, baslik, izin_turu, durum, izin_baslangic, izin_bitis, devamsizlik_turu")
       .in("personel_id", personelIds)
       .eq("tip", "izin")
-      .in("durum", ["Onaylandı", "Onaylandi"])
-      .lte("izin_baslangic", bitis)
-      .gte("izin_bitis", baslangic)
 
-    if (error) return []
-    return data || []
+    if (error) {
+      setMesaj({ tip: "hata", metin: "İzin kayıtları okunamadı: " + error.message })
+      return []
+    }
+
+    return (data || []).filter((x) => onayliMi(x.durum))
   }
 
-  async function izinleriGetir(personelIds: string[], baslangic: string, bitis: string) {
-  if (!ozelDurumUygula || personelIds.length === 0) return []
-
-  const supabase = createClient()
-
-  const { data, error } = await supabase
-    .from("calisan_talepler")
-    .select(
-      "id, personel_id, tip, baslik, izin_turu, durum, izin_baslangic, izin_bitis, izin_gun_sayisi, devamsizlik_turu, yillik_izinden_duser",
-    )
-    .in("personel_id", personelIds)
-    .eq("tip", "izin")
-
-  if (error) {
-    setMesaj({
-      tip: "hata",
-      metin: "Onaylı izinler okunamadı: " + error.message,
+  function izinBul(personelId: string, tarih: string, izinler: Kayit[]) {
+    return izinler.find((izin) => {
+      return (
+        izin.personel_id === personelId &&
+        tarihAraligindaMi(tarih, izin.izin_baslangic, izin.izin_bitis)
+      )
     })
-    return []
   }
-
-  return (data || []).filter((izin: any) => {
-    const durum = String(izin.durum || "").toLocaleLowerCase("tr-TR")
-    const onayli =
-      durum === "onaylandı" ||
-      durum === "onaylandi" ||
-      durum === "approved"
-
-    if (!onayli) return false
-    if (!izin.izin_baslangic || !izin.izin_bitis) return false
-
-    return izin.izin_baslangic <= bitis && izin.izin_bitis >= baslangic
-  })
-}
 
   async function getir() {
     setMesaj(null)
@@ -208,105 +147,60 @@ export default function VardiyaPage() {
       return
     }
 
-    if (!standartBaslangic || !standartBitis) {
-      setMesaj({ tip: "hata", metin: "Standart çalışma saatleri zorunludur." })
-      return
-    }
-
     setLoading(true)
 
-    try {
-      const start = new Date(`${baslangicTarih}T00:00:00`)
-      const days = getDaysArray(start, gunSayisi)
-      const tarihList = days.map(formatISO)
-      const bitisTarih = tarihList[tarihList.length - 1]
-      const personelIds = seciliPersoneller.map((p) => p.id)
+    const start = new Date(`${baslangicTarih}T00:00:00`)
+    const days = getDaysArray(start, gunSayisi)
+    const personelIds = seciliPersoneller.map((p) => p.id)
+    const izinler = await izinleriGetir(personelIds)
 
-      const supabase = createClient()
+    const liste: Kayit[] = []
 
-      const { data: mevcutData, error: mevcutError } = await supabase
-        .from("vardiya_planlari")
-        .select("*")
-        .in("personel_id", personelIds)
-        .in("tarih", tarihList)
+    for (const personel of seciliPersoneller) {
+      for (const day of days) {
+        const tarih = formatISO(day)
+        const izin = izinBul(personel.id, tarih, izinler)
 
-      if (mevcutError) {
-        setMesaj({ tip: "hata", metin: "Mevcut vardiyalar alınamadı: " + mevcutError.message })
-        setLoading(false)
-        return
-      }
+        let durum = "calisma"
+        let baslangicSaati: string | null = standartBaslangic
+        let bitisSaati: string | null = standartBitis
+        let aciklama = ""
 
-      const mevcutMap = new Map<string, Kayit>()
-      for (const v of mevcutData || []) mevcutMap.set(`${v.personel_id}-${v.tarih}`, v)
+        if (izin) {
+          const izinTuru = izin.izin_turu || izin.baslik || "İzin"
+          const devamsizlik = String(izin.devamsizlik_turu || "").toLocaleLowerCase("tr-TR")
 
-      const izinler = await izinleriGetir(personelIds, baslangicTarih, bitisTarih)
-
-      const liste: Kayit[] = []
-
-      for (const personel of seciliPersoneller) {
-        for (const day of days) {
-          const tarih = formatISO(day)
-          const mevcut = mevcutMap.get(`${personel.id}-${tarih}`)
-          const ozelDurum = ozelDurumBul(personel.id, tarih, izinler)
-
-          if (mevcut && !ozelDurum) {
-            liste.push({
-              ...mevcut,
-              personel_adi: adSoyad(personel),
-              personel_kodu: personel.personel_kodu || "",
-              rol: personel.rol || "",
-            })
-            continue
-          }
-
-          let durum = "calisma"
-          let baslangicSaati: string | null = standartBaslangic
-          let bitisSaati: string | null = standartBitis
-          let aciklama = ""
-
-          const tatilAdi = resmiTatilUygula ? resmiTatilAdi(tarih) : ""
-
-          if (ozelDurum) {
-            durum = ozelDurum.durum
-            baslangicSaati = null
-            bitisSaati = null
-            aciklama = ozelDurum.aciklama
-          } else if (tatilAdi) {
-            durum = "resmi_tatil"
-            baslangicSaati = null
-            bitisSaati = null
-            aciklama = tatilAdi
-          } else if (pazarTatil && pazarMi(day)) {
-            durum = "hafta_tatili"
-            baslangicSaati = null
-            bitisSaati = null
-            aciklama = "Pazar hafta tatili"
-          }
-
-          liste.push({
-            id: mevcut?.id || null,
-            personel_id: personel.id,
-            personel_adi: adSoyad(personel),
-            personel_kodu: personel.personel_kodu || "",
-            rol: personel.rol || "",
-            tarih,
-            durum,
-            baslangic_saati: durum === "calisma" ? baslangicSaati : null,
-            bitis_saati: durum === "calisma" ? bitisSaati : null,
-            calisma_gunu: durum === "calisma",
-            aciklama,
-          })
+          durum = devamsizlik === "rapor" || izinTuru === "Hastalık / Rapor" ? "raporlu" : "izinli"
+          baslangicSaati = null
+          bitisSaati = null
+          aciklama = durum === "raporlu" ? `Onaylı rapor: ${izinTuru}` : `Onaylı izin: ${izinTuru}`
+        } else if (pazarTatil && pazarMi(day)) {
+          durum = "hafta_tatili"
+          baslangicSaati = null
+          bitisSaati = null
+          aciklama = "Pazar hafta tatili"
         }
-      }
 
-      setVardiyalar(liste)
-      setMesaj({
-        tip: "basari",
-        metin: `${seciliPersoneller.length} personel için ${gunSayisi} günlük vardiya planı hazırlandı.`,
-      })
-    } catch (err: any) {
-      setMesaj({ tip: "hata", metin: err?.message || "Vardiya planı hazırlanamadı." })
+        liste.push({
+          personel_id: personel.id,
+          personel_adi: adSoyad(personel),
+          personel_kodu: personel.personel_kodu || "",
+          rol: personel.rol || "",
+          tarih,
+          durum,
+          baslangic_saati: baslangicSaati,
+          bitis_saati: bitisSaati,
+          calisma_gunu: durum === "calisma",
+          aciklama,
+        })
+      }
     }
+
+    setVardiyalar(liste)
+    setMesaj({
+      tip: "basari",
+      metin: `${seciliPersoneller.length} personel için ${gunSayisi} günlük vardiya planı hazırlandı. Okunan onaylı izin: ${izinler.length}`,
+    })
 
     setLoading(false)
   }
@@ -322,8 +216,8 @@ export default function VardiyaPage() {
     }
 
     if (field === "durum" && value === "calisma") {
-      kopya[index].baslangic_saati = kopya[index].baslangic_saati || standartBaslangic
-      kopya[index].bitis_saati = kopya[index].bitis_saati || standartBitis
+      kopya[index].baslangic_saati = standartBaslangic
+      kopya[index].bitis_saati = standartBitis
       kopya[index].calisma_gunu = true
     }
 
@@ -331,14 +225,10 @@ export default function VardiyaPage() {
   }
 
   async function kaydet() {
-    setMesaj(null)
-
-    if (vardiyalar.length === 0) {
-      setMesaj({ tip: "hata", metin: "Kaydedilecek vardiya yok." })
-      return
-    }
+    if (vardiyalar.length === 0) return
 
     setLoading(true)
+    setMesaj(null)
 
     const supabase = createClient()
 
@@ -369,11 +259,7 @@ export default function VardiyaPage() {
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900">
       <div className="bg-white border-b px-6 py-4 flex items-center gap-3 shadow-sm">
-        <button
-          type="button"
-          onClick={() => router.push("/portal")}
-          className="text-2xl font-bold text-gray-700"
-        >
+        <button type="button" onClick={() => router.push("/portal")} className="text-2xl font-bold text-gray-700">
           ←
         </button>
 
@@ -441,15 +327,10 @@ export default function VardiyaPage() {
             />
           </div>
 
-          <div className="grid md:grid-cols-4 gap-3">
+          <div className="grid md:grid-cols-3 gap-3">
             <label className="flex items-center gap-2 rounded-xl border bg-gray-50 p-3 text-sm font-bold">
               <input type="checkbox" checked={pazarTatil} onChange={(e) => setPazarTatil(e.target.checked)} />
               Pazar tatil
-            </label>
-
-            <label className="flex items-center gap-2 rounded-xl border bg-gray-50 p-3 text-sm font-bold">
-              <input type="checkbox" checked={resmiTatilUygula} onChange={(e) => setResmiTatilUygula(e.target.checked)} />
-              Resmi/dini tatil
             </label>
 
             <label className="flex items-center gap-2 rounded-xl border bg-gray-50 p-3 text-sm font-bold">
@@ -515,9 +396,7 @@ export default function VardiyaPage() {
                         <option value="calisma">Çalışma</option>
                         <option value="izinli">İzinli</option>
                         <option value="raporlu">Raporlu</option>
-                        <option value="egitim">Eğitim</option>
                         <option value="hafta_tatili">Hafta Tatili</option>
-                        <option value="resmi_tatil">Resmi Tatil</option>
                       </select>
                     </td>
 

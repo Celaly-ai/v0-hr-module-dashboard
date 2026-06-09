@@ -96,12 +96,23 @@ function durumIkon(durum?: string | null) {
 
 function tarihYaz(value?: string | null) {
   if (!value) return "-"
-  return new Date(`${value}T00:00:00`).toLocaleDateString("tr-TR")
+
+  const temiz = String(value).slice(0, 10)
+  const tarih = new Date(`${temiz}T00:00:00`)
+
+  if (Number.isNaN(tarih.getTime())) return "-"
+
+  return tarih.toLocaleDateString("tr-TR")
 }
 
 function tarihSaatYaz(value?: string | null) {
   if (!value) return "-"
-  return new Date(value).toLocaleDateString("tr-TR", {
+
+  const tarih = new Date(value)
+
+  if (Number.isNaN(tarih.getTime())) return "-"
+
+  return tarih.toLocaleDateString("tr-TR", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -122,13 +133,20 @@ function gunSayisi(baslangic: string, bitis: string) {
   return Math.max(0, fark)
 }
 
-function hizmetYili(personel: any) {
-  const giris =
-    personel?.ise_giris ||
+function iseGirisTarihiBul(personel: any) {
+  return (
     personel?.ise_giris_tarihi ||
+    personel?.ise_giris ||
     personel?.giris_tarihi ||
     personel?.baslama_tarihi ||
-    personel?.created_at
+    personel?.ise_baslama_tarihi ||
+    personel?.created_at ||
+    null
+  )
+}
+
+function hizmetYili(personel: any) {
+  const giris = iseGirisTarihiBul(personel)
 
   if (!giris) return 0
 
@@ -185,9 +203,11 @@ function yillikIzinHakkiHesapla(personel: any) {
 
 function talepGun(t: any) {
   if (t.izin_gun_sayisi) return Number(t.izin_gun_sayisi || 0)
+
   if (t.izin_baslangic && t.izin_bitis) {
     return gunSayisi(t.izin_baslangic, t.izin_bitis)
   }
+
   return 0
 }
 
@@ -214,18 +234,32 @@ export default function IzinPage() {
   const talepleriYenile = useCallback(async (personelId: string) => {
     const supabase = createClient()
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("calisan_talepler")
-      .select("id, baslik, aciklama, durum, created_at, izin_turu, izin_baslangic, izin_bitis, izin_gun_sayisi, devamsizlik_turu, yillik_izinden_duser")
+      .select(
+        "id, baslik, aciklama, durum, created_at, izin_turu, izin_baslangic, izin_bitis, izin_gun_sayisi, devamsizlik_turu, yillik_izinden_duser",
+      )
       .eq("personel_id", personelId)
       .eq("tip", "izin")
       .order("created_at", { ascending: false })
+
+    if (error) {
+      setMesaj({
+        tip: "hata",
+        metin: `İzin talepleri okunamadı: ${error.message}`,
+      })
+      setTalepler([])
+      return
+    }
 
     setTalepler(data || [])
   }, [])
 
   useEffect(() => {
     async function yukle() {
+      setYukleniyor(true)
+      setMesaj(null)
+
       const supabase = createClient()
 
       const {
@@ -235,27 +269,39 @@ export default function IzinPage() {
       const user = session?.user
 
       if (!user) {
-        setMesaj({ tip: "hata", metin: "Oturum bulunamadı. Lütfen portaldan tekrar giriş yapın." })
+        setMesaj({
+          tip: "hata",
+          metin: "Oturum bulunamadı. Lütfen portaldan tekrar giriş yapın.",
+        })
         setYukleniyor(false)
         return
       }
 
       const { data: p, error: personelError } = await supabase
         .from("personeller")
-        .select("id, sirket_id, yillik_izin_devir_gunu, dogum_tarihi, ise_giris, ise_giris_tarihi, created_at")
+        .select(
+          "id, sirket_id, yillik_izin_devir_gunu, dogum_tarihi, ise_giris, ise_giris_tarihi, giris_tarihi, baslama_tarihi, ise_baslama_tarihi, created_at",
+        )
         .or(`auth_id.eq.${user.id},kullanici_id.eq.${user.id},email.eq.${user.email}`)
         .maybeSingle()
 
       if (personelError || !p) {
         setMesaj({
           tip: "hata",
-          metin: "İzin sayfası için personel kaydı bulunamadı: " + (personelError?.message || user.email || user.id),
+          metin:
+            "İzin sayfası için personel kaydı bulunamadı: " +
+            (personelError?.message || user.email || user.id),
         })
         setYukleniyor(false)
         return
       }
 
-      setPersonel(p)
+      const normalizePersonel = {
+        ...p,
+        ise_giris_tarihi: iseGirisTarihiBul(p),
+      }
+
+      setPersonel(normalizePersonel)
       await talepleriYenile(p.id)
       setYukleniyor(false)
     }

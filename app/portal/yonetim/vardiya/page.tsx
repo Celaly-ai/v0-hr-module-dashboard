@@ -165,32 +165,40 @@ export default function VardiyaPage() {
     return data || []
   }
 
-  function ozelDurumBul(personelId: string, tarih: string, izinler: Kayit[]) {
-    const izin = izinler.find((x) => {
-      return (
-        x.personel_id === personelId &&
-        onayliMi(x.durum) &&
-        tarihAraligindaMi(tarih, x.izin_baslangic, x.izin_bitis)
-      )
+  async function izinleriGetir(personelIds: string[], baslangic: string, bitis: string) {
+  if (!ozelDurumUygula || personelIds.length === 0) return []
+
+  const supabase = createClient()
+
+  const { data, error } = await supabase
+    .from("calisan_talepler")
+    .select(
+      "id, personel_id, tip, baslik, izin_turu, durum, izin_baslangic, izin_bitis, izin_gun_sayisi, devamsizlik_turu, yillik_izinden_duser",
+    )
+    .in("personel_id", personelIds)
+    .eq("tip", "izin")
+
+  if (error) {
+    setMesaj({
+      tip: "hata",
+      metin: "Onaylı izinler okunamadı: " + error.message,
     })
-
-    if (!izin) return null
-
-    const izinTuru = izin.izin_turu || izin.baslik || "İzin"
-    const devamsizlikTuru = String(izin.devamsizlik_turu || "").toLocaleLowerCase("tr-TR")
-
-    if (devamsizlikTuru === "rapor" || izinTuru === "Hastalık / Rapor") {
-      return {
-        durum: "raporlu",
-        aciklama: `Onaylı rapor: ${izinTuru}`,
-      }
-    }
-
-    return {
-      durum: "izinli",
-      aciklama: `Onaylı izin: ${izinTuru}`,
-    }
+    return []
   }
+
+  return (data || []).filter((izin: any) => {
+    const durum = String(izin.durum || "").toLocaleLowerCase("tr-TR")
+    const onayli =
+      durum === "onaylandı" ||
+      durum === "onaylandi" ||
+      durum === "approved"
+
+    if (!onayli) return false
+    if (!izin.izin_baslangic || !izin.izin_bitis) return false
+
+    return izin.izin_baslangic <= bitis && izin.izin_bitis >= baslangic
+  })
+}
 
   async function getir() {
     setMesaj(null)

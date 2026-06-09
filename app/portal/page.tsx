@@ -32,6 +32,37 @@ type PortalKart = {
   roller: string[]
 }
 
+const TUM_PERSONEL_ROLLERI = [
+  "admin",
+  "yonetici",
+  "yönetici",
+  "servis_yoneticisi",
+  "ik_yoneticisi",
+  "muhasebe",
+  "finans",
+  "anketor",
+  "anketör",
+  "buro",
+  "büro",
+  "buro_personeli",
+  "büro_personeli",
+  "teknisyen",
+  "montaj_teknisyeni",
+  "ariza_teknisyeni",
+  "arıza_teknisyeni",
+  "nakliye",
+  "calisan",
+  "çalışan",
+]
+
+const YONETICI_ROLLERI = [
+  "admin",
+  "yonetici",
+  "yönetici",
+  "servis_yoneticisi",
+  "ik_yoneticisi",
+]
+
 const KARTLAR: PortalKart[] = [
   {
     baslik: "Yönetim Talepleri",
@@ -40,7 +71,7 @@ const KARTLAR: PortalKart[] = [
     ikon: ShieldCheck,
     renk: "border-blue-200 bg-blue-50 text-blue-900",
     grup: "Yönetim",
-    roller: ["admin", "yonetici", "yönetici", "servis_yoneticisi", "ik_yoneticisi"],
+    roller: YONETICI_ROLLERI,
   },
   {
     baslik: "Yönetici Bildirimleri",
@@ -49,7 +80,7 @@ const KARTLAR: PortalKart[] = [
     ikon: Bell,
     renk: "border-red-200 bg-red-50 text-red-900",
     grup: "Yönetim",
-    roller: ["admin", "yonetici", "yönetici", "servis_yoneticisi", "ik_yoneticisi"],
+    roller: YONETICI_ROLLERI,
   },
   {
     baslik: "Vardiya Yönetimi",
@@ -58,7 +89,7 @@ const KARTLAR: PortalKart[] = [
     ikon: CalendarDays,
     renk: "border-violet-200 bg-violet-50 text-violet-900",
     grup: "Yönetim",
-    roller: ["admin", "yonetici", "yönetici", "servis_yoneticisi", "ik_yoneticisi"],
+    roller: YONETICI_ROLLERI,
   },
   {
     baslik: "Ekip Yönetimi",
@@ -67,7 +98,7 @@ const KARTLAR: PortalKart[] = [
     ikon: Users,
     renk: "border-cyan-200 bg-cyan-50 text-cyan-900",
     grup: "Yönetim",
-    roller: ["admin", "yonetici", "yönetici", "servis_yoneticisi", "ik_yoneticisi"],
+    roller: YONETICI_ROLLERI,
   },
   {
     baslik: "Personel Giriş Hesapları",
@@ -76,7 +107,7 @@ const KARTLAR: PortalKart[] = [
     ikon: UserCog,
     renk: "border-slate-200 bg-slate-50 text-slate-900",
     grup: "Yönetim",
-    roller: ["admin", "yonetici", "yönetici", "servis_yoneticisi", "ik_yoneticisi"],
+    roller: YONETICI_ROLLERI,
   },
   {
     baslik: "Personel Yükle",
@@ -85,7 +116,16 @@ const KARTLAR: PortalKart[] = [
     ikon: FileSpreadsheet,
     renk: "border-emerald-200 bg-emerald-50 text-emerald-900",
     grup: "Yönetim",
-    roller: ["admin", "yonetici", "yönetici", "servis_yoneticisi", "ik_yoneticisi"],
+    roller: YONETICI_ROLLERI,
+  },
+  {
+    baslik: "Personel Paneli",
+    aciklama: "Kişisel çalışma paneli, vardiya, mesai ve talepler.",
+    yol: "/portal/personel-paneli",
+    ikon: UserCog,
+    renk: "border-blue-200 bg-blue-50 text-blue-900",
+    grup: "Personel",
+    roller: TUM_PERSONEL_ROLLERI,
   },
   {
     baslik: "Giriş / Çıkış",
@@ -94,7 +134,7 @@ const KARTLAR: PortalKart[] = [
     ikon: LogIn,
     renk: "border-green-200 bg-green-50 text-green-900",
     grup: "Personel",
-    roller: ["admin", "yonetici", "yönetici", "servis_yoneticisi", "ik_yoneticisi", "muhasebe", "finans", "anketor", "anketör", "buro", "büro", "buro_personeli", "büro_personeli", "teknisyen", "montaj_teknisyeni", "ariza_teknisyeni", "arıza_teknisyeni", "nakliye", "calisan", "çalışan"],
+    roller: TUM_PERSONEL_ROLLERI,
   },
   {
     baslik: "İzin Talebi",
@@ -103,7 +143,7 @@ const KARTLAR: PortalKart[] = [
     ikon: ClipboardList,
     renk: "border-orange-200 bg-orange-50 text-orange-900",
     grup: "Personel",
-    roller: ["admin", "yonetici", "yönetici", "servis_yoneticisi", "ik_yoneticisi", "muhasebe", "finans", "anketor", "anketör", "buro", "büro", "buro_personeli", "büro_personeli", "teknisyen", "montaj_teknisyeni", "ariza_teknisyeni", "arıza_teknisyeni", "nakliye", "calisan", "çalışan"],
+    roller: TUM_PERSONEL_ROLLERI,
   },
   {
     baslik: "Taleplerim",
@@ -112,7 +152,7 @@ const KARTLAR: PortalKart[] = [
     ikon: ClipboardList,
     renk: "border-yellow-200 bg-yellow-50 text-yellow-900",
     grup: "Personel",
-    roller: ["admin", "yonetici", "yönetici", "servis_yoneticisi", "ik_yoneticisi", "muhasebe", "finans", "anketor", "anketör", "buro", "büro", "buro_personeli", "büro_personeli", "teknisyen", "montaj_teknisyeni", "ariza_teknisyeni", "arıza_teknisyeni", "nakliye", "calisan", "çalışan"],
+    roller: TUM_PERSONEL_ROLLERI,
   },
   {
     baslik: "Malzeme / Avadanlık",
@@ -121,7 +161,19 @@ const KARTLAR: PortalKart[] = [
     ikon: Package,
     renk: "border-lime-200 bg-lime-50 text-lime-900",
     grup: "Operasyon",
-    roller: ["admin", "yonetici", "yönetici", "servis_yoneticisi", "teknisyen", "montaj_teknisyeni", "ariza_teknisyeni", "arıza_teknisyeni", "nakliye", "calisan", "çalışan"],
+    roller: [
+      "admin",
+      "yonetici",
+      "yönetici",
+      "servis_yoneticisi",
+      "teknisyen",
+      "montaj_teknisyeni",
+      "ariza_teknisyeni",
+      "arıza_teknisyeni",
+      "nakliye",
+      "calisan",
+      "çalışan",
+    ],
   },
   {
     baslik: "Araçlar",
@@ -157,7 +209,18 @@ const KARTLAR: PortalKart[] = [
     ikon: FileSpreadsheet,
     renk: "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-900",
     grup: "Operasyon",
-    roller: ["admin", "yonetici", "yönetici", "servis_yoneticisi", "anketor", "anketör", "buro", "büro", "buro_personeli", "büro_personeli"],
+    roller: [
+      "admin",
+      "yonetici",
+      "yönetici",
+      "servis_yoneticisi",
+      "anketor",
+      "anketör",
+      "buro",
+      "büro",
+      "buro_personeli",
+      "büro_personeli",
+    ],
   },
   {
     baslik: "Müşteri Anketi",
@@ -166,7 +229,18 @@ const KARTLAR: PortalKart[] = [
     ikon: Bot,
     renk: "border-pink-200 bg-pink-50 text-pink-900",
     grup: "Operasyon",
-    roller: ["admin", "yonetici", "yönetici", "servis_yoneticisi", "anketor", "anketör", "buro", "büro", "buro_personeli", "büro_personeli"],
+    roller: [
+      "admin",
+      "yonetici",
+      "yönetici",
+      "servis_yoneticisi",
+      "anketor",
+      "anketör",
+      "buro",
+      "büro",
+      "buro_personeli",
+      "büro_personeli",
+    ],
   },
   {
     baslik: "Riskli Anket Takibi",
@@ -175,7 +249,18 @@ const KARTLAR: PortalKart[] = [
     ikon: AlertTriangle,
     renk: "border-orange-200 bg-orange-50 text-orange-900",
     grup: "Operasyon",
-    roller: ["admin", "yonetici", "yönetici", "servis_yoneticisi", "anketor", "anketör", "buro", "büro", "buro_personeli", "büro_personeli"],
+    roller: [
+      "admin",
+      "yonetici",
+      "yönetici",
+      "servis_yoneticisi",
+      "anketor",
+      "anketör",
+      "buro",
+      "büro",
+      "buro_personeli",
+      "büro_personeli",
+    ],
   },
   {
     baslik: "AI Görev Merkezi",
@@ -311,26 +396,32 @@ export default function PortalPage() {
             <p className="text-xs font-bold text-slate-500">Aktif Personel</p>
             <p className="mt-2 text-2xl font-black text-slate-950">{kpi.aktifPersonel}</p>
           </div>
+
           <div className="rounded-2xl border bg-white p-4 shadow-sm">
             <p className="text-xs font-bold text-slate-500">Bekleyen Anket</p>
             <p className="mt-2 text-2xl font-black text-fuchsia-900">{kpi.bekleyenAnket}</p>
           </div>
+
           <div className="rounded-2xl border bg-white p-4 shadow-sm">
             <p className="text-xs font-bold text-slate-500">Açık Talep</p>
             <p className="mt-2 text-2xl font-black text-orange-900">{kpi.acikTalep}</p>
           </div>
+
           <div className="rounded-2xl border bg-white p-4 shadow-sm">
             <p className="text-xs font-bold text-slate-500">AI Görev</p>
             <p className="mt-2 text-2xl font-black text-red-900">{kpi.aiGorev}</p>
           </div>
+
           <div className="rounded-2xl border bg-white p-4 shadow-sm">
             <p className="text-xs font-bold text-slate-500">Yönetici Bildirimi</p>
             <p className="mt-2 text-2xl font-black text-orange-900">{kpi.yoneticiBildirim}</p>
           </div>
+
           <div className="rounded-2xl border bg-white p-4 shadow-sm">
             <p className="text-xs font-bold text-slate-500">Kritik / Riskli Görev</p>
             <p className="mt-2 text-2xl font-black text-rose-900">{kpi.kritikRisk}</p>
           </div>
+
           <div className="rounded-2xl border bg-white p-4 shadow-sm">
             <p className="text-xs font-bold text-slate-500">Varlık</p>
             <p className="mt-2 text-2xl font-black text-indigo-900">{kpi.varlik}</p>
@@ -347,44 +438,46 @@ export default function PortalPage() {
           </div>
         ) : null}
 
-        {!loading && GRUPLAR.map((grup) => {
-          const kartlar = gorunenKartlar.filter((kart) => kart.grup === grup)
+        {!loading &&
+          GRUPLAR.map((grup) => {
+            const kartlar = gorunenKartlar.filter((kart) => kart.grup === grup)
 
-          if (kartlar.length === 0) return null
+            if (kartlar.length === 0) return null
 
-          return (
-            <div key={grup} className="space-y-3">
-              <h2 className="text-sm font-black uppercase tracking-wide text-slate-600">
-                {grup}
-              </h2>
+            return (
+              <div key={grup} className="space-y-3">
+                <h2 className="text-sm font-black uppercase tracking-wide text-slate-600">
+                  {grup}
+                </h2>
 
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {kartlar.map((kart) => {
-                  const Ikon = kart.ikon
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {kartlar.map((kart) => {
+                    const Ikon = kart.ikon
 
-                  return (
-                    <button
-                      key={kart.yol}
-                      type="button"
-                      onClick={() => router.push(kart.yol)}
-                      className={`rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${kart.renk}`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <h3 className="text-lg font-black">{kart.baslik}</h3>
-                          <p className="mt-2 text-sm opacity-80">{kart.aciklama}</p>
+                    return (
+                      <button
+                        key={kart.yol}
+                        type="button"
+                        onClick={() => router.push(kart.yol)}
+                        className={`rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${kart.renk}`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h3 className="text-lg font-black">{kart.baslik}</h3>
+                            <p className="mt-2 text-sm opacity-80">{kart.aciklama}</p>
+                          </div>
+
+                          <div className="rounded-2xl bg-white/70 p-3">
+                            <Ikon className="h-6 w-6" />
+                          </div>
                         </div>
-                        <div className="rounded-2xl bg-white/70 p-3">
-                          <Ikon className="h-6 w-6" />
-                        </div>
-                      </div>
-                    </button>
-                  )
-                })}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          )
-        })}
+            )
+          })}
       </div>
     </div>
   )

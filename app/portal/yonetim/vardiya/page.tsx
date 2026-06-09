@@ -20,26 +20,6 @@ const DINI_TATILLER: Record<string, string> = {
   "2026-05-28": "Kurban Bayramı 2. Gün",
   "2026-05-29": "Kurban Bayramı 3. Gün",
   "2026-05-30": "Kurban Bayramı 4. Gün",
-
-  "2027-03-08": "Ramazan Bayramı Arefesi",
-  "2027-03-09": "Ramazan Bayramı 1. Gün",
-  "2027-03-10": "Ramazan Bayramı 2. Gün",
-  "2027-03-11": "Ramazan Bayramı 3. Gün",
-  "2027-05-15": "Kurban Bayramı Arefesi",
-  "2027-05-16": "Kurban Bayramı 1. Gün",
-  "2027-05-17": "Kurban Bayramı 2. Gün",
-  "2027-05-18": "Kurban Bayramı 3. Gün",
-  "2027-05-19": "Kurban Bayramı 4. Gün",
-
-  "2028-02-26": "Ramazan Bayramı Arefesi",
-  "2028-02-27": "Ramazan Bayramı 1. Gün",
-  "2028-02-28": "Ramazan Bayramı 2. Gün",
-  "2028-02-29": "Ramazan Bayramı 3. Gün",
-  "2028-05-04": "Kurban Bayramı Arefesi",
-  "2028-05-05": "Kurban Bayramı 1. Gün",
-  "2028-05-06": "Kurban Bayramı 2. Gün",
-  "2028-05-07": "Kurban Bayramı 3. Gün",
-  "2028-05-08": "Kurban Bayramı 4. Gün",
 }
 
 function formatISO(date: Date) {
@@ -61,7 +41,6 @@ function getDaysArray(start: Date, count: number) {
 
 function sabitResmiTatilAdi(tarih: string) {
   const ayGun = tarih.slice(5)
-
   const sabitler: Record<string, string> = {
     "01-01": "Yılbaşı",
     "04-23": "Ulusal Egemenlik ve Çocuk Bayramı",
@@ -71,7 +50,6 @@ function sabitResmiTatilAdi(tarih: string) {
     "08-30": "Zafer Bayramı",
     "10-29": "Cumhuriyet Bayramı",
   }
-
   return sabitler[ayGun] || ""
 }
 
@@ -106,6 +84,21 @@ function mesajClass(tip: MesajTipi) {
   if (tip === "basari") return "border-green-300 bg-green-50 text-green-900"
   if (tip === "hata") return "border-red-300 bg-red-50 text-red-900"
   return "border-blue-300 bg-blue-50 text-blue-900"
+}
+
+function onayliMi(durum?: string | null) {
+  const d = String(durum || "").toLocaleLowerCase("tr-TR")
+  return d === "onaylandı" || d === "onaylandi" || d === "onaylı" || d === "approved"
+}
+
+function izinDurumuBelirle(talep: Kayit) {
+  const tur = String(talep.devamsizlik_turu || talep.izin_turu || "").toLocaleLowerCase("tr-TR")
+
+  if (tur.includes("rapor") || tur.includes("hastalık") || tur.includes("hastalik")) {
+    return "raporlu"
+  }
+
+  return "izinli"
 }
 
 export default function VardiyaPage() {
@@ -150,67 +143,48 @@ export default function VardiyaPage() {
     if (seciliPersonel === TUM_PERSONELLER) {
       return personeller.filter((p) => {
         const durum = String(p.durum || "").toLocaleLowerCase("tr-TR")
-        return !durum.includes("pasif") && !durum.includes("isten_ayrildi")
+        return durum === "aktif" || durum === "active"
       })
     }
 
     return personeller.filter((p) => p.id === seciliPersonel)
   }, [personeller, seciliPersonel])
 
-  async function guvenliOku(tablo: string, personelIds: string[], baslangic: string, bitis: string) {
-    if (personelIds.length === 0) return []
+  async function onayliIzinleriGetir(personelIds: string[], baslangic: string, bitis: string) {
+    if (!ozelDurumUygula || personelIds.length === 0) return []
 
     const supabase = createClient()
 
     const { data, error } = await supabase
-      .from(tablo)
-      .select("*")
+      .from("calisan_talepler")
+      .select("id, personel_id, tip, baslik, izin_turu, durum, izin_baslangic, izin_bitis, devamsizlik_turu")
       .in("personel_id", personelIds)
-      .lte("baslangic_tarihi", bitis)
-      .gte("bitis_tarihi", baslangic)
+      .eq("tip", "izin")
+      .lte("izin_baslangic", bitis)
+      .gte("izin_bitis", baslangic)
 
-    if (error) return []
-    return data || []
-  }
-
-  async function ozelDurumlariGetir(personelIds: string[], baslangic: string, bitis: string) {
-    if (!ozelDurumUygula) {
-      return { izinler: [], raporlar: [], egitimler: [] }
+    if (error) {
+      setMesaj({ tip: "hata", metin: "Onaylı izinler alınamadı: " + error.message })
+      return []
     }
 
-    const izinler = await guvenliOku("izin_talepleri", personelIds, baslangic, bitis)
-    const raporlar = await guvenliOku("saglik_raporlari", personelIds, baslangic, bitis)
-    const egitimler = await guvenliOku("egitim_kayitlari", personelIds, baslangic, bitis)
-
-    return { izinler, raporlar, egitimler }
+    return (data || []).filter((t) => onayliMi(t.durum))
   }
 
-  function ozelDurumBul(personelId: string, tarih: string, izinler: Kayit[], raporlar: Kayit[], egitimler: Kayit[]) {
+  function ozelDurumBul(personelId: string, tarih: string, izinler: Kayit[]) {
     const izin = izinler.find((x) => {
-      const durum = String(x.durum || "").toLocaleLowerCase("tr-TR")
-      const onayli = durum === "onaylandi" || durum === "onaylı" || durum === "approved"
-      return x.personel_id === personelId && onayli && tarihAraligindaMi(tarih, x.baslangic_tarihi, x.bitis_tarihi)
+      return (
+        x.personel_id === personelId &&
+        tarihAraligindaMi(tarih, x.izin_baslangic, x.izin_bitis)
+      )
     })
 
-    if (izin) return { durum: "izinli", aciklama: `Onaylı izin: ${izin.izin_turu || ""}` }
+    if (!izin) return null
 
-    const rapor = raporlar.find((x) => {
-      const durum = String(x.durum || "").toLocaleLowerCase("tr-TR")
-      const aktif = !durum || durum === "onaylandi" || durum === "onaylı" || durum === "aktif" || durum === "approved"
-      return x.personel_id === personelId && aktif && tarihAraligindaMi(tarih, x.baslangic_tarihi, x.bitis_tarihi)
-    })
-
-    if (rapor) return { durum: "raporlu", aciklama: `Sağlık raporu: ${rapor.aciklama || ""}` }
-
-    const egitim = egitimler.find((x) => {
-      const durum = String(x.durum || "").toLocaleLowerCase("tr-TR")
-      const aktif = !durum || durum === "planlandi" || durum === "planlandı" || durum === "aktif" || durum === "onaylandi"
-      return x.personel_id === personelId && aktif && tarihAraligindaMi(tarih, x.baslangic_tarihi, x.bitis_tarihi)
-    })
-
-    if (egitim) return { durum: "egitim", aciklama: `Eğitim: ${egitim.egitim_adi || egitim.baslik || ""}` }
-
-    return null
+    return {
+      durum: izinDurumuBelirle(izin),
+      aciklama: `Onaylı izin: ${izin.izin_turu || izin.baslik || ""}`,
+    }
   }
 
   async function getir() {
@@ -252,7 +226,7 @@ export default function VardiyaPage() {
       const mevcutMap = new Map<string, Kayit>()
       for (const v of mevcutData || []) mevcutMap.set(`${v.personel_id}-${v.tarih}`, v)
 
-      const { izinler, raporlar, egitimler } = await ozelDurumlariGetir(personelIds, baslangicTarih, bitisTarih)
+      const izinler = await onayliIzinleriGetir(personelIds, baslangicTarih, bitisTarih)
 
       const liste: Kayit[] = []
 
@@ -264,6 +238,7 @@ export default function VardiyaPage() {
           if (mevcut) {
             liste.push({
               ...mevcut,
+              sirket_id: personel.sirket_id || mevcut.sirket_id || null,
               personel_adi: adSoyad(personel),
               personel_kodu: personel.personel_kodu || "",
               rol: personel.rol || "",
@@ -276,7 +251,7 @@ export default function VardiyaPage() {
           let bitisSaati: string | null = standartBitis
           let aciklama = ""
 
-          const ozelDurum = ozelDurumBul(personel.id, tarih, izinler, raporlar, egitimler)
+          const ozelDurum = ozelDurumBul(personel.id, tarih, izinler)
           const tatilAdi = resmiTatilUygula ? resmiTatilAdi(tarih) : ""
 
           if (ozelDurum) {
@@ -297,6 +272,7 @@ export default function VardiyaPage() {
           }
 
           liste.push({
+            sirket_id: personel.sirket_id || null,
             personel_id: personel.id,
             personel_adi: adSoyad(personel),
             personel_kodu: personel.personel_kodu || "",
@@ -314,7 +290,7 @@ export default function VardiyaPage() {
       setVardiyalar(liste)
       setMesaj({
         tip: "basari",
-        metin: `${seciliPersoneller.length} personel için ${gunSayisi} günlük vardiya planı hazırlandı.`,
+        metin: `${seciliPersoneller.length} personel için ${gunSayisi} günlük vardiya planı hazırlandı. Onaylı izinler otomatik işlendi.`,
       })
     } catch (err: any) {
       setMesaj({ tip: "hata", metin: err?.message || "Vardiya planı hazırlanamadı." })
@@ -355,6 +331,7 @@ export default function VardiyaPage() {
     const supabase = createClient()
 
     const payload = vardiyalar.map((v) => ({
+      sirket_id: v.sirket_id || null,
       personel_id: v.personel_id,
       tarih: v.tarih,
       baslangic_saati: v.durum === "calisma" ? v.baslangic_saati : null,
@@ -381,11 +358,7 @@ export default function VardiyaPage() {
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900">
       <div className="bg-white border-b px-6 py-4 flex items-center gap-3 shadow-sm">
-        <button
-          type="button"
-          onClick={() => router.push("/portal")}
-          className="text-2xl font-bold text-gray-700"
-        >
+        <button type="button" onClick={() => router.push("/portal")} className="text-2xl font-bold text-gray-700">
           ←
         </button>
 
@@ -400,14 +373,7 @@ export default function VardiyaPage() {
       <div className="p-6 space-y-6 max-w-7xl mx-auto">
         <div className="bg-white p-5 rounded-2xl border shadow-sm space-y-4">
           <div className="grid md:grid-cols-5 gap-3">
-            <select
-              value={seciliPersonel}
-              onChange={(e) => {
-                setSeciliPersonel(e.target.value)
-                setVardiyalar([])
-              }}
-              className="border border-gray-400 bg-white font-semibold p-3 rounded-lg"
-            >
+            <select value={seciliPersonel} onChange={(e) => { setSeciliPersonel(e.target.value); setVardiyalar([]) }} className="border border-gray-400 bg-white font-semibold p-3 rounded-lg">
               <option value={TUM_PERSONELLER}>Tüm aktif personeller</option>
               {personeller.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -416,41 +382,13 @@ export default function VardiyaPage() {
               ))}
             </select>
 
-            <input
-              type="date"
-              value={baslangicTarih}
-              onChange={(e) => {
-                setBaslangicTarih(e.target.value)
-                setVardiyalar([])
-              }}
-              className="border border-gray-400 bg-white font-semibold p-3 rounded-lg"
-            />
+            <input type="date" value={baslangicTarih} onChange={(e) => { setBaslangicTarih(e.target.value); setVardiyalar([]) }} className="border border-gray-400 bg-white font-semibold p-3 rounded-lg" />
 
-            <input
-              type="number"
-              value={gunSayisi}
-              min={1}
-              max={62}
-              onChange={(e) => {
-                setGunSayisi(Number(e.target.value))
-                setVardiyalar([])
-              }}
-              className="border border-gray-400 bg-white font-semibold p-3 rounded-lg"
-            />
+            <input type="number" value={gunSayisi} min={1} max={62} onChange={(e) => { setGunSayisi(Number(e.target.value)); setVardiyalar([]) }} className="border border-gray-400 bg-white font-semibold p-3 rounded-lg" />
 
-            <input
-              type="time"
-              value={standartBaslangic}
-              onChange={(e) => setStandartBaslangic(e.target.value)}
-              className="border border-gray-400 bg-white font-semibold p-3 rounded-lg"
-            />
+            <input type="time" value={standartBaslangic} onChange={(e) => setStandartBaslangic(e.target.value)} className="border border-gray-400 bg-white font-semibold p-3 rounded-lg" />
 
-            <input
-              type="time"
-              value={standartBitis}
-              onChange={(e) => setStandartBitis(e.target.value)}
-              className="border border-gray-400 bg-white font-semibold p-3 rounded-lg"
-            />
+            <input type="time" value={standartBitis} onChange={(e) => setStandartBitis(e.target.value)} className="border border-gray-400 bg-white font-semibold p-3 rounded-lg" />
           </div>
 
           <div className="grid md:grid-cols-4 gap-3">
@@ -466,25 +404,16 @@ export default function VardiyaPage() {
 
             <label className="flex items-center gap-2 rounded-xl border bg-gray-50 p-3 text-sm font-bold">
               <input type="checkbox" checked={ozelDurumUygula} onChange={(e) => setOzelDurumUygula(e.target.checked)} />
-              İzin/rapor/eğitim
+              Onaylı izinleri işle
             </label>
 
-            <button
-              type="button"
-              onClick={getir}
-              disabled={loading}
-              className="bg-blue-700 text-white rounded-lg px-4 py-3 font-black disabled:opacity-50"
-            >
+            <button type="button" onClick={getir} disabled={loading} className="bg-blue-700 text-white rounded-lg px-4 py-3 font-black disabled:opacity-50">
               {loading ? "Yükleniyor..." : "Getir / Planla"}
             </button>
           </div>
         </div>
 
-        {mesaj && (
-          <div className={`rounded-xl border p-4 font-bold ${mesajClass(mesaj.tip)}`}>
-            {mesaj.metin}
-          </div>
-        )}
+        {mesaj && <div className={`rounded-xl border p-4 font-bold ${mesajClass(mesaj.tip)}`}>{mesaj.metin}</div>}
 
         <div className="bg-white rounded-2xl border shadow-sm overflow-auto">
           <table className="w-full text-sm min-w-[1120px]">
@@ -511,19 +440,13 @@ export default function VardiyaPage() {
                   <tr key={`${v.personel_id}-${v.tarih}`} className="border-t hover:bg-gray-50">
                     <td className="p-3 border font-bold">
                       {v.personel_adi}
-                      <p className="text-xs text-gray-500">
-                        {v.personel_kodu || ""} {v.rol ? `· ${v.rol}` : ""}
-                      </p>
+                      <p className="text-xs text-gray-500">{v.personel_kodu || ""} {v.rol ? `· ${v.rol}` : ""}</p>
                     </td>
 
                     <td className="p-3 border font-bold">{v.tarih}</td>
 
                     <td className="p-3 border">
-                      <select
-                        value={v.durum}
-                        onChange={(e) => guncelle(i, "durum", e.target.value)}
-                        className={`w-full border rounded-lg px-3 py-2 font-black ${durumClass(v.durum)}`}
-                      >
+                      <select value={v.durum} onChange={(e) => guncelle(i, "durum", e.target.value)} className={`w-full border rounded-lg px-3 py-2 font-black ${durumClass(v.durum)}`}>
                         <option value="calisma">Çalışma</option>
                         <option value="izinli">İzinli</option>
                         <option value="raporlu">Raporlu</option>
@@ -534,31 +457,15 @@ export default function VardiyaPage() {
                     </td>
 
                     <td className="p-3 border">
-                      <input
-                        type="time"
-                        value={v.baslangic_saati || ""}
-                        disabled={v.durum !== "calisma"}
-                        onChange={(e) => guncelle(i, "baslangic_saati", e.target.value)}
-                        className="w-full border rounded-lg px-3 py-2 font-bold disabled:bg-gray-200"
-                      />
+                      <input type="time" value={v.baslangic_saati || ""} disabled={v.durum !== "calisma"} onChange={(e) => guncelle(i, "baslangic_saati", e.target.value)} className="w-full border rounded-lg px-3 py-2 font-bold disabled:bg-gray-200" />
                     </td>
 
                     <td className="p-3 border">
-                      <input
-                        type="time"
-                        value={v.bitis_saati || ""}
-                        disabled={v.durum !== "calisma"}
-                        onChange={(e) => guncelle(i, "bitis_saati", e.target.value)}
-                        className="w-full border rounded-lg px-3 py-2 font-bold disabled:bg-gray-200"
-                      />
+                      <input type="time" value={v.bitis_saati || ""} disabled={v.durum !== "calisma"} onChange={(e) => guncelle(i, "bitis_saati", e.target.value)} className="w-full border rounded-lg px-3 py-2 font-bold disabled:bg-gray-200" />
                     </td>
 
                     <td className="p-3 border">
-                      <input
-                        value={v.aciklama || ""}
-                        onChange={(e) => guncelle(i, "aciklama", e.target.value)}
-                        className="w-full border rounded-lg px-3 py-2 font-semibold"
-                      />
+                      <input value={v.aciklama || ""} onChange={(e) => guncelle(i, "aciklama", e.target.value)} className="w-full border rounded-lg px-3 py-2 font-semibold" />
                     </td>
                   </tr>
                 ))
@@ -567,12 +474,7 @@ export default function VardiyaPage() {
           </table>
         </div>
 
-        <button
-          type="button"
-          onClick={kaydet}
-          disabled={loading || vardiyalar.length === 0}
-          className="w-full bg-green-700 text-white py-4 rounded-2xl font-black text-lg disabled:opacity-50"
-        >
+        <button type="button" onClick={kaydet} disabled={loading || vardiyalar.length === 0} className="w-full bg-green-700 text-white py-4 rounded-2xl font-black text-lg disabled:opacity-50">
           {loading ? "İşlem yapılıyor..." : "Kaydet"}
         </button>
       </div>

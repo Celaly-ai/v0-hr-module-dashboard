@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
-const YEMEK_MOLASI_DAKIKA = 60
 const ONAY_SINIRI_DAKIKA = 60
 const VARSAYILAN_MESAFE_SINIRI_METRE = 50
 const KONUM_LOG_ARALIGI_MS = 120000
@@ -88,12 +87,41 @@ function durumEtiketi(durum?: string | null) {
   }
 }
 
+function ustKartClass(vardiya: Kayit | null, aktifDurum: "giris" | "cikis") {
+  if (!vardiya) return "bg-gray-700"
+  if (vardiya.durum === "calisma") {
+    return aktifDurum === "giris" ? "bg-green-600" : "bg-gray-700"
+  }
+  if (vardiya.durum === "izinli") return "bg-blue-700"
+  if (vardiya.durum === "raporlu") return "bg-red-700"
+  if (vardiya.durum === "hafta_tatili") return "bg-gray-700"
+  if (vardiya.durum === "resmi_tatil") return "bg-yellow-700"
+  if (vardiya.durum === "egitim") return "bg-purple-700"
+  return "bg-gray-700"
+}
+
+function ustKartIkon(vardiya: Kayit | null, aktifDurum: "giris" | "cikis") {
+  if (!vardiya) return "⚫"
+  if (vardiya.durum === "calisma") return aktifDurum === "giris" ? "🟢" : "⚫"
+  if (vardiya.durum === "izinli") return "🔵"
+  if (vardiya.durum === "raporlu") return "🔴"
+  if (vardiya.durum === "hafta_tatili") return "⚪"
+  if (vardiya.durum === "resmi_tatil") return "🟡"
+  if (vardiya.durum === "egitim") return "🟣"
+  return "⚫"
+}
+
+function ustKartBaslik(vardiya: Kayit | null, aktifDurum: "giris" | "cikis") {
+  if (!vardiya) return "Plan Yok"
+  if (vardiya.durum === "calisma") return aktifDurum === "giris" ? "Serviste" : "Dışarıda"
+  return durumEtiketi(vardiya.durum)
+}
+
 function durumClass(durum: string) {
   if (durum === "Çalışıyor") return "bg-green-100 text-green-900 border-green-300"
   if (durum === "Zamanında") return "bg-emerald-100 text-emerald-900 border-emerald-300"
   return "bg-gray-100 text-gray-900 border-gray-300"
 }
-
 
 function kayitDakika(kayit: Kayit | null) {
   if (!kayit?.created_at) return null
@@ -105,6 +133,7 @@ function analizRenk(value: number) {
   if (value <= 15) return "text-yellow-700"
   return "text-red-700"
 }
+
 function konumAl(): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
@@ -283,6 +312,12 @@ export default function GirisCikisPage() {
 
       setKayitlar(liste)
       setSonKayit(liste[0] || null)
+
+      if (vardiyaData && vardiyaData.durum !== "calisma") {
+        setKonumTakipMesaji(`${durumEtiketi(vardiyaData.durum)} günü olduğu için konum takibi pasiftir.`)
+      } else if (!vardiyaData) {
+        setKonumTakipMesaji("Bugün için vardiya planı bulunmadığı için konum takibi pasiftir.")
+      }
     } catch (err: any) {
       setMesaj({
         tip: "hata",
@@ -294,12 +329,21 @@ export default function GirisCikisPage() {
   }
 
   useEffect(() => {
-    verileriYukle()
+    void verileriYukle()
   }, [])
+
+  const vardiyaCalismaGunu = useMemo(() => {
+    return Boolean(vardiya && vardiya.durum === "calisma" && vardiya.calisma_gunu !== false)
+  }, [vardiya])
 
   async function konumLoguKaydet() {
     if (!personel?.id) {
       setKonumTakipMesaji("Personel bilgisi bulunamadı.")
+      return
+    }
+
+    if (!vardiyaCalismaGunu) {
+      setKonumTakipMesaji("Bugün çalışma günü olmadığı için konum gönderimi yapılmadı.")
       return
     }
 
@@ -364,9 +408,9 @@ export default function GirisCikisPage() {
     }
   }
 
-
   useEffect(() => {
     if (!personel?.id) return
+    if (!vardiyaCalismaGunu) return
     if (sonKayit?.tip !== "giris") return
 
     void konumLoguKaydet()
@@ -379,14 +423,14 @@ export default function GirisCikisPage() {
       window.clearInterval(intervalId)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [personel?.id, sonKayit?.tip])
+  }, [personel?.id, sonKayit?.tip, vardiyaCalismaGunu])
 
   const aktifDurum = useMemo(() => {
     return sonKayit?.tip === "giris" ? "giris" : "cikis"
   }, [sonKayit])
 
   const gunAnalizi = useMemo(() => {
-    if (!vardiya) {
+    if (!vardiya || !vardiyaCalismaGunu) {
       return {
         ilkGiris: null,
         sonCikis: null,
@@ -444,8 +488,7 @@ export default function GirisCikisPage() {
       erkenCikisDakika,
       fazlaMesaiDakika,
     }
-  }, [kayitlar, vardiya])
-
+  }, [kayitlar, vardiya, vardiyaCalismaGunu])
 
   async function handleKayit(tip: "giris" | "cikis") {
     if (!personel) return
@@ -463,7 +506,7 @@ export default function GirisCikisPage() {
         return
       }
 
-      if (vardiya.durum !== "calisma" || !vardiya.calisma_gunu) {
+      if (!vardiyaCalismaGunu) {
         setMesaj({
           tip: "hata",
           metin: `Bugünkü durumunuz: ${durumEtiketi(vardiya.durum)}. Giriş/çıkış yapılamaz.`,
@@ -626,14 +669,12 @@ export default function GirisCikisPage() {
 
       <div className="max-w-md mx-auto p-4 space-y-4">
         <div
-          className={`rounded-2xl p-4 text-white text-center ${
-            aktifDurum === "giris" ? "bg-green-600" : "bg-gray-700"
-          }`}
+          className={`rounded-2xl p-4 text-white text-center ${ustKartClass(vardiya, aktifDurum)}`}
         >
-          <p className="text-3xl">{aktifDurum === "giris" ? "🟢" : "⚫"}</p>
+          <p className="text-3xl">{ustKartIkon(vardiya, aktifDurum)}</p>
 
           <p className="mt-2 text-lg font-black">
-            {aktifDurum === "giris" ? "Serviste" : "Dışarıda"}
+            {ustKartBaslik(vardiya, aktifDurum)}
           </p>
 
           <p className="text-xs font-semibold mt-2">
@@ -644,19 +685,24 @@ export default function GirisCikisPage() {
             Bugünkü Durum: {vardiya ? durumEtiketi(vardiya.durum) : "Plan Yok"}
           </p>
 
-          {vardiya?.durum === "calisma" && (
+          {vardiyaCalismaGunu && (
             <p className="text-xs font-semibold mt-1">
-              {temizSaat(vardiya.baslangic_saati)} - {temizSaat(vardiya.bitis_saati)}
+              {temizSaat(vardiya?.baslangic_saati)} - {temizSaat(vardiya?.bitis_saati)}
             </p>
           )}
 
-          {servisKonumu && (
+          {vardiya && vardiya.durum !== "calisma" && vardiya.aciklama && (
+            <p className="text-xs font-semibold mt-2 opacity-95">
+              {vardiya.aciklama}
+            </p>
+          )}
+
+          {servisKonumu && vardiyaCalismaGunu && (
             <p className="text-xs font-semibold mt-2 opacity-90">
               Konum kaynağı: {servisKonumu.kaynak} · Limit: {servisKonumu.mesafeSiniri} m
             </p>
           )}
         </div>
-
 
         <div className="rounded-2xl border border-gray-300 bg-white p-4 shadow-sm">
           <div className="mb-3">
@@ -670,7 +716,11 @@ export default function GirisCikisPage() {
             <div className="rounded-xl bg-gray-50 border p-3">
               <p className="text-gray-500">Vardiya</p>
               <p className="text-gray-900">
-                {vardiya ? `${temizSaat(vardiya.baslangic_saati)} - ${temizSaat(vardiya.bitis_saati)}` : "Plan yok"}
+                {vardiyaCalismaGunu
+                  ? `${temizSaat(vardiya?.baslangic_saati)} - ${temizSaat(vardiya?.bitis_saati)}`
+                  : vardiya
+                    ? durumEtiketi(vardiya.durum)
+                    : "Plan yok"}
               </p>
             </div>
 
@@ -718,6 +768,7 @@ export default function GirisCikisPage() {
             </div>
           </div>
         </div>
+
         {mesaj && (
           <div
             className={`rounded-xl border p-3 text-sm font-bold ${
@@ -730,10 +781,16 @@ export default function GirisCikisPage() {
           </div>
         )}
 
+        {!vardiyaCalismaGunu && (
+          <div className="rounded-xl border border-blue-300 bg-blue-50 p-3 text-sm font-bold text-blue-950">
+            Bugün {vardiya ? durumEtiketi(vardiya.durum) : "plan yok"} olarak görünüyor. Giriş/çıkış ve konum takibi kapalıdır.
+          </div>
+        )}
+
         <button
           type="button"
           onClick={() => handleKayit("giris")}
-          disabled={islem || aktifDurum === "giris"}
+          disabled={islem || aktifDurum === "giris" || !vardiyaCalismaGunu}
           className="w-full rounded-xl bg-green-600 py-4 text-white font-black disabled:opacity-40"
         >
           {islem ? "İşleniyor..." : "📍 Giriş Yap"}
@@ -742,7 +799,7 @@ export default function GirisCikisPage() {
         <button
           type="button"
           onClick={() => handleKayit("cikis")}
-          disabled={islem || aktifDurum === "cikis"}
+          disabled={islem || aktifDurum === "cikis" || !vardiyaCalismaGunu}
           className="w-full rounded-xl bg-red-600 py-4 text-white font-black disabled:opacity-40"
         >
           {islem ? "İşleniyor..." : "🚪 Çıkış Yap"}
@@ -753,7 +810,9 @@ export default function GirisCikisPage() {
             <div>
               <h2 className="text-sm font-black text-blue-950">Konum Takibi</h2>
               <p className="mt-1 text-xs font-semibold text-blue-900">
-                {aktifDurum === "giris" ? "Aktif mesai sırasında konum takibi çalışır." : "Mesai kapalı olduğu için konum takibi pasiftir."}
+                {vardiyaCalismaGunu && aktifDurum === "giris"
+                  ? "Aktif mesai sırasında konum takibi çalışır."
+                  : "Mesai kapalı veya bugün çalışma günü değil. Konum takibi pasiftir."}
               </p>
               <p className="mt-2 text-xs font-bold text-blue-950">
                 {konumTakipMesaji}

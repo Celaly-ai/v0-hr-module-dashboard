@@ -425,43 +425,33 @@ export default function VardiyaPage() {
           </div>
         )}
 
-        <div className="bg-white rounded-2xl border shadow-sm overflow-auto">
-          <table className="w-full text-sm min-w-[1120px]">
-            <thead className="bg-gray-200">
-              <tr>
-                <th className="p-3 text-left font-black border">Personel</th>
-                <th className="p-3 text-left font-black border">Tarih</th>
-                <th className="p-3 text-left font-black border">Durum</th>
-                <th className="p-3 text-left font-black border">Başlangıç</th>
-                <th className="p-3 text-left font-black border">Bitiş</th>
-                <th className="p-3 text-left font-black border">Açıklama</th>
-              </tr>
-            </thead>
+        {vardiyalar.length === 0 ? (
+          <div className="rounded-2xl border bg-white p-6 text-center font-bold text-gray-600 shadow-sm">
+            Plan oluşturmak için Getir / Planla butonuna basın.
+          </div>
+        ) : (
+          <>
+            <div className="space-y-3 md:hidden">
+              {vardiyalar.map((v, i) => (
+                <div
+                  key={`mobil-${v.personel_id}-${v.tarih}`}
+                  className="rounded-2xl border bg-white p-4 shadow-sm"
+                >
+                  <div className="mb-3">
+                    <p className="text-base font-black text-gray-950">{v.personel_adi}</p>
+                    <p className="text-xs font-semibold text-gray-500">
+                      {v.personel_kodu || ""} {v.rol ? `· ${v.rol}` : ""}
+                    </p>
+                    <p className="mt-1 text-sm font-black text-blue-800">{v.tarih}</p>
+                  </div>
 
-            <tbody>
-              {vardiyalar.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="p-6 text-center font-bold text-gray-600 border">
-                    Plan oluşturmak için Getir / Planla butonuna basın.
-                  </td>
-                </tr>
-              ) : (
-                vardiyalar.map((v, i) => (
-                  <tr key={`${v.personel_id}-${v.tarih}`} className="border-t hover:bg-gray-50">
-                    <td className="p-3 border font-bold">
-                      {v.personel_adi}
-                      <p className="text-xs text-gray-500">
-                        {v.personel_kodu || ""} {v.rol ? `· ${v.rol}` : ""}
-                      </p>
-                    </td>
-
-                    <td className="p-3 border font-bold">{v.tarih}</td>
-
-                    <td className="p-3 border">
+                  <div className="space-y-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-black text-gray-600">Durum</label>
                       <select
                         value={v.durum}
                         onChange={(e) => guncelle(i, "durum", e.target.value)}
-                        className={`w-full border rounded-lg px-3 py-2 font-black ${durumClass(v.durum)}`}
+                        className={`w-full rounded-xl border px-3 py-3 text-base font-black ${durumClass(v.durum)}`}
                       >
                         <option value="calisma">Çalışma</option>
                         <option value="izinli">İzinli</option>
@@ -469,41 +459,118 @@ export default function VardiyaPage() {
                         <option value="hafta_tatili">Hafta Tatili</option>
                         <option value="resmi_tatil">Resmi Tatil</option>
                       </select>
-                    </td>
+                    </div>
 
-                    <td className="p-3 border">
-                      <input
-                        type="time"
-                        value={v.baslangic_saati || ""}
-                        disabled={v.durum !== "calisma"}
-                        onChange={(e) => guncelle(i, "baslangic_saati", e.target.value)}
-                        className="w-full border rounded-lg px-3 py-2 font-bold disabled:bg-gray-200"
-                      />
-                    </td>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="mb-1 block text-xs font-black text-gray-600">Başlangıç</label>
+                        <input
+                          type="time"
+                          value={v.baslangic_saati || ""}
+                          disabled={v.durum !== "calisma"}
+                          onChange={(e) => guncelle(i, "baslangic_saati", e.target.value)}
+                          className="w-full rounded-xl border px-3 py-3 text-base font-bold disabled:bg-gray-200"
+                        />
+                      </div>
 
-                    <td className="p-3 border">
-                      <input
-                        type="time"
-                        value={v.bitis_saati || ""}
-                        disabled={v.durum !== "calisma"}
-                        onChange={(e) => guncelle(i, "bitis_saati", e.target.value)}
-                        className="w-full border rounded-lg px-3 py-2 font-bold disabled:bg-gray-200"
-                      />
-                    </td>
+                      <div>
+                        <label className="mb-1 block text-xs font-black text-gray-600">Bitiş</label>
+                        <input
+                          type="time"
+                          value={v.bitis_saati || ""}
+                          disabled={v.durum !== "calisma"}
+                          onChange={(e) => guncelle(i, "bitis_saati", e.target.value)}
+                          className="w-full rounded-xl border px-3 py-3 text-base font-bold disabled:bg-gray-200"
+                        />
+                      </div>
+                    </div>
 
-                    <td className="p-3 border">
+                    <div>
+                      <label className="mb-1 block text-xs font-black text-gray-600">Açıklama</label>
                       <input
                         value={v.aciklama || ""}
                         onChange={(e) => guncelle(i, "aciklama", e.target.value)}
-                        className="w-full border rounded-lg px-3 py-2 font-semibold"
+                        className="w-full rounded-xl border px-3 py-3 text-base font-semibold"
                       />
-                    </td>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden rounded-2xl border bg-white shadow-sm md:block md:overflow-auto">
+              <table className="w-full text-sm md:min-w-[1120px]">
+                <thead className="bg-gray-200">
+                  <tr>
+                    <th className="p-3 text-left font-black border">Personel</th>
+                    <th className="p-3 text-left font-black border">Tarih</th>
+                    <th className="p-3 text-left font-black border">Durum</th>
+                    <th className="p-3 text-left font-black border">Başlangıç</th>
+                    <th className="p-3 text-left font-black border">Bitiş</th>
+                    <th className="p-3 text-left font-black border">Açıklama</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+
+                <tbody>
+                  {vardiyalar.map((v, i) => (
+                    <tr key={`${v.personel_id}-${v.tarih}`} className="border-t hover:bg-gray-50">
+                      <td className="p-3 border font-bold">
+                        {v.personel_adi}
+                        <p className="text-xs text-gray-500">
+                          {v.personel_kodu || ""} {v.rol ? `· ${v.rol}` : ""}
+                        </p>
+                      </td>
+
+                      <td className="p-3 border font-bold">{v.tarih}</td>
+
+                      <td className="p-3 border">
+                        <select
+                          value={v.durum}
+                          onChange={(e) => guncelle(i, "durum", e.target.value)}
+                          className={`w-full border rounded-lg px-3 py-2 font-black ${durumClass(v.durum)}`}
+                        >
+                          <option value="calisma">Çalışma</option>
+                          <option value="izinli">İzinli</option>
+                          <option value="raporlu">Raporlu</option>
+                          <option value="hafta_tatili">Hafta Tatili</option>
+                          <option value="resmi_tatil">Resmi Tatil</option>
+                        </select>
+                      </td>
+
+                      <td className="p-3 border">
+                        <input
+                          type="time"
+                          value={v.baslangic_saati || ""}
+                          disabled={v.durum !== "calisma"}
+                          onChange={(e) => guncelle(i, "baslangic_saati", e.target.value)}
+                          className="w-full border rounded-lg px-3 py-2 font-bold disabled:bg-gray-200"
+                        />
+                      </td>
+
+                      <td className="p-3 border">
+                        <input
+                          type="time"
+                          value={v.bitis_saati || ""}
+                          disabled={v.durum !== "calisma"}
+                          onChange={(e) => guncelle(i, "bitis_saati", e.target.value)}
+                          className="w-full border rounded-lg px-3 py-2 font-bold disabled:bg-gray-200"
+                        />
+                      </td>
+
+                      <td className="p-3 border">
+                        <input
+                          value={v.aciklama || ""}
+                          onChange={(e) => guncelle(i, "aciklama", e.target.value)}
+                          className="w-full border rounded-lg px-3 py-2 font-semibold"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
 
         <button
           type="button"

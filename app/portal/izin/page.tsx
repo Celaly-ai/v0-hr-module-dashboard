@@ -327,8 +327,12 @@ if (personelError || !p) {
         setMesaj({
           tip: "hata",
           metin:
-            "İzin sayfası için personel kaydı bulunamadı: " +
-            (personelError?.message || user.email || user.id),
+  "DEBUG => user.id=" +
+  user.id +
+  " | email=" +
+  (user.email || "-") +
+  " | hata=" +
+  (personelError?.message || "yok"),
         })
         setYukleniyor(false)
         return

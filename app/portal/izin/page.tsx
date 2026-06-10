@@ -96,23 +96,12 @@ function durumIkon(durum?: string | null) {
 
 function tarihYaz(value?: string | null) {
   if (!value) return "-"
-
-  const temiz = String(value).slice(0, 10)
-  const tarih = new Date(`${temiz}T00:00:00`)
-
-  if (Number.isNaN(tarih.getTime())) return "-"
-
-  return tarih.toLocaleDateString("tr-TR")
+  return new Date(`${value}T00:00:00`).toLocaleDateString("tr-TR")
 }
 
 function tarihSaatYaz(value?: string | null) {
   if (!value) return "-"
-
-  const tarih = new Date(value)
-
-  if (Number.isNaN(tarih.getTime())) return "-"
-
-  return tarih.toLocaleDateString("tr-TR", {
+  return new Date(value).toLocaleDateString("tr-TR", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -134,15 +123,7 @@ function gunSayisi(baslangic: string, bitis: string) {
 }
 
 function iseGirisTarihiBul(personel: any) {
-  return (
-    personel?.ise_giris_tarihi ||
-    personel?.ise_giris ||
-    personel?.giris_tarihi ||
-    personel?.baslama_tarihi ||
-    personel?.ise_baslama_tarihi ||
-    personel?.created_at ||
-    null
-  )
+  return personel?.ise_giris_tarihi || personel?.ise_giris || personel?.created_at || null
 }
 
 function hizmetYili(personel: any) {
@@ -184,6 +165,9 @@ function yasHesapla(dogumTarihi?: string | null) {
 }
 
 function yillikIzinHakkiHesapla(personel: any) {
+  const dbHak = Number(personel?.yillik_izin_hakki || 0)
+  if (dbHak > 0) return dbHak
+
   const yil = hizmetYili(personel)
   const yas = yasHesapla(personel?.dogum_tarihi)
 
@@ -203,11 +187,9 @@ function yillikIzinHakkiHesapla(personel: any) {
 
 function talepGun(t: any) {
   if (t.izin_gun_sayisi) return Number(t.izin_gun_sayisi || 0)
-
   if (t.izin_baslangic && t.izin_bitis) {
     return gunSayisi(t.izin_baslangic, t.izin_bitis)
   }
-
   return 0
 }
 
@@ -234,23 +216,14 @@ export default function IzinPage() {
   const talepleriYenile = useCallback(async (personelId: string) => {
     const supabase = createClient()
 
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("calisan_talepler")
       .select(
-        "id, baslik, aciklama, durum, created_at, izin_turu, izin_baslangic, izin_bitis, izin_gun_sayisi, devamsizlik_turu, yillik_izinden_duser",
+        "id, tip, baslik, aciklama, durum, created_at, izin_turu, izin_baslangic, izin_bitis, izin_gun_sayisi, devamsizlik_turu, yillik_izinden_duser",
       )
       .eq("personel_id", personelId)
       .eq("tip", "izin")
       .order("created_at", { ascending: false })
-
-    if (error) {
-      setMesaj({
-        tip: "hata",
-        metin: `İzin talepleri okunamadı: ${error.message}`,
-      })
-      setTalepler([])
-      return
-    }
 
     setTalepler(data || [])
   }, [])
@@ -278,61 +251,57 @@ export default function IzinPage() {
       }
 
       const personelSelect =
-  "id, sirket_id, yillik_izin_devir_gunu, dogum_tarihi, ise_giris, ise_giris_tarihi, giris_tarihi, baslama_tarihi, ise_baslama_tarihi, created_at"
+        "id, sirket_id, yillik_izin_devir_gunu, yillik_izin_hakki, yillik_izin_kullanilan, dogum_tarihi, ise_giris, ise_giris_tarihi, created_at"
 
-let p: any = null
-let personelError: any = null
+      let p: any = null
+      let personelError: any = null
 
-const authSonuc = await supabase
-  .from("personeller")
-  .select(personelSelect)
-  .eq("auth_id", user.id)
-  .maybeSingle()
+      const authSonuc = await supabase
+        .from("personeller")
+        .select(personelSelect)
+        .eq("auth_id", user.id)
+        .maybeSingle()
 
-if (authSonuc.error) {
-  personelError = authSonuc.error
-} else {
-  p = authSonuc.data
-}
+      if (authSonuc.error) {
+        personelError = authSonuc.error
+      } else {
+        p = authSonuc.data
+      }
 
-if (!p) {
-  const kullaniciSonuc = await supabase
-    .from("personeller")
-    .select(personelSelect)
-    .eq("kullanici_id", user.id)
-    .maybeSingle()
+      if (!p) {
+        const kullaniciSonuc = await supabase
+          .from("personeller")
+          .select(personelSelect)
+          .eq("kullanici_id", user.id)
+          .maybeSingle()
 
-  if (kullaniciSonuc.error) {
-    personelError = kullaniciSonuc.error
-  } else {
-    p = kullaniciSonuc.data
-  }
-}
+        if (kullaniciSonuc.error) {
+          personelError = kullaniciSonuc.error
+        } else {
+          p = kullaniciSonuc.data
+        }
+      }
 
-if (!p && user.email) {
-  const emailSonuc = await supabase
-    .from("personeller")
-    .select(personelSelect)
-    .eq("email", user.email)
-    .maybeSingle()
+      if (!p && user.email) {
+        const emailSonuc = await supabase
+          .from("personeller")
+          .select(personelSelect)
+          .eq("email", user.email)
+          .maybeSingle()
 
-  if (emailSonuc.error) {
-    personelError = emailSonuc.error
-  } else {
-    p = emailSonuc.data
-  }
-}
+        if (emailSonuc.error) {
+          personelError = emailSonuc.error
+        } else {
+          p = emailSonuc.data
+        }
+      }
 
-if (personelError || !p) {
+      if (personelError || !p) {
         setMesaj({
           tip: "hata",
           metin:
-  "DEBUG => user.id=" +
-  user.id +
-  " | email=" +
-  (user.email || "-") +
-  " | hata=" +
-  (personelError?.message || "yok"),
+            "İzin sayfası için personel kaydı bulunamadı: " +
+            (personelError?.message || user.email || user.id),
         })
         setYukleniyor(false)
         return
@@ -362,11 +331,15 @@ if (personelError || !p) {
   const devirGun = Number(personel?.yillik_izin_devir_gunu || 0)
 
   const kullanilanYillik = useMemo(() => {
-    return talepler
+    const dbKullanilan = Number(personel?.yillik_izin_kullanilan || 0)
+
+    const talepKullanilan = talepler
       .filter((t) => onayliMi(t.durum))
       .filter((t) => t.yillik_izinden_duser === true || t.izin_turu === "Yıllık İzin")
       .reduce((toplam, t) => toplam + talepGun(t), 0)
-  }, [talepler])
+
+    return Math.max(dbKullanilan, talepKullanilan)
+  }, [personel, talepler])
 
   const ucretsizIzinGun = useMemo(() => {
     return talepler
@@ -386,7 +359,7 @@ if (personelError || !p) {
     return talepler
       .filter((t) => onayliMi(t.durum))
       .filter((t) =>
-        ["mazeret", "evlilik", "olum", "babalik"].includes(t.devamsizlik_turu),
+        ["mazeret", "evlilik", "olum", "babalik"].includes(String(t.devamsizlik_turu || "")),
       )
       .reduce((toplam, t) => toplam + talepGun(t), 0)
   }, [talepler])
@@ -701,10 +674,10 @@ if (personelError || !p) {
                 {seciliIzinTuru.ad} Bilgi Kartı
               </p>
               <div className="mt-2 rounded-lg bg-white/70 p-3 border border-blue-200">
-  <p className="text-xs leading-5 font-semibold text-blue-950">
-    {seciliIzinTuru.bilgi}
-  </p>
-</div>
+                <p className="text-xs leading-5 font-semibold text-blue-950">
+                  {seciliIzinTuru.bilgi}
+                </p>
+              </div>
               <p className="text-xs text-blue-900 mt-1">
                 {seciliIzinTuru.yillik_izinden_duser
                   ? `Kalan yıllık izin bakiyeniz: ${kalanYillik} gün`
@@ -790,8 +763,6 @@ if (personelError || !p) {
             </div>
           )}
         </div>
-
-        
       </div>
     </div>
   )

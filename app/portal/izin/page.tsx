@@ -137,9 +137,6 @@ function iseGirisTarihiBul(personel: any) {
   return (
     personel?.ise_giris_tarihi ||
     personel?.ise_giris ||
-    personel?.giris_tarihi ||
-    personel?.baslama_tarihi ||
-    personel?.ise_baslama_tarihi ||
     personel?.created_at ||
     null
   )
@@ -280,7 +277,7 @@ export default function IzinPage() {
       const { data: p, error: personelError } = await supabase
         .from("personeller")
         .select(
-          "id, sirket_id, yillik_izin_devir_gunu, dogum_tarihi, ise_giris, ise_giris_tarihi, giris_tarihi, baslama_tarihi, ise_baslama_tarihi, created_at",
+          "id, sirket_id, yillik_izin_devir_gunu, yillik_izin_hakki, yillik_izin_kullanilan, dogum_tarihi, ise_giris, ise_giris_tarihi, created_at",
         )
         .or(`auth_id.eq.${user.id},kullanici_id.eq.${user.id},email.eq.${user.email}`)
         .maybeSingle()

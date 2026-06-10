@@ -98,22 +98,28 @@ export default function VardiyaPage() {
   }, [])
 
   async function personelleriYukle() {
-    const supabase = createClient()
+    try {
+      const response = await fetch("/api/yonetim/personeller", {
+        cache: "no-store",
+      })
 
-    const { data, error } = await supabase
-      .from("personeller")
-      .select("id, ad, soyad, rol, durum, personel_kodu, sirket_id")
-      .order("ad", { ascending: true })
+      const sonuc = await response.json()
 
-    if (error) {
+      if (!response.ok) {
+        setMesaj({
+          tip: "hata",
+          metin: "Personel listesi alınamadı: " + (sonuc?.error || "Bilinmeyen hata"),
+        })
+        return
+      }
+
+      setPersoneller(sonuc.personeller || [])
+    } catch (err: any) {
       setMesaj({
         tip: "hata",
-        metin: "Personel listesi alınamadı: " + error.message,
+        metin: "Personel listesi alınamadı: " + (err?.message || "Bağlantı hatası"),
       })
-      return
     }
-
-    setPersoneller(data || [])
   }
 
   const seciliPersoneller = useMemo(() => {

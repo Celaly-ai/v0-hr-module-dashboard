@@ -1,13 +1,21 @@
-import type { CapacitorConfig } from '@capacitor/cli';
+/// <reference types="@capacitor/status-bar" />
+import type { CapacitorConfig } from "@capacitor/cli"
 
 const config: CapacitorConfig = {
-  appId: 'com.feyteknik.app',
-  appName: 'Fey Teknik',
-  webDir: 'public',
+  appId: "com.feyroute.ik",
+  appName: "FeyRoute IK",
+  webDir: "public",
   server: {
-    url: 'https://v0-hr-module-dashboard.vercel.app',
-    cleartext: false
-  }
-};
+    url: "https://ik.feyroute.com/portal/personel-paneli",
+    cleartext: false,
+  },
+  plugins: {
+    StatusBar: {
+      overlaysWebView: false,
+      style: "DARK",
+      backgroundColor: "#ffffff",
+    },
+  },
+}
 
-export default config;
+export default config

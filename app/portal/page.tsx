@@ -65,6 +65,15 @@ const YONETICI_ROLLERI = [
 
 const KARTLAR: PortalKart[] = [
   {
+    baslik: "Mesai Raporu / Puantaj",
+    aciklama: "Giriş/çıkış, izin, kısmi izin, puantaj ve PDF yazdırma raporları.",
+    yol: "/portal/mesai-raporu",
+    ikon: FileSpreadsheet,
+    renk: "border-emerald-200 bg-emerald-50 text-emerald-900",
+    grup: "Yönetim",
+    roller: YONETICI_ROLLERI,
+  },
+  {
     baslik: "Yönetim Talepleri",
     aciklama: "Personel taleplerini yönet, onayla veya reddet.",
     yol: "/portal/yonetim/talepler",
@@ -84,7 +93,7 @@ const KARTLAR: PortalKart[] = [
   },
   {
     baslik: "Vardiya Yönetimi",
-    aciklama: "Personel vardiya planlarını ve çalışma düzenini yönet.",
+    aciklama: "Personel vardiya planı, çalışma günü, tatil ve operasyon düzenini yönet.",
     yol: "/portal/yonetim/vardiya",
     ikon: CalendarDays,
     renk: "border-violet-200 bg-violet-50 text-violet-900",

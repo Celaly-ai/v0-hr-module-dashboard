@@ -199,8 +199,8 @@ export default function PersonelPaneliPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-950">
-      <div className="sticky top-0 z-10 border-b bg-white px-4 py-4 shadow-sm">
+    <div className="min-h-screen bg-slate-50 text-slate-950 overflow-x-hidden">
+  <div className="sticky top-0 z-10 border-b bg-white px-4 pb-4 shadow-sm pt-[calc(env(safe-area-inset-top)+12px)]">
         <div className="mx-auto flex max-w-md items-center justify-between">
           <div>
             <p className="text-xs font-black uppercase text-blue-700">FeyRoute Personel</p>
@@ -219,7 +219,7 @@ export default function PersonelPaneliPage() {
         </div>
       </div>
 
-      <main className="mx-auto max-w-md space-y-4 p-4">
+      <main className="mx-auto w-full max-w-md space-y-4 p-4">
         <div className={`rounded-3xl p-5 text-white shadow-sm ${mesaiAktif ? "bg-green-600" : "bg-slate-800"}`}>
           <p className="text-sm font-bold opacity-90">Bugünkü Durum</p>
           <p className="mt-2 text-3xl font-black">

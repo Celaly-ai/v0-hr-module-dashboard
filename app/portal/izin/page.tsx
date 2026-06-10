@@ -199,6 +199,8 @@ function yillikIzinHakkiHesapla(personel: any) {
 }
 
 function talepGun(t: any) {
+  if (t.izin_periyodu === "sabah_yarim_gun" || t.izin_periyodu === "ogleden_sonra_yarim_gun") return 0.5
+  if (t.izin_periyodu === "saatlik" && Number(t.izin_saat || 0) > 0) return Number(t.izin_saat || 0) / 8
   if (t.izin_gun_sayisi) return Number(t.izin_gun_sayisi || 0)
 
   if (t.izin_baslangic && t.izin_bitis) {
@@ -206,6 +208,39 @@ function talepGun(t: any) {
   }
 
   return 0
+}
+
+function izinSureYaz(t: any) {
+  if (t.izin_periyodu === "sabah_yarim_gun") return "Sabah yarım gün"
+  if (t.izin_periyodu === "ogleden_sonra_yarim_gun") return "Öğleden sonra yarım gün"
+  if (t.izin_periyodu === "saatlik") return `${Number(t.izin_saat || 0)} saat`
+  return `${talepGun(t)} gün`
+}
+
+function saatFarki(baslangic?: string | null, bitis?: string | null) {
+  if (!baslangic || !bitis) return 0
+  const [bh, bm] = String(baslangic).slice(0, 5).split(":").map(Number)
+  const [eh, em] = String(bitis).slice(0, 5).split(":").map(Number)
+  const bas = Number(bh || 0) * 60 + Number(bm || 0)
+  const son = Number(eh || 0) * 60 + Number(em || 0)
+  return Math.max(0, (son - bas) / 60)
+}
+
+function izinPeriyoduGunDegeri(periyod: string, saat: number) {
+  if (periyod === "sabah_yarim_gun" || periyod === "ogleden_sonra_yarim_gun") return 0.5
+  if (periyod === "saatlik") return Math.max(0, saat / 8)
+  return 1
+}
+
+function gunSaatYaz(gun: number) {
+  const tamGun = Math.floor(Number(gun || 0))
+  const kalanGun = Number(gun || 0) - tamGun
+  const saat = Math.round(kalanGun * 8)
+
+  if (tamGun > 0 && saat > 0) return `${tamGun} gün + ${saat} saat`
+  if (tamGun > 0) return `${tamGun} gün`
+  if (saat > 0) return `${saat} saat`
+  return "0 gün"
 }
 
 export default function IzinPage() {
@@ -222,6 +257,9 @@ export default function IzinPage() {
     tip: "Yıllık İzin",
     baslangic: "",
     bitis: "",
+    periyod: "tam_gun",
+    baslangicSaati: "09:00",
+    bitisSaati: "10:00",
     aciklama: "",
   })
 
@@ -234,7 +272,7 @@ export default function IzinPage() {
     const { data, error } = await supabase
       .from("calisan_talepler")
       .select(
-        "id, baslik, aciklama, durum, created_at, izin_turu, izin_baslangic, izin_bitis, izin_gun_sayisi, devamsizlik_turu, yillik_izinden_duser",
+        "id, baslik, aciklama, durum, created_at, izin_turu, izin_baslangic, izin_bitis, izin_gun_sayisi, devamsizlik_turu, yillik_izinden_duser, izin_periyodu, izin_saat, izin_baslangic_saati, izin_bitis_saati",
       )
       .eq("personel_id", personelId)
       .eq("tip", "izin")
@@ -306,9 +344,18 @@ export default function IzinPage() {
     void yukle()
   }, [router, talepleriYenile])
 
+  const izinSaat = useMemo(() => {
+    if (form.periyod === "sabah_yarim_gun" || form.periyod === "ogleden_sonra_yarim_gun") return 4
+    if (form.periyod === "saatlik") return saatFarki(form.baslangicSaati, form.bitisSaati)
+    return 8
+  }, [form.periyod, form.baslangicSaati, form.bitisSaati])
+
   const istenenGun = useMemo(() => {
-    return gunSayisi(form.baslangic, form.bitis)
-  }, [form.baslangic, form.bitis])
+    const gun = gunSayisi(form.baslangic, form.bitis)
+    if (gun <= 0) return 0
+    if (form.periyod === "tam_gun") return gun
+    return izinPeriyoduGunDegeri(form.periyod, izinSaat)
+  }, [form.baslangic, form.bitis, form.periyod, izinSaat])
 
   const yillikHak = useMemo(() => {
     return yillikIzinHakkiHesapla(personel)
@@ -382,6 +429,16 @@ export default function IzinPage() {
       return
     }
 
+    if (form.periyod !== "tam_gun" && form.baslangic !== form.bitis) {
+      setMesaj({ tip: "hata", metin: "Yarım gün ve saatlik izin yalnızca tek gün için oluşturulabilir." })
+      return
+    }
+
+    if (form.periyod === "saatlik" && izinSaat <= 0) {
+      setMesaj({ tip: "hata", metin: "Saatlik izin için geçerli başlangıç ve bitiş saati seçiniz." })
+      return
+    }
+
     if (!personel?.id) {
       setMesaj({ tip: "hata", metin: "Personel bilgisi bulunamadı." })
       return
@@ -417,7 +474,13 @@ export default function IzinPage() {
         izin_turu: form.tip,
         izin_baslangic: form.baslangic,
         izin_bitis: form.bitis,
-        izin_gun_sayisi: istenenGun,
+        izin_gun_sayisi: Math.ceil(istenenGun),
+        izin_periyodu: form.periyod,
+        izin_saat: form.periyod === "tam_gun" ? null : izinSaat,
+        izin_baslangic_saati:
+          form.periyod === "saatlik" ? form.baslangicSaati : form.periyod === "sabah_yarim_gun" ? "09:00" : form.periyod === "ogleden_sonra_yarim_gun" ? "13:00" : null,
+        izin_bitis_saati:
+          form.periyod === "saatlik" ? form.bitisSaati : form.periyod === "sabah_yarim_gun" ? "13:00" : form.periyod === "ogleden_sonra_yarim_gun" ? "18:00" : null,
         devamsizlik_turu: seciliIzinTuru.devamsizlik_turu,
         ucretli_mi: seciliIzinTuru.ucretli_mi,
         yillik_izinden_duser: seciliIzinTuru.yillik_izinden_duser,
@@ -439,6 +502,9 @@ export default function IzinPage() {
       tip: "Yıllık İzin",
       baslangic: "",
       bitis: "",
+      periyod: "tam_gun",
+      baslangicSaati: "09:00",
+      bitisSaati: "10:00",
       aciklama: "",
     })
 
@@ -470,7 +536,7 @@ export default function IzinPage() {
               {tarihYaz(talep.izin_baslangic)} - {tarihYaz(talep.izin_bitis)}
             </p>
             <p className="text-xs font-bold text-gray-600 mt-1">
-              {talepGun(talep)} gün · Talep tarihi: {tarihSaatYaz(talep.created_at)}
+              {izinSureYaz(talep)} · Talep tarihi: {tarihSaatYaz(talep.created_at)}
             </p>
           </div>
 
@@ -500,7 +566,7 @@ export default function IzinPage() {
         </div>
 
         <div className="col-span-2 font-bold text-gray-900">
-          {talepGun(talep)} gün
+          {izinSureYaz(talep)}
         </div>
 
         <div className="col-span-2 font-semibold text-gray-600">
@@ -576,20 +642,20 @@ export default function IzinPage() {
         <div className="grid grid-cols-3 gap-2">
           <div className="bg-red-50 border border-red-200 rounded-2xl p-3">
             <p className="text-xs text-red-700 font-bold">Ücretsiz</p>
-            <p className="text-2xl font-black text-red-900">{ucretsizIzinGun}</p>
-            <p className="text-[11px] text-red-700">gün</p>
+            <p className="text-xl font-black text-red-900">{gunSaatYaz(ucretsizIzinGun)}</p>
+            <p className="text-[11px] text-red-700">toplam</p>
           </div>
 
           <div className="bg-orange-50 border border-orange-200 rounded-2xl p-3">
             <p className="text-xs text-orange-700 font-bold">Rapor</p>
-            <p className="text-2xl font-black text-orange-900">{raporGun}</p>
-            <p className="text-[11px] text-orange-700">gün</p>
+            <p className="text-xl font-black text-orange-900">{gunSaatYaz(raporGun)}</p>
+            <p className="text-[11px] text-orange-700">toplam</p>
           </div>
 
           <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3">
             <p className="text-xs text-gray-700 font-bold">Mazeret</p>
-            <p className="text-2xl font-black text-gray-900">{mazeretGun}</p>
-            <p className="text-[11px] text-gray-700">gün</p>
+            <p className="text-xl font-black text-gray-900">{gunSaatYaz(mazeretGun)}</p>
+            <p className="text-[11px] text-gray-700">toplam</p>
           </div>
         </div>
 
@@ -669,12 +735,40 @@ export default function IzinPage() {
 
             <div>
               <label className="text-sm font-bold text-gray-800 block mb-1">
+                İzin Süresi
+              </label>
+              <select
+                value={form.periyod}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    periyod: e.target.value,
+                    bitis: e.target.value === "tam_gun" ? form.bitis : form.baslangic,
+                  })
+                }
+                className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base text-gray-900 bg-white"
+              >
+                <option value="tam_gun">Tam Gün</option>
+                <option value="sabah_yarim_gun">Sabah Yarım Gün</option>
+                <option value="ogleden_sonra_yarim_gun">Öğleden Sonra Yarım Gün</option>
+                <option value="saatlik">Saatlik İzin</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-sm font-bold text-gray-800 block mb-1">
                 Başlangıç Tarihi
               </label>
               <input
                 type="date"
                 value={form.baslangic}
-                onChange={(e) => setForm({ ...form, baslangic: e.target.value })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    baslangic: e.target.value,
+                    bitis: form.periyod === "tam_gun" ? form.bitis : e.target.value,
+                  })
+                }
                 className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base text-gray-900 bg-white"
               />
             </div>
@@ -686,14 +780,48 @@ export default function IzinPage() {
               <input
                 type="date"
                 value={form.bitis}
+                disabled={form.periyod !== "tam_gun"}
                 onChange={(e) => setForm({ ...form, bitis: e.target.value })}
-                className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base text-gray-900 bg-white"
+                className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base text-gray-900 bg-white disabled:bg-gray-100"
               />
+              {form.periyod !== "tam_gun" && (
+                <p className="mt-1 text-xs font-semibold text-gray-500">
+                  Yarım gün ve saatlik izinlerde bitiş tarihi başlangıç tarihiyle aynı olur.
+                </p>
+              )}
             </div>
+
+            {form.periyod === "saatlik" && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-bold text-gray-800 block mb-1">
+                    Başlangıç Saati
+                  </label>
+                  <input
+                    type="time"
+                    value={form.baslangicSaati}
+                    onChange={(e) => setForm({ ...form, baslangicSaati: e.target.value })}
+                    className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base text-gray-900 bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-bold text-gray-800 block mb-1">
+                    Bitiş Saati
+                  </label>
+                  <input
+                    type="time"
+                    value={form.bitisSaati}
+                    onChange={(e) => setForm({ ...form, bitisSaati: e.target.value })}
+                    className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base text-gray-900 bg-white"
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
               <p className="text-sm font-bold text-gray-800">
-                Talep edilen süre: {istenenGun} gün
+                Talep edilen süre: {form.periyod === "tam_gun" ? `${istenenGun} gün` : `${izinSaat} saat / ${istenenGun} gün`}
               </p>
             </div>
 

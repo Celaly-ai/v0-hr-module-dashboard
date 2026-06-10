@@ -383,8 +383,8 @@ export default function PortalPage() {
   }, [aktifRol])
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-6">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <div className="min-h-screen bg-slate-50 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+16px)] md:p-6">
+      <div className="mx-auto w-full max-w-7xl space-y-6 overflow-hidden">
         <div className="rounded-3xl border bg-white p-6 shadow-sm">
           <p className="text-xs font-black uppercase tracking-wide text-blue-700">
             Admin Portal
@@ -459,7 +459,7 @@ export default function PortalPage() {
                   {grup}
                 </h2>
 
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <div className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-3">
                   {kartlar.map((kart) => {
                     const Ikon = kart.ikon
 
@@ -468,7 +468,7 @@ export default function PortalPage() {
                         key={kart.yol}
                         type="button"
                         onClick={() => router.push(kart.yol)}
-                        className={`rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${kart.renk}`}
+                        className={`w-full rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${kart.renk}`}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>

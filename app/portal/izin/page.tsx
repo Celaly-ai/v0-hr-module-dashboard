@@ -607,8 +607,8 @@ export default function IzinPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-      <div className="bg-white shadow-sm px-4 py-4 flex items-center gap-3">
+    <div className="min-h-screen bg-gray-50 text-gray-900 overflow-x-hidden">
+      <div className="bg-white shadow-sm px-4 pb-4 flex items-center gap-3 pt-[calc(env(safe-area-inset-top)+12px)]">
         <button
           onClick={() => router.push("/portal")}
           className="text-2xl text-gray-800"
@@ -618,7 +618,7 @@ export default function IzinPage() {
         <h1 className="text-xl font-bold text-gray-900">İzin Talebi</h1>
       </div>
 
-      <div className="p-4 max-w-md mx-auto space-y-4">
+      <div className="p-4 w-full max-w-md mx-auto space-y-4">
         <div className="grid grid-cols-3 gap-2">
           <div className="bg-purple-50 border border-purple-200 rounded-2xl p-3">
             <p className="text-xs text-purple-700 font-bold">Hak</p>

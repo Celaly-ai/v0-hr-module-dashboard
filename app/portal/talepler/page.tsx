@@ -93,7 +93,7 @@ export default function TaleplerPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
+    <div className="h-[100dvh] overflow-y-auto overflow-x-hidden bg-gray-50 text-gray-900 [-webkit-overflow-scrolling:touch]">
       <div className="bg-white shadow-sm px-4 py-4 flex items-center gap-3">
         <button onClick={() => router.push("/portal")} className="text-2xl text-gray-800">
           ←
@@ -101,7 +101,7 @@ export default function TaleplerPage() {
         <h1 className="text-xl font-bold text-gray-900">Taleplerim</h1>
       </div>
 
-      <div className="p-4 max-w-sm mx-auto space-y-4 pb-28">
+      <main className="p-4 max-w-sm mx-auto space-y-4 pb-32">
         <div className="grid grid-cols-3 gap-2">
           {[
             { label: "Bekleyen", durum: "Beklemede", renk: "bg-yellow-50 border-yellow-200 text-yellow-700" },
@@ -201,7 +201,7 @@ export default function TaleplerPage() {
             </div>
           ))
         )}
-      </div>
+      </main>
       <MobileTabBar />
     </div>
   )

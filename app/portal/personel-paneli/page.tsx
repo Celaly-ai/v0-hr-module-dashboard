@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { MobileTabBar } from "@/components/mobile/mobile-tab-bar"
 
 type Personel = {
   id: string
@@ -219,7 +220,7 @@ export default function PersonelPaneliPage() {
         </div>
       </div>
 
-      <main className="mx-auto w-full max-w-md space-y-4 p-4">
+      <main className="mx-auto w-full max-w-md space-y-4 p-4 pb-28">
         <div className={`rounded-3xl p-5 text-white shadow-sm ${mesaiAktif ? "bg-green-600" : "bg-slate-800"}`}>
           <p className="text-sm font-bold opacity-90">Bugünkü Durum</p>
           <p className="mt-2 text-3xl font-black">
@@ -313,6 +314,7 @@ export default function PersonelPaneliPage() {
           </div>
         </div>
       </main>
+      <MobileTabBar />
     </div>
   )
 }

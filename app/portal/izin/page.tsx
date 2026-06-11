@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { MobileTabBar } from "@/components/mobile/mobile-tab-bar"
 import { useRouter } from "next/navigation"
 
 type Mesaj = { tip: "basari" | "hata"; metin: string }
@@ -618,7 +619,7 @@ export default function IzinPage() {
         <h1 className="text-xl font-bold text-gray-900">İzin Talebi</h1>
       </div>
 
-      <div className="p-4 w-full max-w-md mx-auto space-y-4">
+      <div className="p-4 w-full max-w-md mx-auto space-y-4 pb-28">
         <div className="grid grid-cols-3 gap-2">
           <div className="bg-purple-50 border border-purple-200 rounded-2xl p-3">
             <p className="text-xs text-purple-700 font-bold">Hak</p>
@@ -876,6 +877,7 @@ export default function IzinPage() {
 
         
       </div>
+      <MobileTabBar />
     </div>
   )
 }

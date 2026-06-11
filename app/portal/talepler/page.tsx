@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { MobileTabBar } from "@/components/mobile/mobile-tab-bar"
 import { useRouter } from "next/navigation"
 
 export default function TaleplerPage() {
@@ -100,7 +101,7 @@ export default function TaleplerPage() {
         <h1 className="text-xl font-bold text-gray-900">Taleplerim</h1>
       </div>
 
-      <div className="p-4 max-w-sm mx-auto space-y-4">
+      <div className="p-4 max-w-sm mx-auto space-y-4 pb-28">
         <div className="grid grid-cols-3 gap-2">
           {[
             { label: "Bekleyen", durum: "Beklemede", renk: "bg-yellow-50 border-yellow-200 text-yellow-700" },
@@ -201,6 +202,7 @@ export default function TaleplerPage() {
           ))
         )}
       </div>
+      <MobileTabBar />
     </div>
   )
 }

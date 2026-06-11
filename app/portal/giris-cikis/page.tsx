@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { MobileTabBar } from "@/components/mobile/mobile-tab-bar"
 import { useRouter } from "next/navigation"
 
 const ONAY_SINIRI_DAKIKA = 60
@@ -667,7 +668,7 @@ export default function GirisCikisPage() {
         </div>
       </div>
 
-      <div className="max-w-md mx-auto p-4 space-y-4">
+      <div className="max-w-md mx-auto p-4 space-y-4 pb-28">
         <div
           className={`rounded-2xl p-4 text-white text-center ${ustKartClass(vardiya, aktifDurum)}`}
         >
@@ -876,6 +877,7 @@ export default function GirisCikisPage() {
           </p>
         </div>
       </div>
+      <MobileTabBar />
     </div>
   )
 }

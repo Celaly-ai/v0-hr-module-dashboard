@@ -367,7 +367,7 @@ export default function GirisCikisPage() {
         p_hiz: pos.coords.speed ?? null,
         p_dogruluk: pos.coords.accuracy ?? null,
         p_pil_yuzde: null,
-        p_kaynak: "pwa",
+        p_kaynak: "mobile_app",
         p_uygulama_durumu: document.visibilityState === "visible" ? "aktif" : "arka_plan",
         p_cihaz_bilgisi: navigator.userAgent,
       })

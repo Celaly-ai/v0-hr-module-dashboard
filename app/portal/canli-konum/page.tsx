@@ -4,6 +4,23 @@ import { useEffect, useMemo, useState } from "react"
 import dynamic from "next/dynamic"
 import "leaflet/dist/leaflet.css"
 import { createClient } from "@/lib/supabase/client"
+import { MobileTabBar } from "@/components/mobile/mobile-tab-bar"
+
+const YONETICI_ROLLERI = [
+  "admin",
+  "yonetici",
+  "yönetici",
+  "servis_yoneticisi",
+  "ik_yoneticisi",
+]
+
+function normalizeRol(value?: string | null) {
+  return String(value || "").trim().toLocaleLowerCase("tr-TR")
+}
+
+function konumYetkilisiMi(rol?: string | null) {
+  return YONETICI_ROLLERI.includes(normalizeRol(rol))
+}
 
 type KonumKaydi = {
   personel_id: string
@@ -122,7 +139,7 @@ const CanliKonumHaritasi = dynamic(
           : [37.0, 35.321333]
 
       return (
-        <MapContainer center={center} zoom={11} className="h-[420px] w-full rounded-2xl">
+        <MapContainer center={center} zoom={11} className="h-[320px] w-full rounded-2xl md:h-[420px]">
           <TileLayer
             attribution='&copy; OpenStreetMap'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -167,7 +184,7 @@ const CanliKonumHaritasi = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-[420px] items-center justify-center rounded-2xl border bg-muted/30 text-sm font-semibold text-muted-foreground">
+      <div className="flex h-[320px] items-center justify-center rounded-2xl border bg-muted/30 text-sm font-semibold text-muted-foreground md:h-[420px]">
         Harita yükleniyor...
       </div>
     ),
@@ -178,6 +195,8 @@ export default function CanliKonumPage() {
   const supabase = useMemo(() => createClient(), [])
 
   const [kayitlar, setKayitlar] = useState<KonumKaydi[]>([])
+  const [aktifRol, setAktifRol] = useState("")
+  const [kendiPersonelId, setKendiPersonelId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [arama, setArama] = useState("")
@@ -187,11 +206,57 @@ export default function CanliKonumPage() {
     setLoading(true)
     setError(null)
 
-    const { data, error } = await supabase
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    const user = session?.user
+
+    if (!user) {
+      setError("Oturum bulunamadı. Lütfen tekrar giriş yapın.")
+      setKayitlar([])
+      setLoading(false)
+      return
+    }
+
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle()
+
+    const { data: personelData } = await supabase
+      .from("personeller")
+      .select("id, rol, sirket_id")
+      .or(`auth_id.eq.${user.id},kullanici_id.eq.${user.id},email.eq.${user.email}`)
+      .limit(1)
+      .maybeSingle()
+
+    const rol = normalizeRol(profileData?.role || personelData?.rol || "calisan")
+    const personelId = typeof personelData?.id === "string" ? personelData.id : null
+    const yetkili = konumYetkilisiMi(rol)
+
+    setAktifRol(rol)
+    setKendiPersonelId(personelId)
+
+    let sorgu = supabase
       .from("v_personel_son_konum_durumu")
       .select("*")
       .order("siralama_onceligi", { ascending: true })
       .order("personel_adi", { ascending: true })
+
+    if (!yetkili) {
+      if (!personelId) {
+        setError("Kendi personel kaydınız bulunamadı. Konum listesi gösterilemez.")
+        setKayitlar([])
+        setLoading(false)
+        return
+      }
+
+      sorgu = sorgu.eq("personel_id", personelId)
+    }
+
+    const { data, error } = await sorgu
 
     if (error) {
       setError(error.message)
@@ -238,18 +303,21 @@ export default function CanliKonumPage() {
   }, [kayitlar])
 
   const haritaListesi = useMemo(() => {
-    return filtreli.filter((k) => {
-      return koordinatVar(k) && k.oturum_durumu === "aktif"
-    })
+    return filtreli.filter((k) => koordinatVar(k))
   }, [filtreli])
 
+  const konumYetkili = konumYetkilisiMi(aktifRol)
+
   return (
-    <div className="space-y-5 p-4 md:p-6">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+    <div className="min-h-screen space-y-5 overflow-x-hidden px-4 pb-28 md:p-6">
+      <div className="sticky top-0 z-30 -mx-4 border-b bg-background/95 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+12px)] backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <h1 className="text-2xl font-black tracking-tight">Canlı Konum Takibi</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Mesai içindeki personelin son konum, oturum ve takip durumunu gösterir.
+            {konumYetkili
+              ? "Mesai içindeki personelin son konum, oturum ve takip durumunu gösterir."
+              : "Bu ekranda yalnızca kendi konum bilginizi görebilirsiniz."}
           </p>
         </div>
 
@@ -260,6 +328,7 @@ export default function CanliKonumPage() {
         >
           Yenile
         </button>
+        </div>
       </div>
 
       {error && (
@@ -269,7 +338,7 @@ export default function CanliKonumPage() {
       )}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
-        <Kpi title="Toplam" value={ozet.toplam} />
+        <Kpi title={konumYetkili ? "Toplam" : "Kendi Kaydım"} value={ozet.toplam} />
         <Kpi title="Aktif" value={ozet.aktif} />
         <Kpi title="Gecikmiş" value={ozet.gecikmis} />
         <Kpi title="Bekleyen" value={ozet.bekleyen} />
@@ -307,7 +376,7 @@ export default function CanliKonumPage() {
         <div className="rounded-xl bg-muted/30 p-3">
           <p className="text-xs font-bold text-muted-foreground">Harita V1</p>
           <p className="mt-1 text-sm font-black">
-            Haritada aktif kayıt: {haritaListesi.length}
+            Haritada konumlu kayıt: {haritaListesi.length}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             Bir sonraki adımda bu kayıtlar harita üzerine işaretlenecek.
@@ -324,7 +393,7 @@ export default function CanliKonumPage() {
         <div className="mt-3">
           {haritaListesi.length === 0 ? (
             <div className="rounded-xl border border-dashed p-5 text-center text-sm font-semibold text-muted-foreground">
-              Aktif konum oturumu olan personel bulunamadı.
+              Koordinatı bulunan personel bulunamadı.
             </div>
           ) : (
             <CanliKonumHaritasi kayitlar={haritaListesi} />
@@ -336,65 +405,111 @@ export default function CanliKonumPage() {
         <div className="border-b p-4">
           <h2 className="text-sm font-black">Personel Takip Listesi</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Liste 30 saniyede bir otomatik yenilenir.
+            {konumYetkili
+              ? "Liste 30 saniyede bir otomatik yenilenir."
+              : "Yetkili olmayan kullanıcılar yalnızca kendi konum kaydını görebilir."}
           </p>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1000px] text-sm">
-            <thead className="bg-muted/60">
-              <tr>
-                <th className="p-3 text-left">Personel</th>
-                <th className="p-3 text-center">Takip</th>
-                <th className="p-3 text-center">Oturum</th>
-                <th className="p-3 text-center">Son Konum</th>
-                <th className="p-3 text-center">Kayıt Sayısı</th>
-                <th className="p-3 text-center">Koordinat</th>
-                <th className="p-3 text-center">Kaynak</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="p-6 text-center text-muted-foreground">
-                    Yükleniyor...
-                  </td>
-                </tr>
-              ) : filtreli.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="p-6 text-center text-muted-foreground">
-                    Kayıt bulunamadı.
-                  </td>
-                </tr>
-              ) : (
-                filtreli.map((k) => (
-                  <tr key={k.personel_id} className="border-t">
-                    <td className="p-3">
+        {loading ? (
+          <div className="p-6 text-center text-sm font-semibold text-muted-foreground">
+            Yükleniyor...
+          </div>
+        ) : filtreli.length === 0 ? (
+          <div className="p-6 text-center text-sm font-semibold text-muted-foreground">
+            Kayıt bulunamadı.
+          </div>
+        ) : (
+          <>
+            <div className="space-y-3 p-4 md:hidden">
+              {filtreli.map((k) => (
+                <div key={`mobil-${k.personel_id}`} className="rounded-2xl border bg-background p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
                       <p className="font-black">{k.personel_adi || "-"}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="mt-1 text-xs font-semibold text-muted-foreground">
                         {k.personel_kodu || "-"} · {k.unvan || k.rol || "-"}
                       </p>
-                    </td>
-                    <td className="p-3 text-center">
-                      <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${durumClass(k.takip_durumu)}`}>
-                        {durumEtiketi(k.takip_durumu)}
-                      </span>
-                    </td>
-                    <td className="p-3 text-center">{k.oturum_durumu || "-"}</td>
-                    <td className="p-3 text-center">{zamanFormat(k.kayit_zamani)}</td>
-                    <td className="p-3 text-center">{k.toplam_kayit_sayisi ?? 0}</td>
-                    <td className="p-3 text-center">
-                      {koordinatVar(k) ? `${k.enlem}, ${k.boylam}` : "-"}
-                    </td>
-                    <td className="p-3 text-center">{k.kaynak || "-"}</td>
+                    </div>
+
+                    <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-black ${durumClass(k.takip_durumu)}`}>
+                      {durumEtiketi(k.takip_durumu)}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-semibold">
+                    <div className="rounded-xl bg-muted/40 p-3">
+                      <p className="text-muted-foreground">Oturum</p>
+                      <p className="mt-1 font-black">{k.oturum_durumu || "-"}</p>
+                    </div>
+
+                    <div className="rounded-xl bg-muted/40 p-3">
+                      <p className="text-muted-foreground">Son Konum</p>
+                      <p className="mt-1 font-black">{zamanFormat(k.kayit_zamani)}</p>
+                    </div>
+
+                    <div className="rounded-xl bg-muted/40 p-3">
+                      <p className="text-muted-foreground">Kayıt</p>
+                      <p className="mt-1 font-black">{k.toplam_kayit_sayisi ?? 0}</p>
+                    </div>
+
+                    <div className="rounded-xl bg-muted/40 p-3">
+                      <p className="text-muted-foreground">Kaynak</p>
+                      <p className="mt-1 font-black">{k.kaynak || "-"}</p>
+                    </div>
+                  </div>
+
+                  <p className="mt-3 break-all rounded-xl bg-muted/30 p-3 text-xs font-semibold text-muted-foreground">
+                    Koordinat: {koordinatVar(k) ? `${k.enlem}, ${k.boylam}` : "-"}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[1000px] text-sm">
+                <thead className="bg-muted/60">
+                  <tr>
+                    <th className="p-3 text-left">Personel</th>
+                    <th className="p-3 text-center">Takip</th>
+                    <th className="p-3 text-center">Oturum</th>
+                    <th className="p-3 text-center">Son Konum</th>
+                    <th className="p-3 text-center">Kayıt Sayısı</th>
+                    <th className="p-3 text-center">Koordinat</th>
+                    <th className="p-3 text-center">Kaynak</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+
+                <tbody>
+                  {filtreli.map((k) => (
+                    <tr key={k.personel_id} className="border-t">
+                      <td className="p-3">
+                        <p className="font-black">{k.personel_adi || "-"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {k.personel_kodu || "-"} · {k.unvan || k.rol || "-"}
+                        </p>
+                      </td>
+                      <td className="p-3 text-center">
+                        <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${durumClass(k.takip_durumu)}`}>
+                          {durumEtiketi(k.takip_durumu)}
+                        </span>
+                      </td>
+                      <td className="p-3 text-center">{k.oturum_durumu || "-"}</td>
+                      <td className="p-3 text-center">{zamanFormat(k.kayit_zamani)}</td>
+                      <td className="p-3 text-center">{k.toplam_kayit_sayisi ?? 0}</td>
+                      <td className="p-3 text-center">
+                        {koordinatVar(k) ? `${k.enlem}, ${k.boylam}` : "-"}
+                      </td>
+                      <td className="p-3 text-center">{k.kaynak || "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
+      <MobileTabBar />
     </div>
   )
 }

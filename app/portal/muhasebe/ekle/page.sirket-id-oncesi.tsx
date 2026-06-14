@@ -57,35 +57,9 @@ export default function MuhasebeEklePage() {
 
     const supabase = createClient()
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      setKaydediliyor(false)
-      setMesaj("Oturum bilgisi alınamadı. Lütfen tekrar giriş yapın.")
-      return
-    }
-
-    const { data: personel, error: personelError } = await supabase
-      .from("personeller")
-      .select("id, sirket_id")
-      .or(`auth_id.eq.${user.id},kullanici_id.eq.${user.id}`)
-      .maybeSingle()
-
-    if (personelError || !personel?.sirket_id) {
-      setKaydediliyor(false)
-      setMesaj("Şirket bilgisi bulunamadı. Muhasebe kaydı oluşturulamadı.")
-      return
-    }
-
     const kategori = kategoriler.find((k) => k.id === form.kategori_id)
 
     const { error } = await supabase.from("muhasebe_hareketleri").insert({
-      sirket_id: personel.sirket_id,
-      personel_id: personel.id,
-      tarih: new Date().toISOString().slice(0, 10),
       tur: form.tur,
       kategori_id: form.kategori_id,
       kategori_ad: kategori?.ad || null,
@@ -93,8 +67,6 @@ export default function MuhasebeEklePage() {
       odeme_yontemi: form.odeme_yontemi,
       aciklama: form.aciklama.trim() || null,
       kaynak: "manuel",
-      onay_durumu: "onaylandi",
-      odeme_durumu: "odendi",
     })
 
     setKaydediliyor(false)

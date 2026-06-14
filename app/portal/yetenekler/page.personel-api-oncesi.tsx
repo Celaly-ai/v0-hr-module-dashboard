@@ -50,37 +50,19 @@ export default function YetenekPage() {
       return
     }
 
-    let pData: any[] = []
+    const { data: pData, error: pError } = await supabase
+      .from("personeller")
+      .select("id, ad, soyad, durum")
+      .order("ad", { ascending: true })
 
-    try {
-      const response = await fetch("/api/yonetim/personeller", {
-        method: "GET",
-        cache: "no-store",
-      })
-
-      const json = await response.json()
-
-      if (!response.ok) {
-        setMesaj({
-          tip: "hata",
-          metin: json?.error || "Personeller alınamadı.",
-        })
-        setLoading(false)
-        return
-      }
-
-      pData = Array.isArray(json?.personeller) ? json.personeller : []
-    } catch (error: any) {
-      setMesaj({
-        tip: "hata",
-        metin: error?.message || "Personeller alınamadı.",
-      })
+    if (pError) {
+      setMesaj({ tip: "hata", metin: "Personeller alınamadı: " + pError.message })
       setLoading(false)
       return
     }
 
     setYetenekler(yData || [])
-    setPersoneller(pData.filter((p) => p.durum !== "pasif"))
+    setPersoneller(pData || [])
     setLoading(false)
   }, [])
 

@@ -2507,7 +2507,7 @@ export const overtimeRecords: OvertimeRecord[] = [
     plannedEndTime: "18:00",
     actualEndTime: "22:00",
     overtimeHours: 4,
-    reason: "Lunapark saha kurulumu.",
+    reason: "Saha operasyon kurulumu.",
     status: "onaylandi",
     submittedAt: "2026-04-12",
     reviewerId: "7",

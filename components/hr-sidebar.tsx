@@ -167,7 +167,7 @@ export function HRSidebar({ activeSection, onSectionChange }: HRSidebarProps) {
 
           <div>
             <h2 className="text-sm font-semibold text-foreground">
-              Fey Teknik – Lunapark Servis
+              FeyRoute IK Paneli
             </h2>
             <p className="text-xs text-muted-foreground">Yönetim Paneli</p>
           </div>

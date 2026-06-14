@@ -317,7 +317,7 @@ export function EmployeeReportView({
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
                   <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground print:text-gray-600 mb-1">
-                    Fey Teknik - Lunapark Servis
+                    FeyRoute
                   </p>
                   <h1 className="text-2xl font-semibold text-foreground print:text-black">
                     Personel Raporu
@@ -883,7 +883,7 @@ export function EmployeeReportView({
 
               <div className="mt-5 pt-4 border-t border-border print:border-gray-300">
                 <p className="text-xs text-muted-foreground print:text-gray-600 italic">
-                  Bu rapor Fey Teknik - Lunapark Servis Insan Kaynaklari modulu tarafindan otomatik
+                  Bu rapor FeyRoute İnsan Kaynakları modülü tarafından otomatik
                   olarak olusturulmustur. Rapordaki bilgiler {generatedAt} tarihi itibariyle
                   gecerlidir.
                 </p>

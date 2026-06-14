@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
-export async function GET() {
+export async function POST(request: Request) {
   const supabaseUrl =
     process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ||
     process.env.SUPABASE_URL?.trim()
@@ -12,14 +12,21 @@ export async function GET() {
 
   if (!supabaseUrl || !serviceKey) {
     return NextResponse.json(
-      {
-        error: "Supabase admin bağlantısı eksik.",
-        details: {
-          hasUrl: Boolean(supabaseUrl),
-          hasServiceKey: Boolean(serviceKey),
-        },
-      },
+      { error: "Supabase admin bağlantısı eksik." },
       { status: 500 },
+    )
+  }
+
+  const body = await request.json().catch(() => null)
+
+  const personelId = body?.personel_id
+  const modulKod = body?.modul_kod
+  const aktif = Boolean(body?.aktif)
+
+  if (!personelId || !modulKod) {
+    return NextResponse.json(
+      { error: "personel_id ve modul_kod zorunludur." },
+      { status: 400 },
     )
   }
 
@@ -31,9 +38,19 @@ export async function GET() {
   })
 
   const { data, error } = await supabase
-    .from("personeller")
-    .select("id, sirket_id, personel_kodu, ad, soyad, tel, telefon_normalized, auth_id, kullanici_id, rol, durum, lokasyon, bolge, ise_giris_tarihi, notlar")
-    .order("ad", { ascending: true })
+    .from("personel_modul_yetkileri")
+    .upsert(
+      {
+        personel_id: personelId,
+        modul_kod: modulKod,
+        aktif,
+      },
+      {
+        onConflict: "personel_id,modul_kod",
+      },
+    )
+    .select("personel_id, modul_kod, aktif")
+    .single()
 
   if (error) {
     return NextResponse.json(
@@ -42,5 +59,5 @@ export async function GET() {
     )
   }
 
-  return NextResponse.json({ personeller: data || [] })
+  return NextResponse.json({ yetki: data })
 }

@@ -2,7 +2,7 @@ import { SignupForm } from "@/components/auth/signup-form"
 import { Building2 } from "lucide-react"
 
 export const metadata = {
-  title: "Kayit Ol | IK Paneli",
+  title: "Kayıt Ol | FeyRoute IK Paneli",
 }
 
 export default function SignupPage() {
@@ -15,7 +15,7 @@ export default function SignupPage() {
           </div>
           <div>
             <h1 className="text-base font-semibold text-foreground">
-              Fey Teknik &mdash; Lunapark Servis
+              FeyRoute IK Paneli
             </h1>
             <p className="text-xs text-muted-foreground">
               Yeni hesap olusturun

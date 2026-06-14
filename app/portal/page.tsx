@@ -14,7 +14,9 @@ import {
   Car,
   ClipboardList,
   FileSpreadsheet,
+  Home,
   LogIn,
+  LogOut,
   Package,
   ShieldCheck,
   UserCog,
@@ -22,296 +24,122 @@ import {
   WalletCards,
 } from "lucide-react"
 
-type PortalKart = {
-  baslik: string
-  aciklama: string
-  yol: string
-  ikon: any
-  renk: string
-  grup: "Yönetim" | "Operasyon" | "AI" | "Personel" | "Finans"
-  roller: string[]
+type Modul = {
+  kod: string
+  ad: string
+  aciklama: string | null
+  kategori: string
+  standart: boolean
+  aktif: boolean
+  sira: number
 }
 
-const TUM_PERSONEL_ROLLERI = [
-  "admin",
-  "yonetici",
-  "yönetici",
-  "servis_yoneticisi",
-  "ik_yoneticisi",
-  "muhasebe",
-  "finans",
-  "anketor",
-  "anketör",
-  "buro",
-  "büro",
-  "buro_personeli",
-  "büro_personeli",
-  "teknisyen",
-  "montaj_teknisyeni",
-  "ariza_teknisyeni",
-  "arıza_teknisyeni",
-  "nakliye",
-  "calisan",
-  "çalışan",
-]
+type Personel = {
+  id: string
+  ad: string | null
+  soyad: string | null
+  rol: string | null
+  unvan: string | null
+}
 
-const YONETICI_ROLLERI = [
-  "admin",
-  "yonetici",
-  "yönetici",
-  "servis_yoneticisi",
-  "ik_yoneticisi",
-]
+const ADMIN_ROLLERI = ["admin", "ceo"]
 
-const KARTLAR: PortalKart[] = [
-  {
-    baslik: "Mesai Raporu / Puantaj",
-    aciklama: "Giriş/çıkış, izin, kısmi izin, puantaj ve PDF yazdırma raporları.",
-    yol: "/portal/mesai-raporu",
-    ikon: FileSpreadsheet,
-    renk: "border-emerald-200 bg-emerald-50 text-emerald-900",
-    grup: "Yönetim",
-    roller: YONETICI_ROLLERI,
-  },
-  {
-    baslik: "Yönetim Talepleri",
-    aciklama: "Personel taleplerini yönet, onayla veya reddet.",
-    yol: "/portal/yonetim/talepler",
-    ikon: ShieldCheck,
-    renk: "border-blue-200 bg-blue-50 text-blue-900",
-    grup: "Yönetim",
-    roller: YONETICI_ROLLERI,
-  },
-  {
-    baslik: "Yönetici Bildirimleri",
-    aciklama: "Anket, AI ve operasyon modüllerinden gelen yönetici takip bildirimlerini izle.",
-    yol: "/portal/yonetici-bildirimleri",
-    ikon: Bell,
-    renk: "border-red-200 bg-red-50 text-red-900",
-    grup: "Yönetim",
-    roller: YONETICI_ROLLERI,
-  },
-  {
-    baslik: "Vardiya Yönetimi",
-    aciklama: "Personel vardiya planı, çalışma günü, tatil ve operasyon düzenini yönet.",
-    yol: "/portal/yonetim/vardiya",
-    ikon: CalendarDays,
-    renk: "border-violet-200 bg-violet-50 text-violet-900",
-    grup: "Yönetim",
-    roller: YONETICI_ROLLERI,
-  },
-  {
-    baslik: "Ekip Yönetimi",
-    aciklama: "Ekipleri, görev dağılımını ve personel gruplarını yönet.",
-    yol: "/portal/yonetim/ekipler",
-    ikon: Users,
-    renk: "border-cyan-200 bg-cyan-50 text-cyan-900",
-    grup: "Yönetim",
-    roller: YONETICI_ROLLERI,
-  },
-  {
-    baslik: "Personel Giriş Hesapları",
-    aciklama: "Portal giriş hesaplarını oluştur ve yönet.",
-    yol: "/portal/personel-hesaplari",
-    ikon: UserCog,
-    renk: "border-slate-200 bg-slate-50 text-slate-900",
-    grup: "Yönetim",
-    roller: YONETICI_ROLLERI,
-  },
-  {
-    baslik: "Personel Yükle",
-    aciklama: "Personel kayıtlarını toplu veya tekil şekilde yönet.",
-    yol: "/portal/personel-yukle",
-    ikon: FileSpreadsheet,
-    renk: "border-emerald-200 bg-emerald-50 text-emerald-900",
-    grup: "Yönetim",
-    roller: YONETICI_ROLLERI,
-  },
-  {
-    baslik: "Personel Paneli",
-    aciklama: "Kişisel çalışma paneli, vardiya, mesai ve talepler.",
-    yol: "/portal/personel-paneli",
-    ikon: UserCog,
-    renk: "border-blue-200 bg-blue-50 text-blue-900",
-    grup: "Personel",
-    roller: TUM_PERSONEL_ROLLERI,
-  },
-  {
-    baslik: "Giriş / Çıkış",
-    aciklama: "Personel günlük giriş ve çıkış kayıtları.",
-    yol: "/portal/giris-cikis",
-    ikon: LogIn,
-    renk: "border-green-200 bg-green-50 text-green-900",
-    grup: "Personel",
-    roller: TUM_PERSONEL_ROLLERI,
-  },
-  {
-    baslik: "İzin Talebi",
-    aciklama: "İzin talepleri oluştur ve takip et.",
-    yol: "/portal/izin",
-    ikon: ClipboardList,
-    renk: "border-orange-200 bg-orange-50 text-orange-900",
-    grup: "Personel",
-    roller: TUM_PERSONEL_ROLLERI,
-  },
-  {
-    baslik: "Taleplerim",
-    aciklama: "Kendi taleplerini ve süreçlerini görüntüle.",
-    yol: "/portal/talepler",
-    ikon: ClipboardList,
-    renk: "border-yellow-200 bg-yellow-50 text-yellow-900",
-    grup: "Personel",
-    roller: TUM_PERSONEL_ROLLERI,
-  },
-  {
-    baslik: "Malzeme / Avadanlık",
-    aciklama: "Malzeme ve avadanlık taleplerini yönet.",
-    yol: "/portal/malzeme",
-    ikon: Package,
-    renk: "border-lime-200 bg-lime-50 text-lime-900",
-    grup: "Operasyon",
-    roller: [
-      "admin",
-      "yonetici",
-      "yönetici",
-      "servis_yoneticisi",
-      "teknisyen",
-      "montaj_teknisyeni",
-      "ariza_teknisyeni",
-      "arıza_teknisyeni",
-      "nakliye",
-      "calisan",
-      "çalışan",
-    ],
-  },
-  {
-    baslik: "Araçlar",
-    aciklama: "Araç kayıtları ve operasyon araç yönetimi.",
-    yol: "/portal/araclar",
-    ikon: Car,
-    renk: "border-zinc-200 bg-zinc-50 text-zinc-900",
-    grup: "Operasyon",
-    roller: ["admin", "yonetici", "yönetici", "servis_yoneticisi"],
-  },
-  {
-    baslik: "Varlıklar",
-    aciklama: "Demirbaş, zimmet, fotoğraf ve varlık yönetimi.",
-    yol: "/portal/varliklar",
-    ikon: Boxes,
-    renk: "border-indigo-200 bg-indigo-50 text-indigo-900",
-    grup: "Operasyon",
-    roller: ["admin", "yonetici", "yönetici", "servis_yoneticisi"],
-  },
-  {
-    baslik: "Muhasebe",
-    aciklama: "Kasa, ödeme ve muhasebe hareketleri.",
-    yol: "/portal/muhasebe",
-    ikon: WalletCards,
-    renk: "border-teal-200 bg-teal-50 text-teal-900",
-    grup: "Finans",
-    roller: ["admin", "yonetici", "yönetici", "muhasebe", "finans"],
-  },
-  {
-    baslik: "Anket İş Havuzu",
-    aciklama: "Tamamlanmış fişleri tekil veya Excel ile anket havuzuna al.",
-    yol: "/portal/anket-is-havuzu",
-    ikon: FileSpreadsheet,
-    renk: "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-900",
-    grup: "Operasyon",
-    roller: [
-      "admin",
-      "yonetici",
-      "yönetici",
-      "servis_yoneticisi",
-      "anketor",
-      "anketör",
-      "buro",
-      "büro",
-      "buro_personeli",
-      "büro_personeli",
-    ],
-  },
-  {
-    baslik: "Müşteri Anketi",
-    aciklama: "AI destekli müşteri görüşmesi, anketör notu ve sonuç analizi.",
-    yol: "/portal/anket",
-    ikon: Bot,
-    renk: "border-pink-200 bg-pink-50 text-pink-900",
-    grup: "Operasyon",
-    roller: [
-      "admin",
-      "yonetici",
-      "yönetici",
-      "servis_yoneticisi",
-      "anketor",
-      "anketör",
-      "buro",
-      "büro",
-      "buro_personeli",
-      "büro_personeli",
-    ],
-  },
-  {
-    baslik: "Riskli Anket Takibi",
-    aciklama: "Tekrar aranacak, riskli veya yönetici aksiyonu gerektiren müşteri anketlerini takip et.",
-    yol: "/portal/anket?odak=tekrar-aranacaklar",
-    ikon: AlertTriangle,
-    renk: "border-orange-200 bg-orange-50 text-orange-900",
-    grup: "Operasyon",
-    roller: [
-      "admin",
-      "yonetici",
-      "yönetici",
-      "servis_yoneticisi",
-      "anketor",
-      "anketör",
-      "buro",
-      "büro",
-      "buro_personeli",
-      "büro_personeli",
-    ],
-  },
-  {
-    baslik: "AI Görev Merkezi",
-    aciklama: "AI tarafından oluşturulan görevleri izle ve durumlarını yönet.",
-    yol: "/portal/ai-gorev-merkezi",
-    ikon: Activity,
-    renk: "border-red-200 bg-red-50 text-red-900",
-    grup: "AI",
-    roller: ["admin", "yonetici", "yönetici", "servis_yoneticisi"],
-  },
-  {
-    baslik: "AI Canlı Operasyon Merkezi",
-    aciklama: "Canlı operasyon, risk, iletişim ve AI karar ekranı.",
-    yol: "/portal/ai-canli-operasyon-merkezi",
-    ikon: BarChart3,
-    renk: "border-purple-200 bg-purple-50 text-purple-900",
-    grup: "AI",
-    roller: ["admin", "yonetici", "yönetici", "servis_yoneticisi"],
-  },
-]
+const modulYollari: Record<string, string> = {
+  ana_sayfa: "/portal",
+  mesai: "/portal/giris-cikis",
+  izin: "/portal/izin",
+  talepler: "/portal/talepler",
+  vardiya: "/portal/personel-paneli",
+  profil: "/portal/personel-paneli",
 
-const GRUPLAR: PortalKart["grup"][] = ["Yönetim", "Operasyon", "AI", "Personel", "Finans"]
+  yetki_yonetimi: "/portal/yetki-yonetimi",
+  mesai_raporlari: "/portal/mesai-raporu",
+  yonetim_talepleri: "/portal/yonetim/talepler",
+  yonetici_bildirimleri: "/portal/yonetici-bildirimleri",
+  vardiya_yonetimi: "/portal/yonetim/vardiya",
+  ekip_yonetimi: "/portal/yonetim/ekipler",
+  personel_hesaplari: "/portal/personel-hesaplari",
+  personel_yukle: "/portal/personel-yukle",
+
+  malzeme: "/portal/malzeme",
+  araclar: "/portal/araclar",
+  varliklar: "/portal/varliklar",
+
+  anket_is_havuzu: "/portal/anket-is-havuzu",
+  musteri_anketi: "/portal/anket",
+  riskli_anket_takibi: "/portal/anket?odak=tekrar-aranacaklar",
+
+  ai_gorev_merkezi: "/portal/ai-gorev-merkezi",
+  ai_canli_operasyon_merkezi: "/portal/ai-canli-operasyon-merkezi",
+
+  muhasebe: "/portal/muhasebe",
+}
+
+const modulIkonlari: Record<string, any> = {
+  ana_sayfa: Home,
+  mesai: LogIn,
+  izin: ClipboardList,
+  talepler: ClipboardList,
+  vardiya: CalendarDays,
+  profil: UserCog,
+
+  yetki_yonetimi: ShieldCheck,
+  mesai_raporlari: FileSpreadsheet,
+  yonetim_talepleri: ShieldCheck,
+  yonetici_bildirimleri: Bell,
+  vardiya_yonetimi: CalendarDays,
+  ekip_yonetimi: Users,
+  personel_hesaplari: UserCog,
+  personel_yukle: FileSpreadsheet,
+
+  malzeme: Package,
+  araclar: Car,
+  varliklar: Boxes,
+
+  anket_is_havuzu: FileSpreadsheet,
+  musteri_anketi: Bot,
+  riskli_anket_takibi: AlertTriangle,
+
+  ai_gorev_merkezi: Activity,
+  ai_canli_operasyon_merkezi: BarChart3,
+
+  muhasebe: WalletCards,
+}
+
+function normalizeRol(value?: string | null) {
+  return (value || "").trim().toLocaleLowerCase("tr-TR")
+}
+
+function adSoyad(personel: Personel | null) {
+  if (!personel) return "Personel"
+  return `${personel.ad || ""} ${personel.soyad || ""}`.trim() || "Personel"
+}
+
+function kategoriBaslik(kategori: string) {
+  if (kategori === "standart") return "Standart Modüller"
+  if (kategori === "yonetim") return "Yönetim"
+  if (kategori === "operasyon") return "Operasyon"
+  if (kategori === "anket") return "Anket"
+  if (kategori === "ai") return "AI"
+  if (kategori === "finans") return "Finans"
+  return kategori
+}
 
 export default function PortalPage() {
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
-  const [profileRole, setProfileRole] = useState("")
-  const [personelRol, setPersonelRol] = useState("")
-  const [kpi, setKpi] = useState({
-    aktifPersonel: 0,
-    bekleyenAnket: 0,
-    acikTalep: 0,
-    aiGorev: 0,
-    yoneticiBildirim: 0,
-    kritikRisk: 0,
-    varlik: 0,
-  })
 
-  const aktifRol = (profileRole || personelRol || "").toLocaleLowerCase("tr-TR")
+  const [loading, setLoading] = useState(true)
+  const [modulLoading, setModulLoading] = useState(true)
+  const [hata, setHata] = useState("")
+  const [personel, setPersonel] = useState<Personel | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [moduller, setModuller] = useState<Modul[]>([])
+  const [yetkiliModulKodlari, setYetkiliModulKodlari] = useState<string[]>([])
 
   const yukle = useCallback(async () => {
     setLoading(true)
+    setModulLoading(true)
+    setHata("")
 
     const supabase = createClient()
 
@@ -326,167 +154,234 @@ export default function PortalPage() {
       return
     }
 
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle()
-
-    setProfileRole(profileData?.role || "")
-
-    const { data: personelData } = await supabase
+    const { data: personelData, error: personelError } = await supabase
       .from("personeller")
-      .select("rol")
-      .or(`auth_id.eq.${user.id},kullanici_id.eq.${user.id}`)
+      .select("id, ad, soyad, rol, unvan")
+      .or(`auth_id.eq.${user.id},kullanici_id.eq.${user.id},email.eq.${user.email}`)
       .maybeSingle()
 
-    setPersonelRol(personelData?.rol || "")
+    if (personelError || !personelData) {
+      setHata("Bu kullanıcı için personel kaydı bulunamadı.")
+      setLoading(false)
+      setModulLoading(false)
+      return
+    }
 
-    const [
-      aktifPersonelCount,
-      bekleyenAnketCount,
-      acikTalepCount,
-      aiGorevCount,
-      yoneticiBildirimCount,
-      kritikRiskCount,
-      varlikCount,
-    ] = await Promise.all([
-      supabase.from("personeller").select("id", { count: "exact", head: true }).eq("durum", "aktif"),
-      supabase.from("ai_anket_is_havuzu").select("id", { count: "exact", head: true }).in("anket_durumu", ["bekliyor", "devam_ediyor"]),
-      supabase.from("talepler").select("id", { count: "exact", head: true }).in("durum", ["bekliyor", "acik", "incelemede"]),
-      supabase.from("ai_gorev_merkezi").select("id", { count: "exact", head: true }).not("durum", "in", "(tamamlandi,arsivlendi,iptal)"),
-      supabase.from("yonetici_bildirimleri").select("id", { count: "exact", head: true }).not("durum", "in", "(tamamlandi,kapandi,arsivlendi)"),
-      supabase.from("ai_gorev_merkezi").select("id", { count: "exact", head: true }).in("oncelik", ["kritik", "Kritik", "yüksek", "yuksek", "riskli"]),
-      supabase.from("varliklar").select("id", { count: "exact", head: true }),
-    ])
+    const aktifRol = normalizeRol(personelData.rol)
+    const adminMi = ADMIN_ROLLERI.includes(aktifRol)
 
-    setKpi({
-      aktifPersonel: aktifPersonelCount.count || 0,
-      bekleyenAnket: bekleyenAnketCount.count || 0,
-      acikTalep: acikTalepCount.count || 0,
-      aiGorev: aiGorevCount.count || 0,
-      yoneticiBildirim: yoneticiBildirimCount.count || 0,
-      kritikRisk: kritikRiskCount.count || 0,
-      varlik: varlikCount.count || 0,
-    })
+    setPersonel(personelData as Personel)
+    setIsAdmin(adminMi)
 
+    const { data: modulData, error: modulError } = await supabase
+      .from("moduller")
+      .select("kod, ad, aciklama, kategori, standart, aktif, sira")
+      .eq("aktif", true)
+      .order("sira", { ascending: true })
+
+    if (modulError) {
+      setHata("Modüller okunamadı: " + modulError.message)
+      setModuller([])
+      setYetkiliModulKodlari([])
+      setLoading(false)
+      setModulLoading(false)
+      return
+    }
+
+    let yetkiKodlari: string[] = []
+
+    if (!adminMi) {
+      const { data: yetkiData, error: yetkiError } = await supabase
+        .from("personel_modul_yetkileri")
+        .select("modul_kod")
+        .eq("personel_id", personelData.id)
+        .eq("aktif", true)
+
+      if (yetkiError) {
+        setHata("Modül yetkileri okunamadı: " + yetkiError.message)
+        setModuller((modulData || []) as Modul[])
+        setYetkiliModulKodlari([])
+        setLoading(false)
+        setModulLoading(false)
+        return
+      }
+
+      yetkiKodlari = (yetkiData || [])
+        .map((item) => item.modul_kod)
+        .filter(Boolean) as string[]
+    }
+
+    setModuller((modulData || []) as Modul[])
+    setYetkiliModulKodlari(yetkiKodlari)
     setLoading(false)
+    setModulLoading(false)
   }, [router])
 
   useEffect(() => {
     void yukle()
   }, [yukle])
 
-  const gorunenKartlar = useMemo(() => {
-    if (!aktifRol) return []
-    return KARTLAR.filter((kart) => kart.roller.includes(aktifRol))
-  }, [aktifRol])
+  const standartModuller = useMemo(() => {
+    return moduller.filter((modul) => modul.standart)
+  }, [moduller])
+
+  const opsiyonelModuller = useMemo(() => {
+    if (isAdmin) return moduller.filter((modul) => !modul.standart)
+
+    return moduller.filter((modul) => {
+      return !modul.standart && yetkiliModulKodlari.includes(modul.kod)
+    })
+  }, [moduller, isAdmin, yetkiliModulKodlari])
+
+  const opsiyonelGruplar = useMemo(() => {
+    const kategoriSirasi = ["yonetim", "operasyon", "anket", "ai", "finans"]
+
+    return kategoriSirasi
+      .map((kategori) => ({
+        kategori,
+        moduller: opsiyonelModuller.filter((modul) => modul.kategori === kategori),
+      }))
+      .filter((grup) => grup.moduller.length > 0)
+  }, [opsiyonelModuller])
+
+  async function cikisYap() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.replace("/portal/giris")
+  }
+
+  function modulAc(modul: Modul) {
+    const yol = modulYollari[modul.kod]
+
+    if (!yol) return
+
+    router.push(yol)
+  }
+
+  function ModulKart({ modul, opsiyonel = false }: { modul: Modul; opsiyonel?: boolean }) {
+    const Ikon = modulIkonlari[modul.kod] || Package
+    const tiklanabilir = Boolean(modulYollari[modul.kod])
+
+    return (
+      <button
+        type="button"
+        onClick={() => tiklanabilir && modulAc(modul)}
+        disabled={!tiklanabilir}
+        className={`w-full rounded-3xl border p-5 text-left shadow-sm transition ${
+          tiklanabilir ? "hover:-translate-y-0.5 hover:shadow-md" : "opacity-80"
+        } ${
+          opsiyonel
+            ? "border-slate-200 bg-slate-50 text-slate-900"
+            : "border-slate-950 bg-white text-slate-950"
+        }`}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-black">{modul.ad}</h3>
+            <p className="mt-2 text-sm font-semibold opacity-75">
+              {modul.aciklama || "-"}
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-white/80 p-3">
+            <Ikon className="h-6 w-6" />
+          </div>
+        </div>
+      </button>
+    )
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+16px)] md:p-6">
+    <div className="min-h-screen bg-slate-50 px-4 pb-8 pt-[calc(env(safe-area-inset-top)+16px)] md:p-6">
       <div className="mx-auto w-full max-w-7xl space-y-6 overflow-hidden">
-        <div className="rounded-3xl border bg-white p-6 shadow-sm">
+        <div className="rounded-3xl border border-slate-950 bg-white p-6 shadow-sm">
           <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-            Admin Portal
+            FeyRoute Personel
           </p>
+
           <h1 className="mt-2 text-3xl font-black text-slate-950">
-            Yönetim ve Operasyon Paneli
+            Portal
           </h1>
-          <p className="mt-2 max-w-3xl text-sm text-slate-600">
-            Yetkinize uygun yönetim, operasyon, AI, finans ve personel panellerine buradan erişebilirsiniz.
+
+          <p className="mt-2 max-w-3xl text-sm font-semibold text-slate-600">
+            {adSoyad(personel)} için standart modüller ve kişi bazlı opsiyonel modüller.
           </p>
+
           <p className="mt-3 inline-flex rounded-full border bg-slate-50 px-3 py-1 text-xs font-black text-slate-700">
-            Rol: {aktifRol || "yükleniyor"}
+            Rol: {personel?.rol || (isAdmin ? "admin" : "çalışan")}
           </p>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-          <div className="rounded-2xl border bg-white p-4 shadow-sm">
-            <p className="text-xs font-bold text-slate-500">Aktif Personel</p>
-            <p className="mt-2 text-2xl font-black text-slate-950">{kpi.aktifPersonel}</p>
-          </div>
+        <button
+          type="button"
+          onClick={cikisYap}
+          className="w-full rounded-2xl bg-red-600 px-4 py-4 text-base font-black text-white shadow-sm"
+        >
+          <span className="inline-flex items-center gap-2">
+            <LogOut className="h-5 w-5" />
+            Çıkış Yap
+          </span>
+        </button>
 
-          <div className="rounded-2xl border bg-white p-4 shadow-sm">
-            <p className="text-xs font-bold text-slate-500">Bekleyen Anket</p>
-            <p className="mt-2 text-2xl font-black text-fuchsia-900">{kpi.bekleyenAnket}</p>
-          </div>
-
-          <div className="rounded-2xl border bg-white p-4 shadow-sm">
-            <p className="text-xs font-bold text-slate-500">Açık Talep</p>
-            <p className="mt-2 text-2xl font-black text-orange-900">{kpi.acikTalep}</p>
-          </div>
-
-          <div className="rounded-2xl border bg-white p-4 shadow-sm">
-            <p className="text-xs font-bold text-slate-500">AI Görev</p>
-            <p className="mt-2 text-2xl font-black text-red-900">{kpi.aiGorev}</p>
-          </div>
-
-          <div className="rounded-2xl border bg-white p-4 shadow-sm">
-            <p className="text-xs font-bold text-slate-500">Yönetici Bildirimi</p>
-            <p className="mt-2 text-2xl font-black text-orange-900">{kpi.yoneticiBildirim}</p>
-          </div>
-
-          <div className="rounded-2xl border bg-white p-4 shadow-sm">
-            <p className="text-xs font-bold text-slate-500">Kritik / Riskli Görev</p>
-            <p className="mt-2 text-2xl font-black text-rose-900">{kpi.kritikRisk}</p>
-          </div>
-
-          <div className="rounded-2xl border bg-white p-4 shadow-sm">
-            <p className="text-xs font-bold text-slate-500">Varlık</p>
-            <p className="mt-2 text-2xl font-black text-indigo-900">{kpi.varlik}</p>
-          </div>
+        <div className="rounded-3xl border border-blue-200 bg-blue-50 p-5 text-blue-900">
+          <h2 className="text-lg font-black">Standart Yetki Kuralı</h2>
+          <p className="mt-2 text-sm font-bold">
+            Mesai, izin, talepler, vardiya ve profil tüm personellerde standarttır.
+            Diğer modüller admin tarafından kişi bazlı açılır.
+          </p>
         </div>
 
-        {loading ? (
+        {loading || modulLoading ? (
           <div className="rounded-3xl border bg-white p-6 text-sm font-bold text-slate-600">
-            Portal yetkileriniz yükleniyor...
+            Portal modülleri yükleniyor...
           </div>
-        ) : gorunenKartlar.length === 0 ? (
-          <div className="rounded-3xl border border-amber-300 bg-amber-50 p-6 text-sm font-bold text-amber-900">
-            Bu kullanıcı için portal kart yetkisi bulunamadı. Lütfen personel rolünü kontrol edin.
+        ) : hata ? (
+          <div className="rounded-3xl border border-red-300 bg-red-50 p-6 text-sm font-bold text-red-900">
+            {hata}
           </div>
-        ) : null}
+        ) : (
+          <>
+            <div className="space-y-3">
+              <h2 className="text-sm font-black uppercase tracking-wide text-slate-600">
+                {kategoriBaslik("standart")}
+              </h2>
 
-        {!loading &&
-          GRUPLAR.map((grup) => {
-            const kartlar = gorunenKartlar.filter((kart) => kart.grup === grup)
-
-            if (kartlar.length === 0) return null
-
-            return (
-              <div key={grup} className="space-y-3">
-                <h2 className="text-sm font-black uppercase tracking-wide text-slate-600">
-                  {grup}
-                </h2>
-
-                <div className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {kartlar.map((kart) => {
-                    const Ikon = kart.ikon
-
-                    return (
-                      <button
-                        key={kart.yol}
-                        type="button"
-                        onClick={() => router.push(kart.yol)}
-                        className={`w-full rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${kart.renk}`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <h3 className="text-lg font-black">{kart.baslik}</h3>
-                            <p className="mt-2 text-sm opacity-80">{kart.aciklama}</p>
-                          </div>
-
-                          <div className="rounded-2xl bg-white/70 p-3">
-                            <Ikon className="h-6 w-6" />
-                          </div>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
+              <div className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {standartModuller.map((modul) => (
+                  <ModulKart key={modul.kod} modul={modul} />
+                ))}
               </div>
-            )
-          })}
+            </div>
+
+            <div className="space-y-3">
+              <h2 className="text-sm font-black uppercase tracking-wide text-slate-600">
+                Opsiyonel Modüller
+              </h2>
+
+              {opsiyonelModuller.length === 0 ? (
+                <div className="rounded-3xl border bg-white p-6 text-sm font-bold text-slate-600">
+                  Ek modül yetkiniz bulunmuyor. Opsiyonel modüller sadece admin tarafından kişi bazlı açılır.
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {opsiyonelGruplar.map((grup) => (
+                    <div key={grup.kategori} className="space-y-3">
+                      <h3 className="text-xs font-black uppercase tracking-wide text-slate-500">
+                        {kategoriBaslik(grup.kategori)}
+                      </h3>
+
+                      <div className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        {grup.moduller.map((modul) => (
+                          <ModulKart key={modul.kod} modul={modul} opsiyonel />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

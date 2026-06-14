@@ -292,7 +292,7 @@ export function Reports() {
   const handleExportExcel = () => {
     // Build CSV with BOM for Excel Turkish char support
     const rows: string[][] = []
-    rows.push(["Fey Teknik - Lunapark Servis - IK Raporu"])
+    rows.push(["FeyRoute IK Raporu"])
     rows.push([`Tarih Araligi: ${dateRangeLabel(dateRange)}`])
     rows.push([`Olusturulma: ${new Date().toLocaleString("tr-TR")}`])
     rows.push([])

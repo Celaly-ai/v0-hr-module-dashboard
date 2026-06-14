@@ -207,9 +207,9 @@ export default function PortalGirisPage() {
 
             <div>
               <h1 className="text-base font-bold text-foreground">
-                Fey Teknik - Lunapark Servis
+                FeyRoute IK Paneli
               </h1>
-              <p className="text-xs text-muted-foreground">IK Paneli Girişi</p>
+              <p className="text-xs text-muted-foreground">Personel ve Operasyon Girişi</p>
             </div>
           </div>
 

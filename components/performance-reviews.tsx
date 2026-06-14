@@ -352,7 +352,7 @@ function exportReviewPdf(review: PerformanceReview) {
   </div>
 
   <div class="footer">
-    <span>Fey Teknik - Lunapark Servis</span>
+    <span>FeyRoute</span>
     <span>Basim: ${new Date().toLocaleString("tr-TR")}</span>
   </div>
 

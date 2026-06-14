@@ -81,7 +81,6 @@ export default function AnketIsHavuzuPage() {
   const [form, setForm] = useState(BOS_FORM)
   const [isler, setIsler] = useState<Kayit[]>([])
   const [anketler, setAnketler] = useState<Kayit[]>([])
-  const [yoneticiKararlari, setYoneticiKararlari] = useState<Kayit[]>([])
   const [arama, setArama] = useState("")
   const [durumFiltre, setDurumFiltre] = useState("")
 
@@ -96,7 +95,7 @@ export default function AnketIsHavuzuPage() {
     setHata("")
     setBilgi("")
 
-    const [isSonuc, anketSonuc, kararSonuc] = await Promise.all([
+    const [isSonuc, anketSonuc] = await Promise.all([
       supabase
         .from("ai_anket_is_havuzu")
         .select("*")
@@ -107,12 +106,6 @@ export default function AnketIsHavuzuPage() {
         .select("*")
         .order("id", { ascending: false })
         .limit(100),
-      supabase
-        .from("ai_yonetici_karar_merkezi")
-        .select("*")
-        .eq("ilgili_modul", "anket")
-        .order("created_at", { ascending: false })
-        .limit(20),
     ])
 
     if (isSonuc.error) {
@@ -126,12 +119,6 @@ export default function AnketIsHavuzuPage() {
       setAnketler([])
     } else {
       setAnketler(anketSonuc.data || [])
-    }
-
-    if (kararSonuc.error) {
-      setYoneticiKararlari([])
-    } else {
-      setYoneticiKararlari(kararSonuc.data || [])
     }
 
     setLoading(false)
@@ -331,57 +318,6 @@ export default function AnketIsHavuzuPage() {
           <Kpi title="Ulaşılamadı" value={ozet.ulasilamadi} />
           <Kpi title="Riskli" value={ozet.riskli} tone="orange" />
           <Kpi title="Kritik" value={ozet.kritik} tone="red" />
-        </div>
-
-        <div className="rounded-3xl border border-purple-300 bg-purple-50 p-5">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 className="text-lg font-black text-purple-950">AI Yönetici Kararları</h2>
-              <p className="mt-1 text-xs font-semibold text-purple-900">
-                Anketlerden otomatik oluşan müşteri memnuniyeti müdahale kararları.
-              </p>
-            </div>
-
-            <span className="rounded-full border border-purple-400 bg-white px-4 py-2 text-sm font-black text-purple-950">
-              {yoneticiKararlari.length} karar
-            </span>
-          </div>
-
-          {yoneticiKararlari.length === 0 ? (
-            <div className="mt-4 rounded-2xl border border-dashed border-purple-300 bg-white/70 p-5 text-center text-sm font-bold text-purple-900">
-              Henüz anket kaynaklı yönetici kararı yok.
-            </div>
-          ) : (
-            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {yoneticiKararlari.slice(0, 6).map((karar) => (
-                <div key={karar.id} className="rounded-2xl border border-purple-200 bg-white p-4 shadow-sm">
-                  <div className="flex flex-wrap gap-2">
-                    <BadgeText className={riskClass(karar.karar_seviyesi)}>
-                      {karar.karar_seviyesi || "karar"}
-                    </BadgeText>
-                    <BadgeText>{karar.karar_durumu || "bekliyor"}</BadgeText>
-                  </div>
-
-                  <p className="mt-3 text-sm font-black">{karar.karar_tipi || "Müşteri Memnuniyeti Müdahalesi"}</p>
-                  <p className="mt-1 text-xs font-semibold text-slate-600">
-                    Risk: {karar.risk_skoru ?? "-"} · Ürün: {karar.urun_grubu || "-"}
-                  </p>
-
-                  <p className="mt-3 rounded-xl bg-purple-50 p-3 text-xs font-semibold text-purple-950">
-                    {karar.ai_tespit || "-"}
-                  </p>
-
-                  <p className="mt-2 text-xs font-bold text-purple-950">
-                    Öneri: {karar.ai_oneri || "-"}
-                  </p>
-
-                  <p className="mt-2 text-xs font-black text-purple-950">
-                    Aksiyon: {karar.ai_aksiyon || "-"}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         <div className="rounded-3xl border border-orange-300 bg-orange-50 p-5">

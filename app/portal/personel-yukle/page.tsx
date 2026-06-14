@@ -55,23 +55,19 @@ export default function PersonelYuklePage() {
   const personelleriYukle = useCallback(async () => {
     setLoading(true)
 
-    const supabase = createClient()
+    const response = await fetch("/api/yonetim/personeller", { cache: "no-store" })
+    const data = await response.json().catch(() => null)
 
-    const { data, error } = await supabase
-      .from("personeller")
-      .select("id, sirket_id, personel_kodu, ad, soyad, tel, telefon_normalized, auth_id, rol, durum, lokasyon, bolge, ise_giris_tarihi, notlar")
-      .order("ad", { ascending: true })
-
-    if (error) {
+    if (!response.ok) {
       setMesaj({
         tip: "hata",
-        metin: "Personeller alınamadı: " + error.message,
+        metin: "Personeller alınamadı: " + (data?.error || "API hatası"),
       })
       setLoading(false)
       return
     }
 
-    setPersoneller(data || [])
+    setPersoneller(data?.personeller || [])
     setLoading(false)
   }, [])
 
@@ -253,96 +249,46 @@ export default function PersonelYuklePage() {
       return
     }
 
-    const cleanPhone = normalizePhone(form.telefon)
-
-    if (cleanPhone.length !== 10) {
-      setMesaj({ tip: "hata", metin: "Geçerli telefon numarası giriniz." })
-      return
-    }
-
     setKaydediliyor(true)
 
-    const supabase = createClient()
+    const mevcut = duzenlenenId ? personeller.find((p) => p.id === duzenlenenId) : null
 
-    let sirketId: string | null = null
+    const response = await fetch("/api/yonetim/personel-kaydet", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        id: duzenlenenId,
+        sirket_id: mevcut?.sirket_id || null,
+        personel_kodu: form.personel_kodu,
+        ad: form.ad,
+        soyad: form.soyad,
+        telefon: form.telefon,
+        rol: form.rol,
+        durum: form.durum,
+        lokasyon: form.lokasyon,
+        bolge: form.bolge,
+        ise_giris_tarihi: form.ise_giris_tarihi,
+        notlar: form.notlar,
+      }),
+    })
 
-    if (duzenlenenId) {
-      const mevcut = personeller.find((p) => p.id === duzenlenenId)
-      sirketId = mevcut?.sirket_id || null
-    }
+    const data = await response.json().catch(() => null)
 
-    if (!sirketId) {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      if (session?.user?.id) {
-        const { data: sirketKaydi } = await supabase
-          .from("personeller")
-          .select("sirket_id")
-          .or(`auth_id.eq.${session.user.id},kullanici_id.eq.${session.user.id}`)
-          .limit(1)
-          .maybeSingle()
-
-        sirketId = sirketKaydi?.sirket_id || null
-      }
-    }
-
-    if (!sirketId) {
+    if (!response.ok) {
       setMesaj({
         tip: "hata",
-        metin: "Şirket ID bulunamadı. Giriş yapan yönetici personel kaydında sirket_id dolu olmalı.",
+        metin: "Personel kaydedilemedi: " + (data?.error || "API hatası"),
       })
       setKaydediliyor(false)
       return
     }
 
-    const payload = {
-      sirket_id: sirketId,
-      personel_kodu: form.personel_kodu.trim(),
-      ad: form.ad.trim(),
-      soyad: form.soyad.trim(),
-      tel: `0${cleanPhone}`,
-      telefon_normalized: cleanPhone,
-      rol: form.rol,
-      durum: form.durum,
-      lokasyon: form.lokasyon.trim() || null,
-      bolge: form.bolge.trim() || null,
-      ise_giris_tarihi: form.ise_giris_tarihi || null,
-      notlar: form.notlar.trim() || null,
-      updated_at: new Date().toISOString(),
-    }
-
-    if (duzenlenenId) {
-      const { error } = await supabase
-        .from("personeller")
-        .update(payload)
-        .eq("id", duzenlenenId)
-
-      if (error) {
-        setMesaj({
-          tip: "hata",
-          metin: "Personel güncellenemedi: " + error.message,
-        })
-        setKaydediliyor(false)
-        return
-      }
-
-      setMesaj({ tip: "basari", metin: "Personel başarıyla güncellendi." })
-    } else {
-      const { error } = await supabase.from("personeller").insert(payload)
-
-      if (error) {
-        setMesaj({
-          tip: "hata",
-          metin: "Personel eklenemedi: " + error.message,
-        })
-        setKaydediliyor(false)
-        return
-      }
-
-      setMesaj({ tip: "basari", metin: "Personel başarıyla eklendi." })
-    }
+    setMesaj({
+      tip: "basari",
+      metin: duzenlenenId ? "Personel başarıyla güncellendi." : "Personel başarıyla eklendi.",
+    })
 
     temizle()
     await personelleriYukle()

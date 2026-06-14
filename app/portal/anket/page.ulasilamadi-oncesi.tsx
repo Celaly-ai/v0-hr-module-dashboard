@@ -111,7 +111,6 @@ export default function AnketPage() {
   const [excelYukleniyor, setExcelYukleniyor] = useState(false)
   const [anketBaslatiliyor, setAnketBaslatiliyor] = useState<number | null>(null)
   const [cevapKaydediliyor, setCevapKaydediliyor] = useState(false)
-  const [ulasilamadiKaydediliyor, setUlasilamadiKaydediliyor] = useState(false)
 
   const [hata, setHata] = useState<string | null>(null)
   const [bilgi, setBilgi] = useState<string | null>(null)
@@ -435,31 +434,6 @@ export default function AnketPage() {
 
     return () => window.clearTimeout(timer)
   }, [])
-
-  async function ulasilamadiKaydet(neden: string) {
-    if (!aktifIs?.anket_id) return
-
-    setUlasilamadiKaydediliyor(true)
-    setHata(null)
-    setBilgi(null)
-
-    const { data, error } = await supabase.rpc("ai_anket_ulasilamadi_kaydet", {
-      p_anket_id: Number(aktifIs.anket_id),
-      p_neden: neden,
-      p_not: anketorNotu || musteriCevabi || null,
-    })
-
-    if (error || data?.success === false) {
-      setHata(error?.message || data?.error || "Ulaşılamadı kaydı oluşturulamadı.")
-      setUlasilamadiKaydediliyor(false)
-      return
-    }
-
-    setBilgi(data?.message || "Ulaşılamadı kaydı işlendi.")
-    await cevaplariGetir(Number(aktifIs.anket_id))
-    await verileriGetir()
-    setUlasilamadiKaydediliyor(false)
-  }
 
   async function cevapGonder() {
     if (!aktifSoru) return
@@ -857,56 +831,6 @@ export default function AnketPage() {
                 {cevapKaydediliyor ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
                 Cevabı Kaydet ve AI Sonraki Soruyu Üretsin
               </button>
-
-              <div className="rounded-2xl border border-orange-300 bg-orange-50 p-4">
-                <p className="text-sm font-black text-orange-950">Müşteriye Ulaşılamadı</p>
-                <p className="mt-1 text-xs font-semibold text-orange-900">
-                  Müşteri cevap vermediyse nedeni seçin. Sistem tekrar arama sürecine işler.
-                </p>
-
-                <div className="mt-3 grid gap-2 md:grid-cols-5">
-                  <button
-                    type="button"
-                    disabled={ulasilamadiKaydediliyor}
-                    onClick={() => void ulasilamadiKaydet("acmadi")}
-                    className="rounded-lg border border-orange-300 bg-white px-3 py-2 text-xs font-black text-orange-950 disabled:opacity-60"
-                  >
-                    Açmadı
-                  </button>
-                  <button
-                    type="button"
-                    disabled={ulasilamadiKaydediliyor}
-                    onClick={() => void ulasilamadiKaydet("mesgul")}
-                    className="rounded-lg border border-orange-300 bg-white px-3 py-2 text-xs font-black text-orange-950 disabled:opacity-60"
-                  >
-                    Meşgul
-                  </button>
-                  <button
-                    type="button"
-                    disabled={ulasilamadiKaydediliyor}
-                    onClick={() => void ulasilamadiKaydet("telefon_kapali")}
-                    className="rounded-lg border border-orange-300 bg-white px-3 py-2 text-xs font-black text-orange-950 disabled:opacity-60"
-                  >
-                    Telefon Kapalı
-                  </button>
-                  <button
-                    type="button"
-                    disabled={ulasilamadiKaydediliyor}
-                    onClick={() => void ulasilamadiKaydet("yanlis_numara")}
-                    className="rounded-lg border border-red-300 bg-white px-3 py-2 text-xs font-black text-red-800 disabled:opacity-60"
-                  >
-                    Yanlış Numara
-                  </button>
-                  <button
-                    type="button"
-                    disabled={ulasilamadiKaydediliyor}
-                    onClick={() => void ulasilamadiKaydet("daha_sonra_ara")}
-                    className="rounded-lg border border-blue-300 bg-white px-3 py-2 text-xs font-black text-blue-800 disabled:opacity-60"
-                  >
-                    Daha Sonra Ara
-                  </button>
-                </div>
-              </div>
 
               {sonAiSonuc && (
                 <Card className="p-4">

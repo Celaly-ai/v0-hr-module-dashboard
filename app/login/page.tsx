@@ -3,7 +3,7 @@ import LoginForm from "@/components/auth/login-form"
 import { Building2 } from "lucide-react"
 
 export const metadata = {
-  title: "Giris Yap | IK Paneli",
+  title: "Giriş Yap | FeyRoute IK Paneli",
 }
 
 export default function LoginPage() {
@@ -16,9 +16,9 @@ export default function LoginPage() {
           </div>
           <div>
             <h1 className="text-base font-semibold text-foreground">
-              Fey Teknik &mdash; Lunapark Servis
+              FeyRoute IK Paneli
             </h1>
-            <p className="text-xs text-muted-foreground">IK Paneli Girisi</p>
+            <p className="text-xs text-muted-foreground">Personel ve Operasyon Girişi</p>
           </div>
         </div>
 

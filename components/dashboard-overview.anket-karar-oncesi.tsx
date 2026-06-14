@@ -410,39 +410,6 @@ function ActivityIcon({
 }
 
 function YoneticiDashboard() {
-  const supabase = useMemo(() => createClient(), [])
-  const [anketKararlari, setAnketKararlari] = useState<Record<string, any>[]>([])
-  const [anketKararLoading, setAnketKararLoading] = useState(true)
-
-  useEffect(() => {
-    let mounted = true
-
-    async function anketKararlariGetir() {
-      setAnketKararLoading(true)
-
-      const { data } = await supabase
-        .from("ai_yonetici_karar_merkezi")
-        .select("*")
-        .eq("ilgili_modul", "anket")
-        .order("created_at", { ascending: false })
-        .limit(8)
-
-      if (!mounted) return
-
-      setAnketKararlari(data || [])
-      setAnketKararLoading(false)
-    }
-
-    anketKararlariGetir()
-
-    return () => {
-      mounted = false
-    }
-  }, [supabase])
-
-  const anketKritikSayisi = anketKararlari.filter((k) => k.karar_seviyesi === "kritik").length
-  const anketYuksekSayisi = anketKararlari.filter((k) => k.karar_seviyesi === "yuksek" || k.karar_seviyesi === "yüksek").length
-
   const activeEmployees = employees.filter((e) => e.status === "active").length
   const remoteEmployees = employees.filter((e) => e.status === "remote").length
   const onLeaveEmployees = employees.filter((e) => e.status === "on-leave").length
@@ -501,84 +468,6 @@ function YoneticiDashboard() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-purple-300 bg-purple-50 p-5">
-        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h3 className="flex items-center gap-2 font-semibold text-purple-950">
-              <AlertTriangle className="h-4 w-4 text-purple-700" />
-              Anket Kaynaklı AI Yönetici Kararları
-            </h3>
-            <p className="mt-1 text-xs font-semibold text-purple-900">
-              Müşteri memnuniyetsizliği, riskli anketler ve tekrar takip kararları.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <Badge variant="outline" className="border-red-300 bg-white text-red-800">
-              Kritik: {anketKritikSayisi}
-            </Badge>
-            <Badge variant="outline" className="border-orange-300 bg-white text-orange-800">
-              Yüksek: {anketYuksekSayisi}
-            </Badge>
-            <Badge variant="outline" className="border-purple-300 bg-white text-purple-800">
-              Toplam: {anketKararlari.length}
-            </Badge>
-          </div>
-        </div>
-
-        {anketKararLoading ? (
-          <div className="flex h-24 items-center justify-center text-sm font-bold text-purple-900">
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Anket kararları okunuyor...
-          </div>
-        ) : anketKararlari.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-purple-300 bg-white/70 p-5 text-center text-sm font-bold text-purple-900">
-            Henüz anket kaynaklı yönetici kararı yok.
-          </div>
-        ) : (
-          <div className="grid gap-3 lg:grid-cols-2">
-            {anketKararlari.slice(0, 4).map((karar) => (
-              <div key={karar.id} className="rounded-xl border border-purple-200 bg-white p-4">
-                <div className="flex flex-wrap gap-2">
-                  <Badge
-                    variant="outline"
-                    className={
-                      karar.karar_seviyesi === "kritik"
-                        ? "border-red-300 bg-red-50 text-red-800"
-                        : "border-orange-300 bg-orange-50 text-orange-800"
-                    }
-                  >
-                    {karar.karar_seviyesi || "karar"}
-                  </Badge>
-                  <Badge variant="outline" className="border-border bg-secondary text-xs">
-                    {karar.karar_durumu || "bekliyor"}
-                  </Badge>
-                </div>
-
-                <p className="mt-3 text-sm font-black text-foreground">
-                  {karar.karar_tipi || "Müşteri Memnuniyeti Müdahalesi"}
-                </p>
-                <p className="mt-1 text-xs font-semibold text-muted-foreground">
-                  Risk: {karar.risk_skoru ?? "-"} · Ürün: {karar.urun_grubu || "-"}
-                </p>
-
-                <p className="mt-3 rounded-lg bg-purple-50 p-3 text-xs font-semibold text-purple-950">
-                  {karar.ai_tespit || "-"}
-                </p>
-
-                <p className="mt-2 text-xs font-bold text-purple-950">
-                  Öneri: {karar.ai_oneri || "-"}
-                </p>
-
-                <p className="mt-2 text-xs font-black text-purple-950">
-                  Aksiyon: {karar.ai_aksiyon || "-"}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card className="border-border p-5">
           <div className="flex items-center justify-between">

@@ -1,63 +1,166 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
+import {
+  Activity,
+  AlertTriangle,
+  BarChart3,
+  Bell,
+  Bot,
+  Boxes,
+  Building2,
+  CalendarDays,
+  Car,
+  ClipboardList,
+  FileSpreadsheet,
+  Home,
+  LogIn,
+  LogOut,
+  Package,
+  ShieldCheck,
+  UserCog,
+  Users,
+  WalletCards,
+} from "lucide-react"
 
-type Mesaj = {
-  tip: "basari" | "hata"
-  metin: string
+type Modul = {
+  kod: string
+  ad: string
+  aciklama: string | null
+  kategori: string
+  standart: boolean
+  aktif: boolean
+  sira: number
 }
 
-const TALEP_TURLERI = [
-  {
-    tip: "arac_hasar",
-    baslik: "Kaza / Hasar Bildirimi",
-    ikon: "💥",
-    renk: "bg-red-600",
-    aciklamaPlaceholder: "Hasar nerede, nasıl oldu? Kısaca açıklayın...",
-  },
-  {
-    tip: "arac_bakim",
-    baslik: "Bakım / Arıza Talebi",
-    ikon: "🔧",
-    renk: "bg-yellow-600",
-    aciklamaPlaceholder: "Araçtaki arıza veya bakım ihtiyacını yazın...",
-  },
-]
+type Personel = {
+  id: string
+  ad: string | null
+  soyad: string | null
+  rol: string | null
+  unvan: string | null
+}
 
-export default function AracPage() {
+const ADMIN_ROLLERI = ["admin", "ceo"]
+
+const modulYollari: Record<string, string> = {
+  ana_sayfa: "/portal",
+  mesai: "/portal/giris-cikis",
+  izin: "/portal/izin",
+  talepler: "/portal/talepler",
+  vardiya: "/portal/personel-paneli",
+  profil: "/portal/personel-paneli",
+
+  sirket_kunyesi: "/portal/sirket-kunyesi",
+  yetki_yonetimi: "/portal/yetki-yonetimi",
+  rol_atama: "/portal/rol-atama",
+  rol_gecmisi: "/portal/rol-gecmisi",
+  mesai_raporlari: "/portal/mesai-raporu",
+  yonetim_talepleri: "/portal/yonetim/talepler",
+  yonetici_bildirimleri: "/portal/yonetici-bildirimleri",
+  vardiya_yonetimi: "/portal/yonetim/vardiya",
+  ekip_yonetimi: "/portal/yonetim/ekipler",
+  personel_hesaplari: "/portal/personel-hesaplari",
+  personel_yukle: "/portal/personel-yukle",
+
+  malzeme: "/portal/malzeme",
+  araclar: "/portal/araclar",
+  varliklar: "/portal/varliklar",
+
+  urun_merkezi: "/portal/urun-merkezi",
+  urun_kabul: "/portal/urun-kabul",
+  urun_devir: "/portal/urun-devir",
+  urun_fisleri: "/portal/urun-fisleri",
+
+  anket_is_havuzu: "/portal/anket-is-havuzu",
+  musteri_anketi: "/portal/anket",
+  riskli_anket_takibi: "/portal/anket?odak=tekrar-aranacaklar",
+
+  ai_gorev_merkezi: "/portal/ai-gorev-merkezi",
+  ai_canli_operasyon_merkezi: "/portal/ai-canli-operasyon-merkezi",
+
+  muhasebe: "/portal/muhasebe",
+  belge_arsivi: "/portal/belge-arsivi",
+}
+
+const modulIkonlari: Record<string, any> = {
+  ana_sayfa: Home,
+  mesai: LogIn,
+  izin: ClipboardList,
+  talepler: ClipboardList,
+  vardiya: CalendarDays,
+  profil: UserCog,
+
+  sirket_kunyesi: Building2,
+  yetki_yonetimi: ShieldCheck,
+  rol_atama: UserCog,
+  rol_gecmisi: FileSpreadsheet,
+  mesai_raporlari: FileSpreadsheet,
+  yonetim_talepleri: ShieldCheck,
+  yonetici_bildirimleri: Bell,
+  vardiya_yonetimi: CalendarDays,
+  ekip_yonetimi: Users,
+  personel_hesaplari: UserCog,
+  personel_yukle: FileSpreadsheet,
+
+  malzeme: Package,
+  araclar: Car,
+  varliklar: Boxes,
+
+  urun_merkezi: Boxes,
+  urun_kabul: Package,
+  urun_devir: ClipboardList,
+  urun_fisleri: FileSpreadsheet,
+
+  anket_is_havuzu: FileSpreadsheet,
+  musteri_anketi: Bot,
+  riskli_anket_takibi: AlertTriangle,
+
+  ai_gorev_merkezi: Activity,
+  ai_canli_operasyon_merkezi: BarChart3,
+
+  muhasebe: WalletCards,
+  belge_arsivi: FileSpreadsheet,
+}
+
+function normalizeRol(value?: string | null) {
+  return (value || "").trim().toLocaleLowerCase("tr-TR")
+}
+
+function adSoyad(personel: Personel | null) {
+  if (!personel) return "Personel"
+  return `${personel.ad || ""} ${personel.soyad || ""}`.trim() || "Personel"
+}
+
+function kategoriBaslik(kategori: string) {
+  if (kategori === "standart") return "Standart Modüller"
+  if (kategori === "yonetim") return "Yönetim"
+  if (kategori === "operasyon") return "Operasyon"
+  if (kategori === "anket") return "Anket"
+  if (kategori === "ai") return "AI"
+  if (kategori === "finans") return "Finans"
+  if (kategori === "sistem") return "Sistem"
+  return kategori
+}
+
+export default function PortalPage() {
   const router = useRouter()
 
-  const [personel, setPersonel] = useState<any>(null)
-  const [arac, setArac] = useState<any>(null)
-  const [talepler, setTalepler] = useState<any[]>([])
-  const [yukleniyor, setYukleniyor] = useState(true)
-  const [aktifForm, setAktifForm] = useState<string | null>(null)
-  const [kaydediliyor, setKaydediliyor] = useState(false)
-  const [mesaj, setMesaj] = useState<Mesaj | null>(null)
-
-  const [aciklama, setAciklama] = useState("")
-  const [guncelKm, setGuncelKm] = useState("")
-  const [olayTarihi, setOlayTarihi] = useState("")
-  const [dosyalar, setDosyalar] = useState<File[]>([])
-
-  const dosyaRef = useRef<HTMLInputElement>(null)
-
-  const talepleriYenile = useCallback(async (personelId: string) => {
-    const supabase = createClient()
-
-    const { data } = await supabase
-      .from("calisan_talepler")
-      .select("id, tip, baslik, aciklama, durum, medya_urls, yonetici_notu, created_at")
-      .eq("personel_id", personelId)
-      .in("tip", ["arac_hasar", "arac_bakim"])
-      .order("created_at", { ascending: false })
-
-    setTalepler(data || [])
-  }, [])
+  const [loading, setLoading] = useState(true)
+  const [modulLoading, setModulLoading] = useState(true)
+  const [hata, setHata] = useState("")
+  const [personel, setPersonel] = useState<Personel | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [moduller, setModuller] = useState<Modul[]>([])
+  const [yetkiliModulKodlari, setYetkiliModulKodlari] = useState<string[]>([])
 
   const yukle = useCallback(async () => {
+    setLoading(true)
+    setModulLoading(true)
+    setHata("")
+
     const supabase = createClient()
 
     const {
@@ -71,409 +174,240 @@ export default function AracPage() {
       return
     }
 
-    const { data: p, error: personelError } = await supabase
+    const { data: personelData, error: personelError } = await supabase
       .from("personeller")
-      .select("id, sirket_id")
-      .or(`auth_id.eq.${user.id},kullanici_id.eq.${user.id}`)
+      .select("id, ad, soyad, rol, unvan")
+      .or(`auth_id.eq.${user.id},kullanici_id.eq.${user.id},email.eq.${user.email}`)
       .maybeSingle()
 
-    if (personelError || !p) {
-      router.replace("/portal/giris")
+    if (personelError || !personelData) {
+      setHata("Bu kullanıcı için personel kaydı bulunamadı.")
+      setLoading(false)
+      setModulLoading(false)
       return
     }
 
-    setPersonel(p)
+    const aktifRol = normalizeRol(personelData.rol)
+    const adminMi = ADMIN_ROLLERI.includes(aktifRol)
 
-    const { data: a } = await supabase
-      .from("araclar")
-      .select("id, plaka, marka, model, yil, durum, guncel_km")
-      .eq("personel_id", p.id)
-      .maybeSingle()
+    setPersonel(personelData as Personel)
+    setIsAdmin(adminMi)
 
-    if (!a) {
-      router.replace("/portal")
+    const { data: modulData, error: modulError } = await supabase
+      .from("moduller")
+      .select("kod, ad, aciklama, kategori, standart, aktif, sira")
+      .eq("aktif", true)
+      .order("sira", { ascending: true })
+
+    if (modulError) {
+      setHata("Modüller okunamadı: " + modulError.message)
+      setModuller([])
+      setYetkiliModulKodlari([])
+      setLoading(false)
+      setModulLoading(false)
       return
     }
 
-    setArac(a)
-    setGuncelKm(a.guncel_km ? String(a.guncel_km) : "")
+    let yetkiKodlari: string[] = []
 
-    await talepleriYenile(p.id)
+    if (!adminMi) {
+      const { data: yetkiData, error: yetkiError } = await supabase
+        .from("personel_modul_yetkileri")
+        .select("modul_kod")
+        .eq("personel_id", personelData.id)
+        .eq("aktif", true)
 
-    setYukleniyor(false)
-  }, [router, talepleriYenile])
+      if (yetkiError) {
+        setHata("Modül yetkileri okunamadı: " + yetkiError.message)
+        setModuller((modulData || []) as Modul[])
+        setYetkiliModulKodlari([])
+        setLoading(false)
+        setModulLoading(false)
+        return
+      }
+
+      yetkiKodlari = (yetkiData || [])
+        .map((item) => item.modul_kod)
+        .filter(Boolean) as string[]
+    }
+
+    setModuller((modulData || []) as Modul[])
+    setYetkiliModulKodlari(yetkiKodlari)
+    setLoading(false)
+    setModulLoading(false)
+  }, [router])
 
   useEffect(() => {
     void yukle()
   }, [yukle])
 
-  function formuTemizle() {
-    setAktifForm(null)
-    setAciklama("")
-    setOlayTarihi("")
-    setDosyalar([])
-    if (arac?.guncel_km) {
-      setGuncelKm(String(arac.guncel_km))
-    }
-  }
+  const standartModuller = useMemo(() => {
+    return moduller.filter((modul) => modul.standart)
+  }, [moduller])
 
-  async function handleKaydet(tip: string, baslik: string) {
-    setMesaj(null)
+  const opsiyonelModuller = useMemo(() => {
+    if (isAdmin) return moduller.filter((modul) => !modul.standart)
 
-    if (!aciklama.trim()) {
-      setMesaj({ tip: "hata", metin: "Lütfen açıklama yazınız." })
-      return
-    }
-
-    if (!personel?.id) {
-      setMesaj({ tip: "hata", metin: "Personel bilgisi bulunamadı." })
-      return
-    }
-
-    setKaydediliyor(true)
-
-    const supabase = createClient()
-    const medyaUrls: string[] = []
-
-    for (const dosya of dosyalar) {
-      const dosyaAdi = `${personel.id}/arac/${Date.now()}_${dosya.name}`
-
-      const { data, error } = await supabase.storage
-        .from("calisan-medya")
-        .upload(dosyaAdi, dosya)
-
-      if (error) {
-        setMesaj({
-          tip: "hata",
-          metin: `Dosya yüklenemedi: ${error.message}`,
-        })
-        setKaydediliyor(false)
-        return
-      }
-
-      if (data) {
-        const { data: url } = supabase.storage
-          .from("calisan-medya")
-          .getPublicUrl(dosyaAdi)
-
-        medyaUrls.push(url.publicUrl)
-      }
-    }
-
-    const detayliAciklama = [
-      `Araç: ${arac?.plaka || "-"} ${arac?.marka || ""} ${arac?.model || ""}`,
-      `Güncel KM: ${guncelKm || "-"}`,
-      `Olay / Talep Tarihi: ${olayTarihi || "-"}`,
-      "",
-      aciklama.trim(),
-    ].join("\n")
-
-    const { error } = await supabase.from("calisan_talepler").insert([
-      {
-        sirket_id: personel.sirket_id,
-        personel_id: personel.id,
-        tip,
-        baslik,
-        aciklama: detayliAciklama,
-        durum: "Beklemede",
-        medya_urls: medyaUrls,
-      },
-    ])
-
-    if (error) {
-      setMesaj({
-        tip: "hata",
-        metin: `Talep kaydedilemedi: ${error.message}`,
-      })
-      setKaydediliyor(false)
-      return
-    }
-
-    if (guncelKm && arac?.id) {
-      await supabase
-        .from("araclar")
-        .update({
-          guncel_km: Number(guncelKm),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", arac.id)
-    }
-
-    formuTemizle()
-    setMesaj({ tip: "basari", metin: "✅ Araç talebiniz iletildi!" })
-
-    await talepleriYenile(personel.id)
-    setKaydediliyor(false)
-  }
-
-  function durumRenk(durum: string) {
-    if (durum === "Onaylandi" || durum === "Onaylandı") {
-      return "bg-green-100 text-green-800 border-green-300"
-    }
-
-    if (durum === "Reddedildi") {
-      return "bg-red-100 text-red-800 border-red-300"
-    }
-
-    return "bg-yellow-100 text-yellow-800 border-yellow-300"
-  }
-
-  function durumIkon(durum: string) {
-    if (durum === "Onaylandi" || durum === "Onaylandı") return "✅"
-    if (durum === "Reddedildi") return "❌"
-    return "⏳"
-  }
-
-  function tarihYaz(value?: string | null) {
-    if (!value) return "-"
-    return new Date(value).toLocaleDateString("tr-TR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
+    return moduller.filter((modul) => {
+      return !modul.standart && yetkiliModulKodlari.includes(modul.kod)
     })
+  }, [moduller, isAdmin, yetkiliModulKodlari])
+
+  const opsiyonelGruplar = useMemo(() => {
+    const kategoriSirasi = ["yonetim", "operasyon", "anket", "ai", "finans", "sistem"]
+
+    return kategoriSirasi
+      .map((kategori) => ({
+        kategori,
+        moduller: opsiyonelModuller.filter((modul) => modul.kategori === kategori),
+      }))
+      .filter((grup) => grup.moduller.length > 0)
+  }, [opsiyonelModuller])
+
+  async function cikisYap() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.replace("/portal/giris")
   }
 
-  if (yukleniyor) {
+  function modulAc(modul: Modul) {
+    const yol = modulYollari[modul.kod]
+
+    if (!yol) return
+
+    router.push(yol)
+  }
+
+  function ModulKart({ modul, opsiyonel = false }: { modul: Modul; opsiyonel?: boolean }) {
+    const Ikon = modulIkonlari[modul.kod] || Package
+    const tiklanabilir = Boolean(modulYollari[modul.kod])
+
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-700 font-bold">Yükleniyor...</p>
-      </div>
+      <button
+        type="button"
+        onClick={() => tiklanabilir && modulAc(modul)}
+        disabled={!tiklanabilir}
+        className={`w-full rounded-3xl border p-5 text-left shadow-sm transition ${
+          tiklanabilir ? "hover:-translate-y-0.5 hover:shadow-md" : "opacity-80"
+        } ${
+          opsiyonel
+            ? "border-slate-200 bg-slate-50 text-slate-900"
+            : "border-slate-950 bg-white text-slate-950"
+        }`}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-black">{modul.ad}</h3>
+            <p className="mt-2 text-sm font-semibold opacity-75">
+              {modul.aciklama || "-"}
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-white/80 p-3">
+            <Ikon className="h-6 w-6" />
+          </div>
+        </div>
+
+        {!tiklanabilir && (
+          <p className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-black text-amber-900">
+            Bu modül için sayfa yolu henüz tanımlı değil.
+          </p>
+        )}
+      </button>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-      <div className="bg-white shadow-sm px-4 py-4 flex items-center gap-3">
+    <div className="min-h-screen bg-slate-50 px-4 pb-8 pt-[calc(env(safe-area-inset-top)+16px)] md:p-6">
+      <div className="mx-auto w-full max-w-7xl space-y-6 overflow-hidden">
+        <div className="rounded-3xl border border-slate-950 bg-white p-6 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-wide text-blue-700">
+            FeyRoute Personel
+          </p>
+
+          <h1 className="mt-2 text-3xl font-black text-slate-950">
+            Portal
+          </h1>
+
+          <p className="mt-2 max-w-3xl text-sm font-semibold text-slate-600">
+            {adSoyad(personel)} için standart modüller ve kişi bazlı opsiyonel modüller.
+          </p>
+
+          <p className="mt-3 inline-flex rounded-full border bg-slate-50 px-3 py-1 text-xs font-black text-slate-700">
+            Rol: {personel?.rol || (isAdmin ? "admin" : "çalışan")}
+          </p>
+        </div>
+
         <button
-          onClick={() => router.push("/portal")}
-          className="text-2xl text-gray-800 font-bold"
+          type="button"
+          onClick={cikisYap}
+          className="w-full rounded-2xl bg-red-600 px-4 py-4 text-base font-black text-white shadow-sm"
         >
-          ←
+          <span className="inline-flex items-center gap-2">
+            <LogOut className="h-5 w-5" />
+            Çıkış Yap
+          </span>
         </button>
 
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Araç & Zimmet</h1>
-          <p className="text-xs font-semibold text-gray-600">
-            Araç hasar, bakım ve arıza bildirimleri
+        <div className="rounded-3xl border border-blue-200 bg-blue-50 p-5 text-blue-900">
+          <h2 className="text-lg font-black">Standart Yetki Kuralı</h2>
+          <p className="mt-2 text-sm font-bold">
+            Mesai, izin, talepler, vardiya ve profil tüm personellerde standarttır.
+            Diğer modüller admin tarafından kişi bazlı açılır.
           </p>
         </div>
-      </div>
 
-      <div className="p-4 max-w-md mx-auto space-y-4">
-        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4">
-          <p className="text-sm text-orange-700 font-bold mb-1">Zimmetimdeki Araç</p>
+        {loading || modulLoading ? (
+          <div className="rounded-3xl border bg-white p-6 text-sm font-bold text-slate-600">
+            Portal modülleri yükleniyor...
+          </div>
+        ) : hata ? (
+          <div className="rounded-3xl border border-red-300 bg-red-50 p-6 text-sm font-bold text-red-900">
+            {hata}
+          </div>
+        ) : (
+          <>
+            <div className="space-y-3">
+              <h2 className="text-sm font-black uppercase tracking-wide text-slate-600">
+                {kategoriBaslik("standart")}
+              </h2>
 
-          <p className="text-2xl font-black text-orange-900">
-            {arac?.plaka || "-"}
-          </p>
-
-          <p className="text-base font-bold text-orange-800">
-            {arac?.marka || "-"} {arac?.model || ""} {arac?.yil || ""}
-          </p>
-
-          <div className="grid grid-cols-2 gap-2 mt-3">
-            <div className="rounded-xl bg-white border border-orange-200 p-3">
-              <p className="text-xs font-bold text-orange-700">Güncel KM</p>
-              <p className="text-lg font-black text-orange-900">
-                {arac?.guncel_km?.toLocaleString("tr-TR") ?? "-"}
-              </p>
+              <div className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {standartModuller.map((modul) => (
+                  <ModulKart key={modul.kod} modul={modul} />
+                ))}
+              </div>
             </div>
 
-            <div className="rounded-xl bg-white border border-orange-200 p-3">
-              <p className="text-xs font-bold text-orange-700">Durum</p>
-              <p className="text-lg font-black text-orange-900">
-                {arac?.durum || "Aktif"}
-              </p>
-            </div>
-          </div>
-        </div>
+            <div className="space-y-3">
+              <h2 className="text-sm font-black uppercase tracking-wide text-slate-600">
+                Opsiyonel Modüller
+              </h2>
 
-        {mesaj && (
-          <div
-            className={`rounded-xl p-3 text-center border ${
-              mesaj.tip === "basari"
-                ? "bg-green-50 border-green-200 text-green-700"
-                : "bg-red-50 border-red-200 text-red-700"
-            }`}
-          >
-            <p className="text-sm font-bold">{mesaj.metin}</p>
-          </div>
-        )}
+              {opsiyonelModuller.length === 0 ? (
+                <div className="rounded-3xl border bg-white p-6 text-sm font-bold text-slate-600">
+                  Ek modül yetkiniz bulunmuyor. Opsiyonel modüller sadece admin tarafından kişi bazlı açılır.
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {opsiyonelGruplar.map((grup) => (
+                    <div key={grup.kategori} className="space-y-3">
+                      <h3 className="text-xs font-black uppercase tracking-wide text-slate-500">
+                        {kategoriBaslik(grup.kategori)}
+                      </h3>
 
-        <div className="space-y-3">
-          <p className="font-bold text-gray-800">Ne yapmak istiyorsunuz?</p>
-
-          {TALEP_TURLERI.map((item) => (
-            <div key={item.tip}>
-              <button
-                type="button"
-                onClick={() => {
-                  setMesaj(null)
-                  setAktifForm(aktifForm === item.tip ? null : item.tip)
-                }}
-                className={`w-full ${item.renk} text-white rounded-2xl p-4 flex items-center gap-4 active:scale-95 transition-transform`}
-              >
-                <span className="text-3xl">{item.ikon}</span>
-                <span className="text-base font-bold">{item.baslik}</span>
-              </button>
-
-              {aktifForm === item.tip && (
-                <div className="bg-white border border-gray-300 rounded-2xl p-4 mt-2 space-y-3 overflow-hidden">
-                  <div>
-                    <label className="block text-sm font-bold text-gray-900 mb-1">
-                      Güncel KM
-                    </label>
-                    <input
-                      type="number"
-                      value={guncelKm}
-                      onChange={(e) => setGuncelKm(e.target.value)}
-                      placeholder="Örn: 125000"
-                      className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base text-gray-900 bg-white placeholder:text-gray-400"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-bold text-gray-900 mb-1">
-                      Olay / Talep Tarihi
-                    </label>
-                    <input
-                      type="date"
-                      value={olayTarihi}
-                      onChange={(e) => setOlayTarihi(e.target.value)}
-                      className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base text-gray-900 bg-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-bold text-gray-900 mb-1">
-                      Açıklama
-                    </label>
-                    <textarea
-                      value={aciklama}
-                      onChange={(e) => setAciklama(e.target.value)}
-                      placeholder={item.aciklamaPlaceholder}
-                      className="w-full max-w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base text-gray-900 bg-white placeholder:text-gray-400 resize-none"
-                      rows={4}
-                    />
-                  </div>
-
-                  <div>
-                    <input
-                      ref={dosyaRef}
-                      type="file"
-                      accept="image/*,video/*"
-                      multiple
-                      className="hidden"
-                      onChange={(e) => setDosyalar(Array.from(e.target.files || []))}
-                    />
-
-                    <button
-                      type="button"
-                      onClick={() => dosyaRef.current?.click()}
-                      className="w-full border-2 border-dashed border-gray-300 rounded-xl py-3 text-gray-700 text-sm font-bold bg-gray-50"
-                    >
-                      📷 Fotoğraf / Video Ekle{" "}
-                      {dosyalar.length > 0 && `(${dosyalar.length} dosya)`}
-                    </button>
-
-                    {dosyalar.length > 0 && (
-                      <div className="mt-2 rounded-xl bg-gray-50 border border-gray-200 p-2">
-                        {dosyalar.map((d, index) => (
-                          <p key={index} className="text-xs font-semibold text-gray-700 truncate">
-                            {index + 1}. {d.name}
-                          </p>
+                      <div className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        {grup.moduller.map((modul) => (
+                          <ModulKart key={modul.kod} modul={modul} opsiyonel />
                         ))}
                       </div>
-                    )}
-                  </div>
-
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={formuTemizle}
-                      className="flex-1 border-2 border-gray-300 text-gray-700 rounded-xl py-3 font-bold"
-                    >
-                      Vazgeç
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleKaydet(item.tip, item.baslik)}
-                      disabled={kaydediliyor}
-                      className="flex-1 bg-gray-900 text-white rounded-xl py-3 font-bold disabled:opacity-50"
-                    >
-                      {kaydediliyor ? "Gönderiliyor..." : "Gönder"}
-                    </button>
-                  </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
-          ))}
-        </div>
-
-        <div className="space-y-3">
-          <h3 className="font-bold text-gray-800">Araç Geçmiş Talepleri</h3>
-
-          {talepler.length === 0 ? (
-            <div className="bg-white rounded-2xl p-6 text-center text-gray-500 border border-gray-200">
-              <p className="text-3xl mb-2">📭</p>
-              <p>Henüz araç talebiniz yok</p>
-            </div>
-          ) : (
-            talepler.map((t) => (
-              <div key={t.id} className="bg-white rounded-2xl p-4 border border-gray-200">
-                <div className="flex justify-between items-start gap-3">
-                  <div className="min-w-0">
-                    <p className="font-bold text-gray-900">{t.baslik}</p>
-
-                    <p className="text-sm text-gray-600 mt-1 whitespace-pre-line">
-                      {t.aciklama}
-                    </p>
-
-                    <p className="text-xs text-gray-500 mt-2">
-                      {tarihYaz(t.created_at)}
-                    </p>
-                  </div>
-
-                  <span
-                    className={`shrink-0 text-xs px-3 py-1 rounded-full border font-bold ${durumRenk(
-                      t.durum,
-                    )}`}
-                  >
-                    {durumIkon(t.durum)} {t.durum || "Beklemede"}
-                  </span>
-                </div>
-
-                {Array.isArray(t.medya_urls) && t.medya_urls.length > 0 && (
-                  <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-2">
-                    <p className="text-xs font-bold text-gray-700 mb-1">
-                      Ekli medya: {t.medya_urls.length} dosya
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {t.medya_urls.map((url: string, index: number) => (
-                        <a
-                          key={index}
-                          href={url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs font-bold text-blue-700 underline"
-                        >
-                          Dosya {index + 1}
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {t.yonetici_notu && (
-                  <div className="mt-2 bg-gray-50 rounded-lg p-2">
-                    <p className="text-xs text-gray-700">💬 {t.yonetici_notu}</p>
-                  </div>
-                )}
-              </div>
-            ))
-          )}
-        </div>
+          </>
+        )}
       </div>
     </div>
   )

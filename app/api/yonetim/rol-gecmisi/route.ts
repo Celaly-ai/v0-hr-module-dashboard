@@ -40,7 +40,11 @@ export async function GET() {
 
   if (gecmisError) {
     return NextResponse.json(
-      { error: gecmisError.message, code: gecmisError.code, details: gecmisError.details },
+      {
+        error: gecmisError.message,
+        code: gecmisError.code,
+        details: gecmisError.details,
+      },
       { status: 500 },
     )
   }
@@ -59,7 +63,11 @@ export async function GET() {
 
     if (personelError) {
       return NextResponse.json(
-        { error: personelError.message, code: personelError.code, details: personelError.details },
+        {
+          error: personelError.message,
+          code: personelError.code,
+          details: personelError.details,
+        },
         { status: 500 },
       )
     }

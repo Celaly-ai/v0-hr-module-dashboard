@@ -112,24 +112,15 @@ export default function RolAtamaPage() {
     setKaydediliyor(true)
     setMesaj(null)
 
-    const response = await fetch("/api/yonetim/personel-kaydet", {
+    const response = await fetch("/api/yonetim/rol-atama", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        id: seciliPersonel.id,
-        sirket_id: seciliPersonel.sirket_id,
-        personel_kodu: seciliPersonel.personel_kodu,
-        ad: seciliPersonel.ad,
-        soyad: seciliPersonel.soyad,
-        telefon: seciliPersonel.tel || seciliPersonel.telefon_normalized,
-        rol: seciliRol,
-        durum: seciliPersonel.durum || "aktif",
-        lokasyon: seciliPersonel.lokasyon,
-        bolge: seciliPersonel.bolge,
-        ise_giris_tarihi: seciliPersonel.ise_giris_tarihi,
-        notlar: seciliPersonel.notlar,
+        personel_id: seciliPersonel.id,
+        yeni_rol: seciliRol,
+        aciklama: "Rol Atama ekranından güncellendi.",
       }),
     })
 

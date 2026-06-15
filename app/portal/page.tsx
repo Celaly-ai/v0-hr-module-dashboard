@@ -54,6 +54,7 @@ const modulYollari: Record<string, string> = {
 
   yetki_yonetimi: "/portal/yetki-yonetimi",
   rol_atama: "/portal/rol-atama",
+  rol_gecmisi: "/portal/rol-gecmisi",
   mesai_raporlari: "/portal/mesai-raporu",
   yonetim_talepleri: "/portal/yonetim/talepler",
   yonetici_bildirimleri: "/portal/yonetici-bildirimleri",

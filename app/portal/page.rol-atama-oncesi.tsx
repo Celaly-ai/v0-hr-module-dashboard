@@ -53,7 +53,6 @@ const modulYollari: Record<string, string> = {
   profil: "/portal/personel-paneli",
 
   yetki_yonetimi: "/portal/yetki-yonetimi",
-  rol_atama: "/portal/rol-atama",
   mesai_raporlari: "/portal/mesai-raporu",
   yonetim_talepleri: "/portal/yonetim/talepler",
   yonetici_bildirimleri: "/portal/yonetici-bildirimleri",
@@ -86,7 +85,6 @@ const modulIkonlari: Record<string, any> = {
   profil: UserCog,
 
   yetki_yonetimi: ShieldCheck,
-  rol_atama: UserCog,
   mesai_raporlari: FileSpreadsheet,
   yonetim_talepleri: ShieldCheck,
   yonetici_bildirimleri: Bell,

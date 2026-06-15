@@ -1,11 +1,10 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
 
 type RolGecmisi = {
   id: string
-  personel_id: string
+  personel_id: string | null
   eski_rol: string | null
   yeni_rol: string | null
   degistiren_personel_id: string | null
@@ -16,9 +15,9 @@ type RolGecmisi = {
 
 type Personel = {
   id: string
+  personel_kodu: string | null
   ad: string | null
   soyad: string | null
-  personel_kodu: string | null
 }
 
 function tarihSaat(value?: string | null) {
@@ -31,6 +30,18 @@ function adSoyad(p?: Personel | null) {
   return `${p.ad || ""} ${p.soyad || ""}`.trim() || p.personel_kodu || "-"
 }
 
+function rolClass(value?: string | null) {
+  if (!value) return "bg-slate-100 text-slate-700 border-slate-300"
+  const rol = value.toLocaleLowerCase("tr-TR")
+
+  if (rol === "admin") return "bg-red-100 text-red-800 border-red-300"
+  if (rol.includes("yonetici") || rol.includes("yönetici")) return "bg-purple-100 text-purple-800 border-purple-300"
+  if (rol.includes("teknisyen")) return "bg-blue-100 text-blue-800 border-blue-300"
+  if (rol.includes("muhasebe")) return "bg-emerald-100 text-emerald-800 border-emerald-300"
+  if (rol.includes("sorumlu")) return "bg-amber-100 text-amber-800 border-amber-300"
+  return "bg-slate-100 text-slate-800 border-slate-300"
+}
+
 export default function RolGecmisiPage() {
   const [kayitlar, setKayitlar] = useState<RolGecmisi[]>([])
   const [personeller, setPersoneller] = useState<Personel[]>([])
@@ -40,7 +51,9 @@ export default function RolGecmisiPage() {
 
   const personelMap = useMemo(() => {
     const map = new Map<string, Personel>()
-    personeller.forEach((p) => map.set(p.id, p))
+    personeller.forEach((p) => {
+      map.set(p.id, p)
+    })
     return map
   }, [personeller])
 
@@ -48,42 +61,29 @@ export default function RolGecmisiPage() {
     setLoading(true)
     setHata("")
 
-    const supabase = createClient()
+    try {
+      const response = await fetch("/api/yonetim/rol-gecmisi", {
+        cache: "no-store",
+      })
 
-    const { data: gecmisData, error: gecmisError } = await supabase
-      .from("personel_rol_gecmisi")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(300)
+      const json = await response.json().catch(() => null)
 
-    if (gecmisError) {
-      setHata("Rol geçmişi alınamadı: " + gecmisError.message)
-      setKayitlar([])
-      setLoading(false)
-      return
-    }
-
-    const personelIds = Array.from(
-      new Set((gecmisData || []).map((k: any) => k.personel_id).filter(Boolean)),
-    )
-
-    let personelData: Personel[] = []
-
-    if (personelIds.length > 0) {
-      const { data, error } = await supabase
-        .from("personeller")
-        .select("id, ad, soyad, personel_kodu")
-        .in("id", personelIds)
-
-      if (error) {
-        setHata("Personel bilgileri alınamadı: " + error.message)
-      } else {
-        personelData = (data || []) as Personel[]
+      if (!response.ok) {
+        setHata("Rol geçmişi alınamadı: " + (json?.error || "API hatası"))
+        setKayitlar([])
+        setPersoneller([])
+        setLoading(false)
+        return
       }
+
+      setKayitlar(Array.isArray(json?.kayitlar) ? json.kayitlar : [])
+      setPersoneller(Array.isArray(json?.personeller) ? json.personeller : [])
+    } catch (error: any) {
+      setHata("Rol geçmişi alınamadı: " + (error?.message || "Bağlantı hatası"))
+      setKayitlar([])
+      setPersoneller([])
     }
 
-    setKayitlar((gecmisData || []) as RolGecmisi[])
-    setPersoneller(personelData)
     setLoading(false)
   }
 
@@ -96,11 +96,11 @@ export default function RolGecmisiPage() {
     if (!q) return kayitlar
 
     return kayitlar.filter((k) => {
-      const p = personelMap.get(k.personel_id)
+      const personel = k.personel_id ? personelMap.get(k.personel_id) : null
 
       const metin = `
-        ${adSoyad(p)}
-        ${p?.personel_kodu || ""}
+        ${adSoyad(personel)}
+        ${personel?.personel_kodu || ""}
         ${k.eski_rol || ""}
         ${k.yeni_rol || ""}
         ${k.degistiren_ad || ""}
@@ -110,6 +110,17 @@ export default function RolGecmisiPage() {
       return metin.includes(q)
     })
   }, [kayitlar, arama, personelMap])
+
+  const ozet = useMemo(() => {
+    const bugun = new Date()
+    bugun.setHours(0, 0, 0, 0)
+
+    return {
+      toplam: kayitlar.length,
+      bugun: kayitlar.filter((k) => new Date(k.created_at) >= bugun).length,
+      degistirenSayisi: new Set(kayitlar.map((k) => k.degistiren_ad).filter(Boolean)).size,
+    }
+  }, [kayitlar])
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 pb-8 pt-[calc(env(safe-area-inset-top)+16px)] md:p-6">
@@ -131,6 +142,12 @@ export default function RolGecmisiPage() {
             {hata}
           </div>
         )}
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <Kpi title="Toplam Değişiklik" value={ozet.toplam} />
+          <Kpi title="Bugünkü Değişiklik" value={ozet.bugun} />
+          <Kpi title="İşlem Yapan Kişi" value={ozet.degistirenSayisi} />
+        </div>
 
         <div className="rounded-3xl border bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -157,12 +174,12 @@ export default function RolGecmisiPage() {
               Değişiklik Kayıtları
             </h2>
             <p className="mt-1 text-xs font-bold text-slate-500">
-              Toplam kayıt: {filtreliKayitlar.length}
+              Listelenen kayıt: {filtreliKayitlar.length}
             </p>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-sm">
+            <table className="w-full min-w-[980px] text-sm">
               <thead className="bg-slate-100">
                 <tr>
                   <th className="p-3 text-left">Tarih</th>
@@ -189,28 +206,45 @@ export default function RolGecmisiPage() {
                   </tr>
                 ) : (
                   filtreliKayitlar.map((k) => {
-                    const p = personelMap.get(k.personel_id)
+                    const personel = k.personel_id ? personelMap.get(k.personel_id) : null
 
                     return (
-                      <tr key={k.id} className="border-t">
+                      <tr key={k.id} className="border-t align-top">
                         <td className="p-3 font-bold text-slate-700">
                           {tarihSaat(k.created_at)}
                         </td>
+
                         <td className="p-3">
-                          <p className="font-black text-slate-950">{adSoyad(p)}</p>
+                          <p className="font-black text-slate-950">{adSoyad(personel)}</p>
                           <p className="text-xs font-bold text-slate-500">
-                            {p?.personel_kodu || "-"}
+                            {personel?.personel_kodu || "-"}
                           </p>
                         </td>
-                        <td className="p-3 font-bold text-slate-700">
-                          {k.eski_rol || "-"}
+
+                        <td className="p-3">
+                          <span
+                            className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${rolClass(
+                              k.eski_rol,
+                            )}`}
+                          >
+                            {k.eski_rol || "-"}
+                          </span>
                         </td>
-                        <td className="p-3 font-black text-blue-800">
-                          {k.yeni_rol || "-"}
+
+                        <td className="p-3">
+                          <span
+                            className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${rolClass(
+                              k.yeni_rol,
+                            )}`}
+                          >
+                            {k.yeni_rol || "-"}
+                          </span>
                         </td>
+
                         <td className="p-3 font-bold text-slate-700">
                           {k.degistiren_ad || "-"}
                         </td>
+
                         <td className="p-3 font-bold text-slate-600">
                           {k.aciklama || "-"}
                         </td>
@@ -223,6 +257,17 @@ export default function RolGecmisiPage() {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function Kpi({ title, value }: { title: string; value: string | number }) {
+  return (
+    <div className="rounded-3xl border bg-white p-5 shadow-sm">
+      <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+        {title}
+      </p>
+      <p className="mt-2 text-2xl font-black text-slate-950">{value}</p>
     </div>
   )
 }

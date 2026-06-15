@@ -12,11 +12,13 @@ type RolGecmisi = {
   degistiren_ad: string | null
   aciklama: string | null
   created_at: string
-  personeller?: {
-    ad: string | null
-    soyad: string | null
-    personel_kodu: string | null
-  } | null
+}
+
+type Personel = {
+  id: string
+  ad: string | null
+  soyad: string | null
+  personel_kodu: string | null
 }
 
 function tarihSaat(value?: string | null) {
@@ -24,17 +26,23 @@ function tarihSaat(value?: string | null) {
   return new Date(value).toLocaleString("tr-TR")
 }
 
-function personelAdi(kayit: RolGecmisi) {
-  const p = kayit.personeller
+function adSoyad(p?: Personel | null) {
   if (!p) return "-"
   return `${p.ad || ""} ${p.soyad || ""}`.trim() || p.personel_kodu || "-"
 }
 
 export default function RolGecmisiPage() {
   const [kayitlar, setKayitlar] = useState<RolGecmisi[]>([])
+  const [personeller, setPersoneller] = useState<Personel[]>([])
   const [arama, setArama] = useState("")
   const [loading, setLoading] = useState(true)
   const [hata, setHata] = useState("")
+
+  const personelMap = useMemo(() => {
+    const map = new Map<string, Personel>()
+    personeller.forEach((p) => map.set(p.id, p))
+    return map
+  }, [personeller])
 
   async function verileriYukle() {
     setLoading(true)
@@ -42,34 +50,40 @@ export default function RolGecmisiPage() {
 
     const supabase = createClient()
 
-    const { data, error } = await supabase
+    const { data: gecmisData, error: gecmisError } = await supabase
       .from("personel_rol_gecmisi")
-      .select(`
-        id,
-        personel_id,
-        eski_rol,
-        yeni_rol,
-        degistiren_personel_id,
-        degistiren_ad,
-        aciklama,
-        created_at,
-        personeller:personel_id (
-          ad,
-          soyad,
-          personel_kodu
-        )
-      `)
+      .select("*")
       .order("created_at", { ascending: false })
       .limit(300)
 
-    if (error) {
-      setHata("Rol geçmişi alınamadı: " + error.message)
+    if (gecmisError) {
+      setHata("Rol geçmişi alınamadı: " + gecmisError.message)
       setKayitlar([])
       setLoading(false)
       return
     }
 
-    setKayitlar((data || []) as unknown as RolGecmisi[])
+    const personelIds = Array.from(
+      new Set((gecmisData || []).map((k: any) => k.personel_id).filter(Boolean)),
+    )
+
+    let personelData: Personel[] = []
+
+    if (personelIds.length > 0) {
+      const { data, error } = await supabase
+        .from("personeller")
+        .select("id, ad, soyad, personel_kodu")
+        .in("id", personelIds)
+
+      if (error) {
+        setHata("Personel bilgileri alınamadı: " + error.message)
+      } else {
+        personelData = (data || []) as Personel[]
+      }
+    }
+
+    setKayitlar((gecmisData || []) as RolGecmisi[])
+    setPersoneller(personelData)
     setLoading(false)
   }
 
@@ -79,13 +93,14 @@ export default function RolGecmisiPage() {
 
   const filtreliKayitlar = useMemo(() => {
     const q = arama.trim().toLocaleLowerCase("tr-TR")
-
     if (!q) return kayitlar
 
     return kayitlar.filter((k) => {
+      const p = personelMap.get(k.personel_id)
+
       const metin = `
-        ${personelAdi(k)}
-        ${k.personeller?.personel_kodu || ""}
+        ${adSoyad(p)}
+        ${p?.personel_kodu || ""}
         ${k.eski_rol || ""}
         ${k.yeni_rol || ""}
         ${k.degistiren_ad || ""}
@@ -94,7 +109,7 @@ export default function RolGecmisiPage() {
 
       return metin.includes(q)
     })
-  }, [kayitlar, arama])
+  }, [kayitlar, arama, personelMap])
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 pb-8 pt-[calc(env(safe-area-inset-top)+16px)] md:p-6">
@@ -173,31 +188,35 @@ export default function RolGecmisiPage() {
                     </td>
                   </tr>
                 ) : (
-                  filtreliKayitlar.map((k) => (
-                    <tr key={k.id} className="border-t">
-                      <td className="p-3 font-bold text-slate-700">
-                        {tarihSaat(k.created_at)}
-                      </td>
-                      <td className="p-3">
-                        <p className="font-black text-slate-950">{personelAdi(k)}</p>
-                        <p className="text-xs font-bold text-slate-500">
-                          {k.personeller?.personel_kodu || "-"}
-                        </p>
-                      </td>
-                      <td className="p-3 font-bold text-slate-700">
-                        {k.eski_rol || "-"}
-                      </td>
-                      <td className="p-3 font-black text-blue-800">
-                        {k.yeni_rol || "-"}
-                      </td>
-                      <td className="p-3 font-bold text-slate-700">
-                        {k.degistiren_ad || "-"}
-                      </td>
-                      <td className="p-3 font-bold text-slate-600">
-                        {k.aciklama || "-"}
-                      </td>
-                    </tr>
-                  ))
+                  filtreliKayitlar.map((k) => {
+                    const p = personelMap.get(k.personel_id)
+
+                    return (
+                      <tr key={k.id} className="border-t">
+                        <td className="p-3 font-bold text-slate-700">
+                          {tarihSaat(k.created_at)}
+                        </td>
+                        <td className="p-3">
+                          <p className="font-black text-slate-950">{adSoyad(p)}</p>
+                          <p className="text-xs font-bold text-slate-500">
+                            {p?.personel_kodu || "-"}
+                          </p>
+                        </td>
+                        <td className="p-3 font-bold text-slate-700">
+                          {k.eski_rol || "-"}
+                        </td>
+                        <td className="p-3 font-black text-blue-800">
+                          {k.yeni_rol || "-"}
+                        </td>
+                        <td className="p-3 font-bold text-slate-700">
+                          {k.degistiren_ad || "-"}
+                        </td>
+                        <td className="p-3 font-bold text-slate-600">
+                          {k.aciklama || "-"}
+                        </td>
+                      </tr>
+                    )
+                  })
                 )}
               </tbody>
             </table>

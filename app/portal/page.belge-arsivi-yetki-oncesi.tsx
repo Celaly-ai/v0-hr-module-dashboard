@@ -73,7 +73,6 @@ const modulYollari: Record<string, string> = {
   ai_canli_operasyon_merkezi: "/portal/ai-canli-operasyon-merkezi",
 
   muhasebe: "/portal/muhasebe",
-  belge_arsivi: "/portal/belge-arsivi",
 }
 
 const modulIkonlari: Record<string, any> = {
@@ -105,7 +104,6 @@ const modulIkonlari: Record<string, any> = {
   ai_canli_operasyon_merkezi: BarChart3,
 
   muhasebe: WalletCards,
-  belge_arsivi: FileSpreadsheet,
 }
 
 function normalizeRol(value?: string | null) {

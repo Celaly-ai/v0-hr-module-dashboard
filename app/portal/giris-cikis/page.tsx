@@ -174,20 +174,20 @@ function konumCikar(kayit: Kayit | null, kaynak: string): ServisKonumu | null {
   if (!kayit) return null
 
   const lat =
+    sayi(kayit.giris_cikis_lat) ??
     sayi(kayit.lat) ??
     sayi(kayit.latitude) ??
     sayi(kayit.merkez_lat) ??
     sayi(kayit.konum_lat) ??
-    sayi(kayit.servis_lat) ??
-    sayi(kayit.giris_cikis_lat)
+    sayi(kayit.servis_lat)
 
   const lng =
+    sayi(kayit.giris_cikis_lng) ??
     sayi(kayit.lng) ??
     sayi(kayit.longitude) ??
     sayi(kayit.merkez_lng) ??
     sayi(kayit.konum_lng) ??
-    sayi(kayit.servis_lng) ??
-    sayi(kayit.giris_cikis_lng)
+    sayi(kayit.servis_lng)
 
   if (lat === null || lng === null) return null
 
@@ -225,20 +225,33 @@ export default function GirisCikisPage() {
   async function servisKonumuGetir(p: Kayit) {
     const supabase = createClient()
 
-    const personelKonumu = konumCikar(p, "personel")
-    if (personelKonumu) return personelKonumu
+    if (p.sirket_id) {
+      const { data } = await supabase
+        .from("sirketler")
+        .select(
+          "id, ad, unvan, il, ilce, mahalle, acik_adres, giris_cikis_lat, giris_cikis_lng, giris_cikis_mesafe_limiti, kunye_tamamlandi",
+        )
+        .eq("id", p.sirket_id)
+        .maybeSingle()
+
+      const sirketKonumu = konumCikar(data, "şirket künyesi")
+      if (sirketKonumu) return sirketKonumu
+
+      if (data) {
+        throw new Error(
+          "Şirket künyesinde giriş/çıkış lokasyonu eksik. Lütfen Şirket Künyesi ekranında giriş/çıkış enlem, boylam ve mesafe limitini tanımlayın.",
+        )
+      }
+    }
 
     if (p.sube_id) {
       const { data } = await supabase.from("subeler").select("*").eq("id", p.sube_id).maybeSingle()
-      const subeKonumu = konumCikar(data, "sube")
+      const subeKonumu = konumCikar(data, "şube")
       if (subeKonumu) return subeKonumu
     }
 
-    if (p.sirket_id) {
-      const { data } = await supabase.from("sirketler").select("*").eq("id", p.sirket_id).maybeSingle()
-      const sirketKonumu = konumCikar(data, "sirket")
-      if (sirketKonumu) return sirketKonumu
-    }
+    const personelKonumu = konumCikar(p, "personel")
+    if (personelKonumu) return personelKonumu
 
     return null
   }
@@ -282,7 +295,7 @@ export default function GirisCikisPage() {
 
       setPersonel(personelData)
 
-      setYuklemeAdimi("Servis konumu alınıyor...")
+      setYuklemeAdimi("Şirket künyesi giriş/çıkış lokasyonu alınıyor...")
 
       const konum = await servisKonumuGetir(personelData)
       setServisKonumu(konum)
@@ -519,7 +532,8 @@ export default function GirisCikisPage() {
       if (!servisKonumu) {
         setMesaj({
           tip: "hata",
-          metin: "Şirket/şube servis konumu bulunamadı. Lütfen şirket veya şube lokasyon bilgisini tanımlayın.",
+          metin:
+            "Giriş/çıkış lokasyonu bulunamadı. Lütfen Şirket Künyesi ekranında giriş/çıkış enlem, boylam ve mesafe limitini tanımlayın.",
         })
         setIslem(false)
         return
@@ -534,7 +548,7 @@ export default function GirisCikisPage() {
       if (mesafe > servisKonumu.mesafeSiniri) {
         setMesaj({
           tip: "hata",
-          metin: `Servise uzaklık ${mesafe} metre. Limit: ${servisKonumu.mesafeSiniri} metre.`,
+          metin: `Şirket giriş/çıkış lokasyonuna uzaklık ${mesafe} metre. Limit: ${servisKonumu.mesafeSiniri} metre.`,
         })
         setIslem(false)
         return
@@ -873,7 +887,7 @@ export default function GirisCikisPage() {
 
         <div className="rounded-xl bg-blue-50 border border-blue-200 p-3">
           <p className="text-xs font-bold text-blue-900">
-            📍 Servis lokasyonu artık sabit değildir. Personel, şube veya şirket kayıtlarından dinamik okunur.
+            📍 Giriş/çıkış lokasyonu ana kaynak olarak Şirket Künyesi ekranındaki enlem, boylam ve mesafe limitinden okunur.
           </p>
         </div>
       </div>

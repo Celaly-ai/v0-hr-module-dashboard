@@ -67,6 +67,13 @@ const modulYollari: Record<string, string> = {
   araclar: "/portal/araclar",
   varliklar: "/portal/varliklar",
 
+  sirket_kunyesi: "/portal/sirket-kunyesi",
+
+  urun_merkezi: "/portal/urun-merkezi",
+  urun_kabul: "/portal/urun-kabul",
+  urun_devir: "/portal/urun-devir",
+  urun_fisleri: "/portal/urun-fisleri",
+
   anket_is_havuzu: "/portal/anket-is-havuzu",
   musteri_anketi: "/portal/anket",
   riskli_anket_takibi: "/portal/anket?odak=tekrar-aranacaklar",
@@ -99,6 +106,13 @@ const modulIkonlari: Record<string, any> = {
   malzeme: Package,
   araclar: Car,
   varliklar: Boxes,
+
+  sirket_kunyesi: Home,
+
+  urun_merkezi: Boxes,
+  urun_kabul: Package,
+  urun_devir: Users,
+  urun_fisleri: FileSpreadsheet,
 
   anket_is_havuzu: FileSpreadsheet,
   musteri_anketi: Bot,

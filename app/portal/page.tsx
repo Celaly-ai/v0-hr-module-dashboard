@@ -73,6 +73,8 @@ const modulYollari: Record<string, string> = {
   urun_kabul: "/portal/urun-kabul",
   urun_devir: "/portal/urun-devir",
   urun_fisleri: "/portal/urun-fisleri",
+  cihaz_teslim: "/portal/cihaz-teslim",
+  cihaz_iade: "/portal/cihaz-iade",
 
   anket_is_havuzu: "/portal/anket-is-havuzu",
   musteri_anketi: "/portal/anket",
@@ -113,6 +115,8 @@ const modulIkonlari: Record<string, any> = {
   urun_kabul: Package,
   urun_devir: Users,
   urun_fisleri: FileSpreadsheet,
+  cihaz_teslim: Package,
+  cihaz_iade: FileSpreadsheet,
 
   anket_is_havuzu: FileSpreadsheet,
   musteri_anketi: Bot,

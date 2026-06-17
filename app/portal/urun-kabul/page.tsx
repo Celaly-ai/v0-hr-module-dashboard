@@ -1,22 +1,16 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import BarcodeScanner from "@/components/barcode-scanner"
 
-type UrunSatiri = {
+type CihazSatiri = {
   barkod: string
   seri_no: string
   marka: string
   model: string
 }
 
-type Sonuc = {
-  fis?: {
-    belge_no?: string
-    toplam_urun?: number
-  }
-}
-
-const BOS_URUN: UrunSatiri = {
+const BOS_CIHAZ: CihazSatiri = {
   barkod: "",
   seri_no: "",
   marka: "",
@@ -24,67 +18,88 @@ const BOS_URUN: UrunSatiri = {
 }
 
 export default function UrunKabulPage() {
-  const [kaynakTipi, setKaynakTipi] = useState("bayi_deposu")
+  const [kaynakTipi, setKaynakTipi] = useState("bayi")
   const [kaynakAdi, setKaynakAdi] = useState("")
   const [teslimEdenAdi, setTeslimEdenAdi] = useState("")
   const [teslimEdenTelefon, setTeslimEdenTelefon] = useState("")
-  const [teslimAlanAdi, setTeslimAlanAdi] = useState("Servis")
-  const [urunler, setUrunler] = useState<UrunSatiri[]>([{ ...BOS_URUN }])
+  const [cihazlar, setCihazlar] = useState<CihazSatiri[]>([{ ...BOS_CIHAZ }])
   const [kaydediliyor, setKaydediliyor] = useState(false)
   const [hata, setHata] = useState("")
   const [basari, setBasari] = useState("")
-  const [sonuc, setSonuc] = useState<Sonuc | null>(null)
+  const [belgeNo, setBelgeNo] = useState("")
 
-  const gecerliUrunSayisi = useMemo(() => {
-    return urunler.filter((u) => u.barkod.trim() || u.seri_no.trim()).length
-  }, [urunler])
+  const gecerliCihazSayisi = useMemo(() => {
+    return cihazlar.filter((c) => c.barkod.trim() && c.seri_no.trim()).length
+  }, [cihazlar])
 
-  function urunGuncelle(index: number, field: keyof UrunSatiri, value: string) {
-    setUrunler((onceki) =>
-      onceki.map((u, i) => (i === index ? { ...u, [field]: value } : u)),
+  function cihazGuncelle(index: number, field: keyof CihazSatiri, value: string) {
+    setCihazlar((onceki) =>
+      onceki.map((cihaz, i) => (i === index ? { ...cihaz, [field]: value } : cihaz)),
     )
   }
 
-  function urunEkle() {
-    setUrunler((onceki) => [...onceki, { ...BOS_URUN }])
+  function cihazEkle() {
+    setCihazlar((onceki) => [...onceki, { ...BOS_CIHAZ }])
   }
 
-  function urunSil(index: number) {
-    setUrunler((onceki) => {
+  function cihazSil(index: number) {
+    setCihazlar((onceki) => {
       if (onceki.length === 1) return onceki
       return onceki.filter((_, i) => i !== index)
     })
   }
 
   function formuTemizle() {
-    setKaynakTipi("bayi_deposu")
+    setKaynakTipi("bayi")
     setKaynakAdi("")
     setTeslimEdenAdi("")
     setTeslimEdenTelefon("")
-    setTeslimAlanAdi("Servis")
-    setUrunler([{ ...BOS_URUN }])
-    setSonuc(null)
+    setCihazlar([{ ...BOS_CIHAZ }])
+    setBelgeNo("")
+    setHata("")
+    setBasari("")
   }
 
   async function kaydet() {
     setKaydediliyor(true)
     setHata("")
     setBasari("")
-    setSonuc(null)
+    setBelgeNo("")
 
-    const temizUrunler = urunler
-      .map((u) => ({
-        barkod: u.barkod.trim(),
-        seri_no: u.seri_no.trim(),
-        marka: u.marka.trim(),
-        model: u.model.trim(),
+    const temizCihazlar = cihazlar
+      .map((c) => ({
+        barkod: c.barkod.trim(),
+        seri_no: c.seri_no.trim(),
+        marka: c.marka.trim(),
+        model: c.model.trim(),
       }))
-      .filter((u) => u.barkod || u.seri_no)
+      .filter((c) => c.barkod || c.seri_no)
 
-    if (temizUrunler.length === 0) {
-      setHata("En az bir üründe barkod veya seri no girilmelidir.")
+    if (temizCihazlar.length === 0) {
+      setHata("En az bir cihaz girilmelidir.")
       setKaydediliyor(false)
       return
+    }
+
+    const eksikBarkod = temizCihazlar.some((c) => !c.barkod)
+    const eksikSeriNo = temizCihazlar.some((c) => !c.seri_no)
+
+    if (eksikBarkod || eksikSeriNo) {
+      setHata("Her cihaz için barkod ve seri no zorunludur.")
+      setKaydediliyor(false)
+      return
+    }
+
+    const tekrarKontrol = new Set<string>()
+
+    for (const cihaz of temizCihazlar) {
+      const anahtar = `${cihaz.barkod}__${cihaz.seri_no}`.toLocaleLowerCase("tr-TR")
+      if (tekrarKontrol.has(anahtar)) {
+        setHata("Aynı barkod / seri no aynı kayıt içinde tekrar edemez.")
+        setKaydediliyor(false)
+        return
+      }
+      tekrarKontrol.add(anahtar)
     }
 
     const response = await fetch("/api/urun-kabul", {
@@ -97,38 +112,37 @@ export default function UrunKabulPage() {
         kaynak_adi: kaynakAdi,
         teslim_eden_adi: teslimEdenAdi,
         teslim_eden_telefon: teslimEdenTelefon,
-        teslim_alan_adi: teslimAlanAdi || "Servis",
-        urunler: temizUrunler,
+        teslim_alan_adi: "Depo / Servis",
+        urunler: temizCihazlar,
       }),
     })
 
     const json = await response.json().catch(() => null)
 
     if (!response.ok) {
-      setHata(json?.error || "Ürün kabul işlemi başarısız.")
+      setHata(json?.error || "Cihaz sisteme alınamadı.")
       setKaydediliyor(false)
       return
     }
 
-    setSonuc(json)
-    setBasari(
-      `${json?.fis?.belge_no || "Fiş"} numaralı ürün hareket fişi oluşturuldu. Toplam ${json?.fis?.toplam_urun || temizUrunler.length} ürün kabul edildi.`,
-    )
+    const no = json?.fis?.belge_no || ""
+    setBelgeNo(no)
+    setBasari(`${no || "Cihaz kayıt işlemi"} oluşturuldu. ${temizCihazlar.length} cihaz depoya alındı.`)
     setKaydediliyor(false)
   }
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 pb-8 pt-[calc(env(safe-area-inset-top)+16px)] md:p-6">
-      <div className="mx-auto max-w-7xl space-y-6">
+      <div className="mx-auto max-w-6xl space-y-6">
         <div className="rounded-3xl border border-slate-950 bg-white p-6 shadow-sm">
           <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-            FeyRoute Operasyon
+            Cihaz Takip Merkezi
           </p>
           <h1 className="mt-2 text-3xl font-black text-slate-950">
-            Ürün Kabul
+            Cihaz Sisteme Al
           </h1>
           <p className="mt-2 text-sm font-bold text-slate-600">
-            Bayi, ortak depo, kargo veya müşteriden gelen cihazları toplu olarak sisteme alın ve ürün hareket fişi oluşturun.
+            İlk kez sorumluluğumuza giren cihazları barkod ve seri no ile depoya kaydedin.
           </p>
         </div>
 
@@ -144,11 +158,11 @@ export default function UrunKabulPage() {
           </div>
         )}
 
-        <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
+        <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
           <div className="space-y-6">
             <div className="rounded-3xl border bg-white p-5 shadow-sm">
               <h2 className="text-lg font-black text-slate-950">
-                Teslim Bilgileri
+                Kaynak Bilgisi
               </h2>
 
               <div className="mt-4 space-y-4">
@@ -158,11 +172,10 @@ export default function UrunKabulPage() {
                     onChange={(e) => setKaynakTipi(e.target.value)}
                     className="field"
                   >
-                    <option value="bayi_deposu">Bayi Deposu</option>
-                    <option value="ortak_depo">Ortak Depo</option>
+                    <option value="bayi">Bayi</option>
+                    <option value="depo">Depo</option>
                     <option value="kargo">Kargo</option>
                     <option value="musteri">Müşteri</option>
-                    <option value="servise_getirildi">Servise Getirildi</option>
                     <option value="diger">Diğer</option>
                   </select>
                 </Field>
@@ -171,7 +184,7 @@ export default function UrunKabulPage() {
                   <input
                     value={kaynakAdi}
                     onChange={(e) => setKaynakAdi(e.target.value)}
-                    placeholder="Örn: ABC Bayisi, Ortak Depo, Yurtiçi Kargo"
+                    placeholder="Örn: ABC Bayisi / Kargo / Depo"
                     className="field"
                   />
                 </Field>
@@ -180,7 +193,7 @@ export default function UrunKabulPage() {
                   <input
                     value={teslimEdenAdi}
                     onChange={(e) => setTeslimEdenAdi(e.target.value)}
-                    placeholder="Teslim eden kişi adı"
+                    placeholder="Teslim eden kişi"
                     className="field"
                   />
                 </Field>
@@ -193,37 +206,26 @@ export default function UrunKabulPage() {
                     className="field"
                   />
                 </Field>
-
-                <Field label="Teslim Alan">
-                  <input
-                    value={teslimAlanAdi}
-                    onChange={(e) => setTeslimAlanAdi(e.target.value)}
-                    placeholder="Servis / Ürün sorumlusu / Teknisyen"
-                    className="field"
-                  />
-                </Field>
               </div>
             </div>
 
             <div className="rounded-3xl border bg-white p-5 shadow-sm">
               <h2 className="text-lg font-black text-slate-950">
-                Özet
+                Kayıt Özeti
               </h2>
 
               <div className="mt-4 grid grid-cols-2 gap-3">
-                <Info title="Satır Sayısı" value={urunler.length} />
-                <Info title="Geçerli Ürün" value={gecerliUrunSayisi} />
-                <Info title="Kaynak" value={kaynakTipi} />
-                <Info title="Teslim Alan" value={teslimAlanAdi || "Servis"} />
+                <Info title="Satır" value={cihazlar.length} />
+                <Info title="Geçerli" value={gecerliCihazSayisi} />
               </div>
 
               <button
                 type="button"
                 onClick={kaydet}
-                disabled={kaydediliyor || gecerliUrunSayisi === 0}
-                className="mt-5 w-full rounded-xl bg-blue-700 px-4 py-3 text-sm font-black text-white hover:bg-blue-800 disabled:bg-slate-300 disabled:text-slate-600"
+                disabled={kaydediliyor || gecerliCihazSayisi === 0}
+                className="mt-5 w-full rounded-xl bg-blue-700 px-4 py-4 text-sm font-black text-white hover:bg-blue-800 disabled:bg-slate-300 disabled:text-slate-600"
               >
-                {kaydediliyor ? "Kaydediliyor..." : "Ürün Kabul Et ve Fiş Oluştur"}
+                {kaydediliyor ? "Kaydediliyor..." : "Cihazları Sisteme Al"}
               </button>
 
               <button
@@ -234,19 +236,18 @@ export default function UrunKabulPage() {
                 Formu Temizle
               </button>
 
-              {sonuc?.fis?.belge_no && (
+              {belgeNo && (
                 <div className="mt-4 rounded-2xl border border-blue-300 bg-blue-50 p-4">
                   <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-                    Oluşan Fiş
+                    Oluşan Kayıt
                   </p>
-                  <p className="mt-1 text-xl font-black text-blue-950">
-                    {sonuc.fis.belge_no}
-                  </p>
-                  <p className="mt-1 text-sm font-bold text-blue-800">
-                    Teslim belgesi ekranı sonraki adımda bağlanacak.
-                  </p>
+                  <p className="mt-1 text-xl font-black text-blue-950">{belgeNo}</p>
                 </div>
               )}
+            </div>
+
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-xs font-bold text-blue-950">
+              Bu işlemde belge veya imza gerekmez. Cihazlar ilk kayıt olarak depoya alınır. İmzalı belge sadece iade sürecinde zorunlu olacaktır.
             </div>
           </div>
 
@@ -254,96 +255,87 @@ export default function UrunKabulPage() {
             <div className="flex flex-col gap-3 border-b p-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <h2 className="text-lg font-black text-slate-950">
-                  Ürün Satırları
+                  Cihazlar
                 </h2>
                 <p className="mt-1 text-xs font-bold text-slate-500">
-                  Her satır bir cihazdır. Barkod veya seri no zorunludur.
+                  Her cihaz için barkod ve seri no zorunludur.
                 </p>
               </div>
 
               <button
                 type="button"
-                onClick={urunEkle}
+                onClick={cihazEkle}
                 className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-black text-white hover:bg-slate-800"
               >
-                + Ürün Ekle
+                + Cihaz Ekle
               </button>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-sm">
-                <thead className="bg-slate-100">
-                  <tr>
-                    <th className="w-14 p-3 text-left">#</th>
-                    <th className="p-3 text-left">Barkod</th>
-                    <th className="p-3 text-left">Seri No</th>
-                    <th className="p-3 text-left">Marka</th>
-                    <th className="p-3 text-left">Model</th>
-                    <th className="w-24 p-3 text-center">İşlem</th>
-                  </tr>
-                </thead>
+            <div className="space-y-3 p-4">
+              {cihazlar.map((c, index) => (
+                <div key={index} className="rounded-2xl border bg-slate-50 p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <p className="text-sm font-black text-slate-700">
+                      Cihaz {index + 1}
+                    </p>
 
-                <tbody>
-                  {urunler.map((u, index) => (
-                    <tr key={index} className="border-t">
-                      <td className="p-3 font-black text-slate-500">
-                        {index + 1}
-                      </td>
+                    <button
+                      type="button"
+                      onClick={() => cihazSil(index)}
+                      disabled={cihazlar.length === 1}
+                      className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-black text-red-800 disabled:opacity-40"
+                    >
+                      Sil
+                    </button>
+                  </div>
 
-                      <td className="p-3">
-                        <input
-                          value={u.barkod}
-                          onChange={(e) => urunGuncelle(index, "barkod", e.target.value)}
-                          placeholder="Barkod"
-                          className="field"
-                        />
-                      </td>
+                  <div className="mb-4">
+                    <BarcodeScanner
+                      onDetected={(value) => {
+                        cihazGuncelle(index, "barkod", value)
+                      }}
+                    />
+                  </div>
 
-                      <td className="p-3">
-                        <input
-                          value={u.seri_no}
-                          onChange={(e) => urunGuncelle(index, "seri_no", e.target.value)}
-                          placeholder="Seri no"
-                          className="field"
-                        />
-                      </td>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <Field label="Barkod">
+                      <input
+                        value={c.barkod}
+                        onChange={(e) => cihazGuncelle(index, "barkod", e.target.value)}
+                        placeholder="Barkod okut / gir"
+                        className="field"
+                      />
+                    </Field>
 
-                      <td className="p-3">
-                        <input
-                          value={u.marka}
-                          onChange={(e) => urunGuncelle(index, "marka", e.target.value)}
-                          placeholder="Marka"
-                          className="field"
-                        />
-                      </td>
+                    <Field label="Seri No">
+                      <input
+                        value={c.seri_no}
+                        onChange={(e) => cihazGuncelle(index, "seri_no", e.target.value)}
+                        placeholder="Seri no"
+                        className="field"
+                      />
+                    </Field>
 
-                      <td className="p-3">
-                        <input
-                          value={u.model}
-                          onChange={(e) => urunGuncelle(index, "model", e.target.value)}
-                          placeholder="Model"
-                          className="field"
-                        />
-                      </td>
+                    <Field label="Marka">
+                      <input
+                        value={c.marka}
+                        onChange={(e) => cihazGuncelle(index, "marka", e.target.value)}
+                        placeholder="Marka"
+                        className="field"
+                      />
+                    </Field>
 
-                      <td className="p-3 text-center">
-                        <button
-                          type="button"
-                          onClick={() => urunSil(index)}
-                          disabled={urunler.length === 1}
-                          className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-black text-red-800 disabled:opacity-40"
-                        >
-                          Sil
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="border-t bg-slate-50 p-4 text-sm font-bold text-slate-600">
-              Bu ilk sürümde barkod fotoğrafı ekleme yapılmadı. Sonraki adımda her satıra barkod fotoğrafı yükleme alanı eklenecek.
+                    <Field label="Model">
+                      <input
+                        value={c.model}
+                        onChange={(e) => cihazGuncelle(index, "model", e.target.value)}
+                        placeholder="Model"
+                        className="field"
+                      />
+                    </Field>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -351,7 +343,7 @@ export default function UrunKabulPage() {
 
       <style jsx global>{`
         .field {
-          min-height: 44px;
+          min-height: 46px;
           width: 100%;
           border-radius: 12px;
           border: 1px solid rgb(203 213 225);
@@ -361,6 +353,10 @@ export default function UrunKabulPage() {
           font-weight: 700;
           color: rgb(15 23 42);
           outline: none;
+        }
+
+        textarea.field {
+          padding-top: 12px;
         }
 
         .field:focus {
@@ -386,9 +382,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function Info({ title, value }: { title: string; value: string | number }) {
   return (
     <div className="rounded-2xl border bg-slate-50 p-3">
-      <p className="text-xs font-black uppercase tracking-wide text-slate-500">
-        {title}
-      </p>
+      <p className="text-xs font-black uppercase tracking-wide text-slate-500">{title}</p>
       <p className="mt-1 text-sm font-black text-slate-950">{value}</p>
     </div>
   )

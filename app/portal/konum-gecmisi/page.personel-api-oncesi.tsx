@@ -187,36 +187,13 @@ export default function KonumGecmisiPage() {
   const [error, setError] = useState<string | null>(null)
 
   async function personelleriGetir() {
-    try {
-      const response = await fetch("/api/yonetim/personeller", {
-        method: "GET",
-        cache: "no-store",
-      })
+    const { data } = await supabase
+      .from("personeller")
+      .select("id, personel_kodu, ad, soyad")
+      .eq("durum", "aktif")
+      .order("ad", { ascending: true })
 
-      const json = await response.json()
-
-      if (!response.ok) {
-        setError(json?.error || "Personel listesi alınamadı.")
-        setPersoneller([])
-        return
-      }
-
-      const liste = Array.isArray(json?.personeller) ? json.personeller : []
-
-      setPersoneller(
-        liste
-          .filter((p: any) => p.durum === "aktif")
-          .map((p: any) => ({
-            id: p.id,
-            personel_kodu: p.personel_kodu || null,
-            ad: p.ad || null,
-            soyad: p.soyad || null,
-          })),
-      )
-    } catch (error: any) {
-      setError(error?.message || "Personel listesi alınamadı.")
-      setPersoneller([])
-    }
+    setPersoneller((data || []) as Personel[])
   }
 
   async function kayitlariGetir() {
@@ -315,9 +292,9 @@ export default function KonumGecmisiPage() {
           <button
             type="button"
             onClick={() => void kayitlariGetir()}
-            className="min-h-10 w-full rounded-xl bg-blue-700 px-4 py-2 text-sm font-black text-white shadow-sm hover:bg-blue-800"
+            className="min-h-10 w-full rounded-xl bg-foreground px-4 py-2 text-sm font-black text-background"
           >
-            {loading ? "Konum Geçmişi Yükleniyor..." : "Konum Geçmişini Getir"}
+            Konum Geçmişini Getir
           </button>
         </div>
       </div>

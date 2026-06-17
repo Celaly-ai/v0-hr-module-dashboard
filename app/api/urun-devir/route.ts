@@ -1,452 +1,281 @@
-"use client"
+import { NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
 
-import { useEffect, useMemo, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
+function getAdminClient() {
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ||
+    process.env.SUPABASE_URL?.trim()
 
-type Cihaz = {
-  id: string
-  barkod: string | null
-  seri_no: string | null
-  marka: string | null
-  model: string | null
-  durum: string | null
-  mevcut_zimmet_adi: string | null
-  mevcut_zimmet_tipi: string | null
-  mevcut_konum_adi: string | null
-  son_hareket_at: string | null
-  created_at: string | null
-}
+  const serviceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+    process.env.SUPABASE_SERVICE_KEY?.trim()
 
-type Personel = {
-  id: string
-  ad: string | null
-  soyad: string | null
-  rol: string | null
-  durum: string | null
-}
-
-function adSoyad(p: Personel) {
-  return `${p.ad || ""} ${p.soyad || ""}`.trim() || "Personel"
-}
-
-function tarihSaat(value?: string | null) {
-  if (!value) return "-"
-  return new Date(value).toLocaleString("tr-TR")
-}
-
-function durumEtiketi(value?: string | null) {
-  switch (value) {
-    case "kabul_edildi":
-      return "Kabul Edildi"
-    case "urun_sorumlusunda":
-      return "Ürün Sorumlusunda"
-    case "teknisyende":
-      return "Teknisyende"
-    case "montaj_bekliyor":
-      return "Montaj Bekliyor"
-    case "montaj_tamamlandi":
-      return "Montaj Tamamlandı"
-    default:
-      return value || "-"
+  if (!supabaseUrl || !serviceKey) {
+    throw new Error("Supabase admin bağlantısı eksik.")
   }
+
+  return createClient(supabaseUrl, serviceKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  })
 }
 
-export default function UrunDevirPage() {
-  const supabase = useMemo(() => createClient(), [])
+function temiz(value: unknown) {
+  const text = String(value || "").trim()
+  return text.length > 0 ? text : null
+}
 
-  const [cihazlar, setCihazlar] = useState<Cihaz[]>([])
-  const [personeller, setPersoneller] = useState<Personel[]>([])
-  const [seciliCihazIds, setSeciliCihazIds] = useState<string[]>([])
-  const [arama, setArama] = useState("")
-  const [kaynakPersonelAdi, setKaynakPersonelAdi] = useState("Servis")
-  const [hedefPersonelId, setHedefPersonelId] = useState("")
-  const [hedefPersonelAdi, setHedefPersonelAdi] = useState("")
-  const [loading, setLoading] = useState(true)
-  const [kaydediliyor, setKaydediliyor] = useState(false)
-  const [hata, setHata] = useState("")
-  const [basari, setBasari] = useState("")
+function sayi(value: unknown) {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : null
+}
 
-  async function verileriYukle() {
-    setLoading(true)
-    setHata("")
+function belgeNoUret() {
+  const now = new Date()
 
-    const [cihazRes, personelRes] = await Promise.all([
-      supabase
+  const yil = now.getFullYear()
+  const ay = String(now.getMonth() + 1).padStart(2, "0")
+  const gun = String(now.getDate()).padStart(2, "0")
+
+  const saat = String(now.getHours()).padStart(2, "0")
+  const dakika = String(now.getMinutes()).padStart(2, "0")
+  const saniye = String(now.getSeconds()).padStart(2, "0")
+
+  return `UDF-${yil}${ay}${gun}-${saat}${dakika}${saniye}`
+}
+
+function hedefDurumBelirle(rol?: string | null, unvan?: string | null) {
+  const metin = `${rol || ""} ${unvan || ""}`.toLocaleLowerCase("tr-TR")
+
+  if (metin.includes("ürün") || metin.includes("urun")) return "urun_sorumlusunda"
+
+  return "personelde"
+}
+
+function hedefKonumTipiBelirle(rol?: string | null, unvan?: string | null) {
+  const metin = `${rol || ""} ${unvan || ""}`.toLocaleLowerCase("tr-TR")
+
+  if (metin.includes("ürün") || metin.includes("urun")) return "personel"
+
+  return "personel"
+}
+
+export async function POST(request: Request) {
+  try {
+    const supabase = getAdminClient()
+    const body = await request.json().catch(() => null)
+
+    const cihazIds = Array.isArray(body?.cihaz_ids)
+      ? body.cihaz_ids.map((id: unknown) => temiz(id)).filter(Boolean)
+      : []
+
+    if (cihazIds.length === 0) {
+      return NextResponse.json(
+        { error: "En az bir cihaz seçmelisiniz." },
+        { status: 400 },
+      )
+    }
+
+    const kaynakPersonelId = temiz(body?.kaynak_personel_id)
+    const kaynakPersonelAdi = temiz(body?.kaynak_personel_adi) || "Depo / Servis"
+
+    const hedefPersonelId = temiz(body?.hedef_personel_id)
+
+    if (!hedefPersonelId) {
+      return NextResponse.json(
+        { error: "Hedef personel seçilmelidir." },
+        { status: 400 },
+      )
+    }
+
+    const gpsLat = sayi(body?.gps_lat)
+    const gpsLng = sayi(body?.gps_lng)
+    const gpsDogruluk = sayi(body?.gps_dogruluk)
+
+    const hasarVar = Boolean(body?.hasar_var)
+    const hasarAciklama = temiz(body?.hasar_aciklama)
+
+    if (hasarVar && !hasarAciklama) {
+      return NextResponse.json(
+        { error: "Hasar varsa açıklama zorunludur." },
+        { status: 400 },
+      )
+    }
+
+    const { data: hedefPersonel, error: hedefError } = await supabase
+      .from("personeller")
+      .select("id, ad, soyad, rol, unvan, sirket_id")
+      .eq("id", hedefPersonelId)
+      .maybeSingle()
+
+    if (hedefError || !hedefPersonel) {
+      return NextResponse.json(
+        { error: "Hedef personel bulunamadı." },
+        { status: 404 },
+      )
+    }
+
+    const hedefPersonelAdi =
+      temiz(body?.hedef_personel_adi) ||
+      `${hedefPersonel.ad || ""} ${hedefPersonel.soyad || ""}`.trim() ||
+      hedefPersonel.unvan ||
+      "Personel"
+
+    const belgeNo = belgeNoUret()
+    const yeniDurum = hedefDurumBelirle(hedefPersonel.rol, hedefPersonel.unvan)
+    const hedefKonumTipi = hedefKonumTipiBelirle(hedefPersonel.rol, hedefPersonel.unvan)
+
+    const { data: fis, error: fisError } = await supabase
+      .from("urun_devir_fisleri")
+      .insert({
+        belge_no: belgeNo,
+        kaynak_personel_id: kaynakPersonelId,
+        kaynak_personel_adi: kaynakPersonelAdi,
+        hedef_personel_id: hedefPersonel.id,
+        hedef_personel_adi: hedefPersonelAdi,
+        toplam_urun: cihazIds.length,
+        durum: "tamamlandi",
+      })
+      .select("*")
+      .single()
+
+    if (fisError || !fis) {
+      return NextResponse.json(
+        { error: "Devir fişi oluşturulamadı: " + (fisError?.message || "") },
+        { status: 500 },
+      )
+    }
+
+    const sonucCihazlar: any[] = []
+    const sonucKalemler: any[] = []
+    const sonucHareketler: any[] = []
+
+    for (const cihazId of cihazIds) {
+      const { data: cihaz, error: cihazError } = await supabase
         .from("cihazlar")
         .select("*")
-        .order("created_at", { ascending: false })
-        .limit(500),
+        .eq("id", cihazId)
+        .maybeSingle()
 
-      fetch("/api/yonetim/personeller", { cache: "no-store" }),
-    ])
+      if (cihazError || !cihaz) {
+        return NextResponse.json(
+          { error: `Cihaz bulunamadı: ${cihazId}` },
+          { status: 404 },
+        )
+      }
 
-    const personelJson = await personelRes.json().catch(() => null)
+      const oncekiDurum = cihaz.durum || null
+      const oncekiZimmetTipi = cihaz.mevcut_zimmet_tipi || null
+      const oncekiZimmetAdi = cihaz.mevcut_zimmet_adi || null
 
-    if (cihazRes.error) {
-      setHata("Ürünler alınamadı: " + cihazRes.error.message)
-      setCihazlar([])
-      setLoading(false)
-      return
+      const { data: guncelCihaz, error: updateError } = await supabase
+        .from("cihazlar")
+        .update({
+          mevcut_konum_tipi: hedefKonumTipi,
+          mevcut_konum_id: hedefPersonel.id,
+          mevcut_konum_adi: hedefPersonelAdi,
+
+          mevcut_zimmet_tipi: "personel",
+          mevcut_zimmet_personel_id: hedefPersonel.id,
+          mevcut_zimmet_adi: hedefPersonelAdi,
+
+          durum: yeniDurum,
+          son_hareket_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", cihaz.id)
+        .select("*")
+        .single()
+
+      if (updateError || !guncelCihaz) {
+        return NextResponse.json(
+          { error: "Cihaz güncellenemedi: " + (updateError?.message || "") },
+          { status: 500 },
+        )
+      }
+
+      const { data: hareket, error: hareketError } = await supabase
+        .from("cihaz_hareketleri")
+        .insert({
+          cihaz_id: cihaz.id,
+          hareket_tipi: "devir",
+          onceki_durum: oncekiDurum,
+          yeni_durum: yeniDurum,
+
+          kaynak_tipi: oncekiZimmetTipi || "depo",
+          kaynak_id: kaynakPersonelId,
+          kaynak_adi: oncekiZimmetAdi || kaynakPersonelAdi,
+
+          hedef_tipi: hedefKonumTipi,
+          hedef_id: hedefPersonel.id,
+          hedef_adi: hedefPersonelAdi,
+
+          teslim_eden_personel_id: kaynakPersonelId,
+          teslim_eden_adi: kaynakPersonelAdi,
+
+          teslim_alan_personel_id: hedefPersonel.id,
+          teslim_alan_adi: hedefPersonelAdi,
+
+          aciklama: `${belgeNo} numaralı devir kaydı ile zimmet aktarıldı.`,
+
+          gps_lat: gpsLat,
+          gps_lng: gpsLng,
+          gps_dogruluk: gpsDogruluk,
+          islem_kaynagi: temiz(body?.islem_kaynagi) || "mobil_portal",
+          barkod_dogrulandi: true,
+          hasar_var: hasarVar,
+          hasar_aciklama: hasarAciklama,
+          iade_belgesi_gerekli: false,
+          iade_belgesi_yuklendi: false,
+          belge_foto_url: null,
+          risk_durumu: hasarVar ? "hasar_bildirildi" : null,
+        })
+        .select("*")
+        .single()
+
+      if (hareketError || !hareket) {
+        return NextResponse.json(
+          { error: "Hareket kaydı oluşturulamadı: " + (hareketError?.message || "") },
+          { status: 500 },
+        )
+      }
+
+      const { data: kalem, error: kalemError } = await supabase
+        .from("urun_devir_fisi_kalemleri")
+        .insert({
+          fis_id: fis.id,
+          cihaz_id: cihaz.id,
+          barkod: cihaz.barkod,
+          seri_no: cihaz.seri_no,
+        })
+        .select("*")
+        .single()
+
+      if (kalemError || !kalem) {
+        return NextResponse.json(
+          { error: "Devir fişi kalemi oluşturulamadı: " + (kalemError?.message || "") },
+          { status: 500 },
+        )
+      }
+
+      sonucCihazlar.push(guncelCihaz)
+      sonucHareketler.push(hareket)
+      sonucKalemler.push(kalem)
     }
 
-    if (!personelRes.ok) {
-      setHata("Personeller alınamadı: " + (personelJson?.error || "API hatası"))
-      setPersoneller([])
-      setLoading(false)
-      return
-    }
-
-    setCihazlar((cihazRes.data || []) as Cihaz[])
-    setPersoneller((personelJson?.personeller || []) as Personel[])
-    setLoading(false)
-  }
-
-  useEffect(() => {
-    void verileriYukle()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const filtreliCihazlar = useMemo(() => {
-    const q = arama.trim().toLocaleLowerCase("tr-TR")
-
-    return cihazlar.filter((c) => {
-      const metin = `
-        ${c.barkod || ""}
-        ${c.seri_no || ""}
-        ${c.marka || ""}
-        ${c.model || ""}
-        ${c.mevcut_zimmet_adi || ""}
-        ${c.mevcut_konum_adi || ""}
-        ${c.durum || ""}
-      `.toLocaleLowerCase("tr-TR")
-
-      return !q || metin.includes(q)
+    return NextResponse.json({
+      success: true,
+      fis,
+      cihazlar: sonucCihazlar,
+      hareketler: sonucHareketler,
+      kalemler: sonucKalemler,
     })
-  }, [cihazlar, arama])
-
-  const seciliCihazlar = useMemo(() => {
-    return cihazlar.filter((c) => seciliCihazIds.includes(c.id))
-  }, [cihazlar, seciliCihazIds])
-
-  function cihazSec(cihazId: string, secili: boolean) {
-    setSeciliCihazIds((onceki) => {
-      if (secili) return Array.from(new Set([...onceki, cihazId]))
-      return onceki.filter((id) => id !== cihazId)
-    })
-  }
-
-  function tumunuSec() {
-    setSeciliCihazIds(filtreliCihazlar.map((c) => c.id))
-  }
-
-  function secimiTemizle() {
-    setSeciliCihazIds([])
-  }
-
-  function hedefSec(personelId: string) {
-    setHedefPersonelId(personelId)
-
-    const p = personeller.find((item) => item.id === personelId)
-    setHedefPersonelAdi(p ? adSoyad(p) : "")
-  }
-
-  async function devirEt() {
-    setKaydediliyor(true)
-    setHata("")
-    setBasari("")
-
-    if (seciliCihazIds.length === 0) {
-      setHata("En az bir ürün seçmelisiniz.")
-      setKaydediliyor(false)
-      return
-    }
-
-    if (!hedefPersonelAdi.trim()) {
-      setHata("Hedef personel seçmelisiniz.")
-      setKaydediliyor(false)
-      return
-    }
-
-    const response = await fetch("/api/urun-devir", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        cihaz_ids: seciliCihazIds,
-        kaynak_personel_adi: kaynakPersonelAdi || "Servis",
-        hedef_personel_id: hedefPersonelId || null,
-        hedef_personel_adi: hedefPersonelAdi,
-      }),
-    })
-
-    const json = await response.json().catch(() => null)
-
-    if (!response.ok) {
-      setHata(json?.error || "Ürün devir işlemi başarısız.")
-      setKaydediliyor(false)
-      return
-    }
-
-    setBasari(
-      `${json?.fis?.belge_no || "Devir fişi"} oluşturuldu. ${seciliCihazIds.length} ürün devredildi.`,
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error?.message || "Ürün devir işlemi başarısız." },
+      { status: 500 },
     )
-    setSeciliCihazIds([])
-    await verileriYukle()
-    setKaydediliyor(false)
   }
-
-  return (
-    <div className="min-h-screen bg-slate-50 px-4 pb-8 pt-[calc(env(safe-area-inset-top)+16px)] md:p-6">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <div className="rounded-3xl border border-slate-950 bg-white p-6 shadow-sm">
-          <p className="text-xs font-black uppercase tracking-wide text-blue-700">
-            FeyRoute Operasyon
-          </p>
-          <h1 className="mt-2 text-3xl font-black text-slate-950">
-            Ürün Devir
-          </h1>
-          <p className="mt-2 text-sm font-bold text-slate-600">
-            Servisteki veya personel zimmetindeki ürünleri ürün sorumlusuna, teknisyene ya da ilgili personele toplu olarak devredin.
-          </p>
-        </div>
-
-        {hata && (
-          <div className="rounded-2xl border border-red-300 bg-red-50 p-4 text-sm font-black text-red-900">
-            {hata}
-          </div>
-        )}
-
-        {basari && (
-          <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-sm font-black text-emerald-900">
-            {basari}
-          </div>
-        )}
-
-        <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
-          <div className="rounded-3xl border bg-white shadow-sm">
-            <div className="border-b p-4">
-              <h2 className="text-lg font-black text-slate-950">
-                Devredilecek Ürünler
-              </h2>
-              <p className="mt-1 text-xs font-bold text-slate-500">
-                Seçilen ürün: {seciliCihazIds.length}
-              </p>
-            </div>
-
-            <div className="grid gap-3 border-b p-4 md:grid-cols-[1fr_140px_140px]">
-              <input
-                value={arama}
-                onChange={(e) => setArama(e.target.value)}
-                placeholder="Barkod, seri no, marka, model veya zimmet ara..."
-                className="field"
-              />
-
-              <button
-                type="button"
-                onClick={tumunuSec}
-                className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-black text-white hover:bg-slate-800"
-              >
-                Tümünü Seç
-              </button>
-
-              <button
-                type="button"
-                onClick={secimiTemizle}
-                className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-800 hover:bg-slate-50"
-              >
-                Temizle
-              </button>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[980px] text-sm">
-                <thead className="bg-slate-100">
-                  <tr>
-                    <th className="w-14 p-3 text-center">Seç</th>
-                    <th className="p-3 text-left">Barkod / Seri</th>
-                    <th className="p-3 text-left">Ürün</th>
-                    <th className="p-3 text-left">Durum</th>
-                    <th className="p-3 text-left">Mevcut Zimmet</th>
-                    <th className="p-3 text-left">Son Hareket</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {loading ? (
-                    <tr>
-                      <td colSpan={6} className="p-6 text-center font-bold text-slate-500">
-                        Ürünler yükleniyor...
-                      </td>
-                    </tr>
-                  ) : filtreliCihazlar.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="p-6 text-center font-bold text-slate-500">
-                        Ürün bulunamadı.
-                      </td>
-                    </tr>
-                  ) : (
-                    filtreliCihazlar.map((c) => {
-                      const secili = seciliCihazIds.includes(c.id)
-
-                      return (
-                        <tr key={c.id} className={secili ? "border-t bg-blue-50" : "border-t"}>
-                          <td className="p-3 text-center">
-                            <input
-                              type="checkbox"
-                              checked={secili}
-                              onChange={(e) => cihazSec(c.id, e.target.checked)}
-                              className="h-5 w-5"
-                            />
-                          </td>
-
-                          <td className="p-3">
-                            <p className="font-black text-slate-950">{c.barkod || "-"}</p>
-                            <p className="text-xs font-bold text-slate-500">
-                              Seri: {c.seri_no || "-"}
-                            </p>
-                          </td>
-
-                          <td className="p-3">
-                            <p className="font-black text-slate-950">
-                              {c.marka || "-"} {c.model || ""}
-                            </p>
-                          </td>
-
-                          <td className="p-3 font-bold text-slate-700">
-                            {durumEtiketi(c.durum)}
-                          </td>
-
-                          <td className="p-3">
-                            <p className="font-black text-slate-950">
-                              {c.mevcut_zimmet_adi || "-"}
-                            </p>
-                            <p className="text-xs font-bold text-slate-500">
-                              {c.mevcut_zimmet_tipi || "-"}
-                            </p>
-                          </td>
-
-                          <td className="p-3 font-bold text-slate-700">
-                            {tarihSaat(c.son_hareket_at || c.created_at)}
-                          </td>
-                        </tr>
-                      )
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <div className="rounded-3xl border bg-white p-5 shadow-sm">
-              <h2 className="text-lg font-black text-slate-950">
-                Devir Bilgileri
-              </h2>
-
-              <div className="mt-4 space-y-4">
-                <label className="block">
-                  <span className="label">Kaynak</span>
-                  <input
-                    value={kaynakPersonelAdi}
-                    onChange={(e) => setKaynakPersonelAdi(e.target.value)}
-                    placeholder="Servis / Ürün sorumlusu / Teknisyen"
-                    className="field"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="label">Hedef Personel</span>
-                  <select
-                    value={hedefPersonelId}
-                    onChange={(e) => hedefSec(e.target.value)}
-                    className="field"
-                  >
-                    <option value="">Personel seçin</option>
-                    {personeller.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {adSoyad(p)} {p.rol ? `(${p.rol})` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="block">
-                  <span className="label">Hedef Adı</span>
-                  <input
-                    value={hedefPersonelAdi}
-                    onChange={(e) => setHedefPersonelAdi(e.target.value)}
-                    placeholder="Personel adı"
-                    className="field"
-                  />
-                </label>
-              </div>
-
-              <button
-                type="button"
-                onClick={devirEt}
-                disabled={kaydediliyor || seciliCihazIds.length === 0}
-                className="mt-5 w-full rounded-xl bg-blue-700 px-4 py-3 text-sm font-black text-white hover:bg-blue-800 disabled:bg-slate-300 disabled:text-slate-600"
-              >
-                {kaydediliyor ? "Devrediliyor..." : "Seçili Ürünleri Devret"}
-              </button>
-            </div>
-
-            <div className="rounded-3xl border bg-white p-5 shadow-sm">
-              <h2 className="text-lg font-black text-slate-950">
-                Seçili Ürün Özeti
-              </h2>
-
-              {seciliCihazlar.length === 0 ? (
-                <div className="mt-4 rounded-2xl border border-dashed p-5 text-center text-sm font-bold text-slate-500">
-                  Henüz ürün seçilmedi.
-                </div>
-              ) : (
-                <div className="mt-4 space-y-3">
-                  {seciliCihazlar.map((c) => (
-                    <div key={c.id} className="rounded-2xl border bg-slate-50 p-3">
-                      <p className="font-black text-slate-950">{c.barkod || "-"}</p>
-                      <p className="text-xs font-bold text-slate-500">
-                        {c.marka || "-"} {c.model || ""} · Seri: {c.seri_no || "-"}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <style jsx global>{`
-        .field {
-          min-height: 44px;
-          width: 100%;
-          border-radius: 12px;
-          border: 1px solid rgb(203 213 225);
-          background: white;
-          padding: 0 12px;
-          font-size: 14px;
-          font-weight: 700;
-          color: rgb(15 23 42);
-          outline: none;
-        }
-
-        .field:focus {
-          border-color: rgb(37 99 235);
-          box-shadow: 0 0 0 3px rgb(37 99 235 / 0.12);
-        }
-
-        .label {
-          display: block;
-          margin-bottom: 4px;
-          font-size: 12px;
-          font-weight: 900;
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
-          color: rgb(100 116 139);
-        }
-      `}</style>
-    </div>
-  )
 }

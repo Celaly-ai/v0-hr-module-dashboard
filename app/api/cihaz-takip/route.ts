@@ -161,7 +161,7 @@ export async function POST(request: Request) {
       mevcut_konum_adi: "Servis",
       mevcut_zimmet_tipi: "servis",
       mevcut_zimmet_adi: "Servis",
-      durum: "kabul_edildi",
+      durum: "servis_deposunda",
       son_hareket_at: new Date().toISOString(),
       notlar: temiz(form.get("notlar")),
     }
@@ -185,7 +185,7 @@ export async function POST(request: Request) {
         cihaz_id: cihaz.id,
         hareket_tipi: "cihaz_kabul",
         onceki_durum: null,
-        yeni_durum: "kabul_edildi",
+        yeni_durum: "servis_deposunda",
         kaynak_tipi: payload.kaynak_tipi,
         kaynak_adi: payload.kaynak_aciklama,
         hedef_tipi: "servis",
@@ -202,9 +202,29 @@ export async function POST(request: Request) {
       )
     }
 
-    await dosyaYukle(supabase, cihaz.id, hareket.id, form.get("barkod_foto") as File | null, "barkod")
-    await dosyaYukle(supabase, cihaz.id, hareket.id, form.get("cihaz_foto") as File | null, "cihaz")
-    await dosyaYukle(supabase, cihaz.id, hareket.id, form.get("koli_foto") as File | null, "koli")
+    await dosyaYukle(
+      supabase,
+      cihaz.id,
+      hareket.id,
+      form.get("barkod_foto") as File | null,
+      "barkod",
+    )
+
+    await dosyaYukle(
+      supabase,
+      cihaz.id,
+      hareket.id,
+      form.get("cihaz_foto") as File | null,
+      "cihaz",
+    )
+
+    await dosyaYukle(
+      supabase,
+      cihaz.id,
+      hareket.id,
+      form.get("koli_foto") as File | null,
+      "koli",
+    )
 
     return NextResponse.json({
       success: true,

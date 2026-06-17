@@ -54,24 +54,22 @@ function tarihSaat(value?: string | null) {
 
 function durumEtiketi(value?: string | null) {
   switch (value) {
-    case "kabul_edildi":
-      return "Kabul Edildi"
-    case "serviste":
-      return "Serviste"
+    case "bayi_deposunda":
+      return "Bayi Deposunda"
+    case "ortak_depoda":
+      return "Ortak Depoda"
+    case "servis_deposunda":
+      return "Servis Deposunda"
     case "urun_sorumlusunda":
       return "Ürün Sorumlusunda"
     case "teknisyende":
       return "Teknisyende"
-    case "montaj_bekliyor":
-      return "Montaj Bekliyor"
-    case "montaj_tamamlandi":
-      return "Montaj Tamamlandı"
-    case "iade":
-      return "İade"
+    case "musteride":
+      return "Müşteride"
+    case "iadede":
+      return "İadede"
     case "hurda":
       return "Hurda"
-    case "kayip":
-      return "Kayıp"
     default:
       return value || "-"
   }
@@ -79,24 +77,22 @@ function durumEtiketi(value?: string | null) {
 
 function durumClass(value?: string | null) {
   switch (value) {
-    case "kabul_edildi":
-      return "border-blue-300 bg-blue-50 text-blue-800"
-    case "serviste":
+    case "bayi_deposunda":
+      return "border-sky-300 bg-sky-50 text-sky-800"
+    case "ortak_depoda":
+      return "border-cyan-300 bg-cyan-50 text-cyan-800"
+    case "servis_deposunda":
       return "border-emerald-300 bg-emerald-50 text-emerald-800"
     case "urun_sorumlusunda":
       return "border-purple-300 bg-purple-50 text-purple-800"
     case "teknisyende":
       return "border-amber-300 bg-amber-50 text-amber-800"
-    case "montaj_bekliyor":
-      return "border-orange-300 bg-orange-50 text-orange-800"
-    case "montaj_tamamlandi":
+    case "musteride":
       return "border-green-300 bg-green-50 text-green-800"
-    case "iade":
-      return "border-slate-300 bg-slate-50 text-slate-800"
+    case "iadede":
+      return "border-orange-300 bg-orange-50 text-orange-800"
     case "hurda":
       return "border-red-300 bg-red-50 text-red-800"
-    case "kayip":
-      return "border-red-400 bg-red-100 text-red-900"
     default:
       return "border-slate-300 bg-slate-50 text-slate-700"
   }
@@ -227,10 +223,10 @@ export default function UrunMerkeziPage() {
   const ozet = useMemo(() => {
     return {
       toplam: cihazlar.length,
-      serviste: cihazlar.filter((c) => c.mevcut_konum_tipi === "servis" || c.durum === "kabul_edildi").length,
+      servisDeposunda: cihazlar.filter((c) => c.durum === "servis_deposunda").length,
       urunSorumlusunda: cihazlar.filter((c) => c.durum === "urun_sorumlusunda").length,
       teknisyende: cihazlar.filter((c) => c.durum === "teknisyende").length,
-      montajBekliyor: cihazlar.filter((c) => c.durum === "montaj_bekliyor").length,
+      musteride: cihazlar.filter((c) => c.durum === "musteride").length,
     }
   }, [cihazlar])
 
@@ -257,10 +253,10 @@ export default function UrunMerkeziPage() {
 
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
           <Kpi title="Toplam Ürün" value={ozet.toplam} />
-          <Kpi title="Serviste" value={ozet.serviste} />
+          <Kpi title="Servis Deposunda" value={ozet.servisDeposunda} />
           <Kpi title="Ürün Sorumlusunda" value={ozet.urunSorumlusunda} />
           <Kpi title="Teknisyende" value={ozet.teknisyende} />
-          <Kpi title="Montaj Bekliyor" value={ozet.montajBekliyor} />
+          <Kpi title="Müşteride" value={ozet.musteride} />
         </div>
 
         <div className="rounded-3xl border bg-white p-4 shadow-sm">
@@ -278,15 +274,14 @@ export default function UrunMerkeziPage() {
               className="min-h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-900 outline-none"
             >
               <option value="tum">Tüm Durumlar</option>
-              <option value="kabul_edildi">Kabul Edildi</option>
-              <option value="serviste">Serviste</option>
+              <option value="bayi_deposunda">Bayi Deposunda</option>
+              <option value="ortak_depoda">Ortak Depoda</option>
+              <option value="servis_deposunda">Servis Deposunda</option>
               <option value="urun_sorumlusunda">Ürün Sorumlusunda</option>
               <option value="teknisyende">Teknisyende</option>
-              <option value="montaj_bekliyor">Montaj Bekliyor</option>
-              <option value="montaj_tamamlandi">Montaj Tamamlandı</option>
-              <option value="iade">İade</option>
+              <option value="musteride">Müşteride</option>
+              <option value="iadede">İadede</option>
               <option value="hurda">Hurda</option>
-              <option value="kayip">Kayıp</option>
             </select>
 
             <button

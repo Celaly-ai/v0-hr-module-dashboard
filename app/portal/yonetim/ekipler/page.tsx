@@ -383,7 +383,23 @@ export default function YonetimEkiplerPage() {
                 <p className="text-xs font-bold text-gray-600">
                   Araç: {aracAdi(e.arac_varlik_id)}
                 </p>
-
+                <div className="mt-3 flex gap-2">
+  {e.aktif ? (
+    <button
+      onClick={() => ekipDurumDegistir(e.id, false)}
+      className="rounded bg-orange-600 px-3 py-2 text-xs font-black text-white"
+    >
+      Pasife Al
+    </button>
+  ) : (
+    <button
+      onClick={() => ekipDurumDegistir(e.id, true)}
+      className="rounded bg-green-700 px-3 py-2 text-xs font-black text-white"
+    >
+      Aktif Yap
+    </button>
+  )}
+</div>
                 <div className="mt-3 rounded-xl bg-gray-50 border p-3">
                   <p className="text-xs font-black mb-2">Üyeler</p>
 

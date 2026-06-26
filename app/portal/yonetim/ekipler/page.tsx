@@ -386,14 +386,14 @@ export default function YonetimEkiplerPage() {
                 <div className="mt-3 flex gap-2">
   {e.aktif ? (
     <button
-      onClick={() => ekipDurumDegistir(e.id, false)}
+      onClick={() => alert('Ekip durum değiştirme işlemi sonraki sürümde aktif edilecektir.')}
       className="rounded bg-orange-600 px-3 py-2 text-xs font-black text-white"
     >
       Pasife Al
     </button>
   ) : (
     <button
-      onClick={() => ekipDurumDegistir(e.id, true)}
+      onClick={() => alert('Ekip durum değiştirme işlemi sonraki sürümde aktif edilecektir.')}
       className="rounded bg-green-700 px-3 py-2 text-xs font-black text-white"
     >
       Aktif Yap

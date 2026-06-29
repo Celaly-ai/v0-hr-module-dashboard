@@ -20,7 +20,7 @@ type Hareket = {
   id: string
   tur: string
   cari_id: string | null
-  kasa_banka_id: string | null
+  hesap_id: string | null
   tarih: string | null
   tutar: number
   belge_no: string | null
@@ -32,7 +32,7 @@ type Hareket = {
 type FormState = {
   islem_tipi: IslemTipi
   cari_id: string
-  kasa_banka_id: string
+  hesap_id: string
   tarih: string
   tutar: string
   belge_no: string
@@ -58,7 +58,7 @@ function bugunTarihi() {
 const bosForm: FormState = {
   islem_tipi: "tahsilat",
   cari_id: "",
-  kasa_banka_id: "",
+  hesap_id: "",
   tarih: bugunTarihi(),
   tutar: "",
   belge_no: "",
@@ -203,7 +203,7 @@ export default function MuhasebeTahsilatOdemePage() {
     const { data, error } = await supabase
       .from("muhasebe_hareketleri")
       .select(
-        "id, tur, cari_id, kasa_banka_id, tarih, tutar, belge_no, odeme_yontemi, aciklama, created_at"
+        "id, tur, cari_id, hesap_id, tarih, tutar, belge_no, odeme_yontemi, aciklama, created_at"
       )
       .eq("sirket_id", aktifSirketId)
       .in("tur", ["tahsilat", "odeme"])
@@ -267,7 +267,7 @@ export default function MuhasebeTahsilatOdemePage() {
       return
     }
 
-    if (!form.kasa_banka_id) {
+    if (!form.hesap_id) {
       setMesaj({ tip: "hata", metin: "Kasa / banka seçimi zorunludur." })
       return
     }
@@ -319,7 +319,7 @@ export default function MuhasebeTahsilatOdemePage() {
       hareket_tipi: form.islem_tipi,
 
       cari_id: form.cari_id,
-      kasa_banka_id: form.kasa_banka_id,
+      hesap_id: form.hesap_id,
 
       tutar,
       borc_tutar: isTahsilat ? 0 : tutar,
@@ -333,7 +333,7 @@ export default function MuhasebeTahsilatOdemePage() {
       islem_yapan_ad_soyad: personel.ad_soyad || null,
 
       kaynak: "manuel",
-      kaynak_modul: "manuel",
+      kaynak_modul: "tahsilat_odeme",
       onay_durumu: "onaylandi",
       odeme_durumu: "odendi",
       durum: "aktif",
@@ -483,8 +483,8 @@ export default function MuhasebeTahsilatOdemePage() {
                 Kasa / Banka <span className="text-red-600">*</span>
               </label>
               <select
-                value={form.kasa_banka_id}
-                onChange={(e) => formGuncelle("kasa_banka_id", e.target.value)}
+                value={form.hesap_id}
+                onChange={(e) => formGuncelle("hesap_id", e.target.value)}
                 className={selectSinifi}
               >
                 <option value="">Hesap seçiniz</option>
@@ -642,7 +642,7 @@ export default function MuhasebeTahsilatOdemePage() {
                         </p>
                         <p>
                           <span className="text-gray-500">Kasa / Banka:</span>{" "}
-                          {hesapAdiBul(hareket.kasa_banka_id)}
+                          {hesapAdiBul(hareket.hesap_id)}
                         </p>
                         <p>
                           <span className="text-gray-500">Tarih:</span>{" "}

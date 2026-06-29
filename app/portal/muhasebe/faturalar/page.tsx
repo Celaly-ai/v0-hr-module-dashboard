@@ -42,7 +42,7 @@ type FormState = {
 }
 
 type Mesaj = {
-  tip: "basari" | "hata"
+  tip: "basari" | "hata" | "uyari"
   metin: string
 }
 
@@ -110,7 +110,12 @@ function tarihGoster(value: string | null | undefined) {
 
 function mesajClass(tip: Mesaj["tip"]) {
   if (tip === "basari") return "bg-green-50 border-green-300 text-green-900"
+  if (tip === "uyari") return "bg-yellow-50 border-yellow-300 text-yellow-900"
   return "bg-red-50 border-red-300 text-red-900"
+}
+
+function faturaHareketOlusturulmali(faturaTipi: FaturaTipi) {
+  return faturaTipi === "satis" || faturaTipi === "alis" || faturaTipi === "gider"
 }
 
 function durumRenkSinifi(durum: string) {
@@ -288,33 +293,119 @@ export default function MuhasebeFaturalarPage() {
 
     const supabase = createClient()
 
-    const { error } = await supabase.from("muhasebe_faturalar").insert({
-      sirket_id: aktifSirketId,
-      cari_id: form.cari_id || null,
-      fatura_tipi: form.fatura_tipi,
-      fatura_no: form.fatura_no.trim() || null,
-      fatura_tarihi: form.fatura_tarihi || null,
-      vade_tarihi: form.vade_tarihi || null,
-      toplam_tutar: toplamTutar,
-      odenen_tutar: odenenTutar,
-      kalan_tutar: toplamTutar - odenenTutar,
-      durum: form.durum,
-      belge_url: form.belge_url.trim() || null,
-      aciklama: form.aciklama.trim() || null,
-      kaynak_modul: "manuel",
-      kaynak_kayit_id: null,
-    })
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
 
-    setKaydediliyor(false)
-
-    if (error) {
-      setMesaj({ tip: "hata", metin: "Fatura kaydı oluşturulamadı: " + error.message })
+    if (userError || !user) {
+      setKaydediliyor(false)
+      setMesaj({ tip: "hata", metin: "Oturum bilgisi alınamadı. Lütfen tekrar giriş yapın." })
       return
     }
 
+    const { data: personel, error: personelError } = await supabase
+      .from("personeller")
+      .select("id, sirket_id")
+      .or(`auth_id.eq.${user.id},kullanici_id.eq.${user.id}`)
+      .maybeSingle()
+
+    if (personelError || !personel?.sirket_id) {
+      setKaydediliyor(false)
+      setMesaj({ tip: "hata", metin: "Şirket bilgisi bulunamadı. Fatura kaydı oluşturulamadı." })
+      return
+    }
+
+    const faturaTarihi = form.fatura_tarihi || bugunTarihi()
+    const faturaNoMetin = form.fatura_no.trim() || "-"
+
+    const { data: faturaKayit, error } = await supabase
+      .from("muhasebe_faturalar")
+      .insert({
+        sirket_id: personel.sirket_id,
+        cari_id: form.cari_id || null,
+        fatura_tipi: form.fatura_tipi,
+        fatura_no: form.fatura_no.trim() || null,
+        fatura_tarihi: faturaTarihi,
+        vade_tarihi: form.vade_tarihi || null,
+        toplam_tutar: toplamTutar,
+        odenen_tutar: odenenTutar,
+        kalan_tutar: toplamTutar - odenenTutar,
+        durum: form.durum,
+        belge_url: form.belge_url.trim() || null,
+        aciklama: form.aciklama.trim() || null,
+        kaynak_modul: "manuel",
+        kaynak_kayit_id: null,
+      })
+      .select("id")
+      .single()
+
+    if (error || !faturaKayit?.id) {
+      setKaydediliyor(false)
+      setMesaj({ tip: "hata", metin: "Fatura kaydı oluşturulamadı: " + error?.message })
+      return
+    }
+
+    const kayitSirketId = personel.sirket_id
+    setSirketId(kayitSirketId)
+
+    if (faturaHareketOlusturulmali(form.fatura_tipi)) {
+      const isSatis = form.fatura_tipi === "satis"
+      const hareketTur = isSatis ? "gelir" : "gider"
+
+      const { error: hareketError } = await supabase.from("muhasebe_hareketleri").insert({
+        sirket_id: personel.sirket_id,
+        personel_id: personel.id,
+
+        tarih: faturaTarihi,
+        islem_tarihi: faturaTarihi,
+
+        tur: hareketTur,
+        hareket_tipi: hareketTur,
+
+        cari_id: form.cari_id || null,
+
+        tutar: toplamTutar,
+        borc_tutar: isSatis ? 0 : toplamTutar,
+        alacak_tutar: isSatis ? toplamTutar : 0,
+
+        aciklama: isSatis
+          ? "Satış faturası: " + faturaNoMetin
+          : "Alış/Gider faturası: " + faturaNoMetin,
+
+        kaynak: "fatura",
+        kaynak_modul: "muhasebe_faturalar",
+        kaynak_kayit_id: faturaKayit.id,
+
+        onay_durumu: "onaylandi",
+        odeme_durumu: form.durum,
+        durum: "aktif",
+      })
+
+      setKaydediliyor(false)
+
+      if (hareketError) {
+        setForm({ ...bosForm, fatura_tarihi: bugunTarihi() })
+        await faturalariYukle(kayitSirketId)
+        setMesaj({
+          tip: "uyari",
+          metin:
+            "Fatura kaydedildi ancak muhasebe hareketi oluşturulamadı: " +
+            hareketError.message,
+        })
+        return
+      }
+
+      setForm({ ...bosForm, fatura_tarihi: bugunTarihi() })
+      setMesaj({ tip: "basari", metin: "Fatura ve muhasebe hareketi kaydedildi." })
+      await faturalariYukle(kayitSirketId)
+      return
+    }
+
+    setKaydediliyor(false)
     setForm({ ...bosForm, fatura_tarihi: bugunTarihi() })
     setMesaj({ tip: "basari", metin: "Fatura başarıyla eklendi." })
-    await faturalariYukle(aktifSirketId)
+    await faturalariYukle(kayitSirketId)
   }
 
   const filtreliFaturalar = useMemo(() => {

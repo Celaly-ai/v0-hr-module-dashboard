@@ -1,11 +1,41 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import {
-  calculateDashboard,
-  type FinanceDashboard,
-} from "@/lib/services/finance-service"
+
+type SonHareket = {
+  id: string
+  tur: string | null
+  hareket_tipi: string | null
+  tutar: number | null
+  kategori_ad: string | null
+  aciklama: string | null
+  created_at: string | null
+}
+
+type SonFatura = {
+  id: string
+  fatura_no: string | null
+  fatura_tipi: string
+  toplam_tutar: number | null
+  kalan_tutar: number | null
+  durum: string
+  created_at: string | null
+}
+
+type DashboardState = {
+  gelir: number
+  gider: number
+  tahsilat: number
+  odeme: number
+  netDurum: number
+  acikFatura: number
+  cariSayisi: number
+  kasaBankaSayisi: number
+  sonHareketler: SonHareket[]
+  sonFaturalar: SonFatura[]
+}
 
 const hizliIslemler = [
   {
@@ -46,7 +76,7 @@ const hizliIslemler = [
   },
 ]
 
-const bosDashboard: FinanceDashboard = {
+const bosDashboard: DashboardState = {
   gelir: 0,
   gider: 0,
   tahsilat: 0,
@@ -57,6 +87,14 @@ const bosDashboard: FinanceDashboard = {
   kasaBankaSayisi: 0,
   sonHareketler: [],
   sonFaturalar: [],
+}
+
+function turEsles(
+  tur: string | null | undefined,
+  hareketTipi: string | null | undefined,
+  hedef: string
+) {
+  return tur === hedef || hareketTipi === hedef
 }
 
 function para(value: number) {
@@ -101,7 +139,7 @@ function tarihSaat(value?: string | null) {
 export default function MuhasebePage() {
   const router = useRouter()
 
-  const [dashboard, setDashboard] = useState<FinanceDashboard>(bosDashboard)
+  const [dashboard, setDashboard] = useState<DashboardState>(bosDashboard)
   const [loading, setLoading] = useState(true)
   const [hata, setHata] = useState<string | null>(null)
 
@@ -109,24 +147,130 @@ export default function MuhasebePage() {
     veriYukle()
   }, [])
 
+  async function sirketIdAl(supabase: ReturnType<typeof createClient>) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) return null
+
+    const { data: personel } = await supabase
+      .from("personeller")
+      .select("sirket_id")
+      .or(`auth_id.eq.${user.id},kullanici_id.eq.${user.id}`)
+      .maybeSingle()
+
+    return personel?.sirket_id ?? null
+  }
+
   async function veriYukle() {
     setLoading(true)
     setHata(null)
 
-    const sonuc = await calculateDashboard()
+    const supabase = createClient()
+    const sirketId = await sirketIdAl(supabase)
 
-    if (!sonuc.ok) {
-      setHata(sonuc.error)
+    const hareketSorgu = supabase
+      .from("muhasebe_hareketleri")
+      .select("tur, hareket_tipi, tutar")
+
+    const sonHareketSorgu = supabase
+      .from("muhasebe_hareketleri")
+      .select("id, tur, hareket_tipi, tutar, kategori_ad, aciklama, created_at")
+      .order("created_at", { ascending: false })
+      .limit(8)
+
+    const faturaSorgu = supabase.from("muhasebe_faturalar").select("id, durum")
+
+    const sonFaturaSorgu = supabase
+      .from("muhasebe_faturalar")
+      .select("id, fatura_no, fatura_tipi, toplam_tutar, kalan_tutar, durum, created_at")
+      .order("created_at", { ascending: false })
+      .limit(8)
+
+    const cariSorgu = supabase
+      .from("muhasebe_cariler")
+      .select("id", { count: "exact", head: true })
+      .eq("durum", "aktif")
+
+    const kasaBankaSorgu = supabase
+      .from("muhasebe_kasa_banka")
+      .select("id", { count: "exact", head: true })
+      .eq("durum", "aktif")
+
+    if (sirketId) {
+      hareketSorgu.eq("sirket_id", sirketId)
+      sonHareketSorgu.eq("sirket_id", sirketId)
+      faturaSorgu.eq("sirket_id", sirketId)
+      sonFaturaSorgu.eq("sirket_id", sirketId)
+      cariSorgu.eq("sirket_id", sirketId)
+      kasaBankaSorgu.eq("sirket_id", sirketId)
+    }
+
+    const [
+      { data: hareketData, error: hareketError },
+      { data: sonHareketData, error: sonHareketError },
+      { data: faturaData, error: faturaError },
+      { data: sonFaturaData, error: sonFaturaError },
+      { count: cariSayisi, error: cariError },
+      { count: kasaBankaSayisi, error: kasaError },
+    ] = await Promise.all([
+      hareketSorgu,
+      sonHareketSorgu,
+      faturaSorgu,
+      sonFaturaSorgu,
+      cariSorgu,
+      kasaBankaSorgu,
+    ])
+
+    const ilkHata =
+      hareketError ||
+      sonHareketError ||
+      faturaError ||
+      sonFaturaError ||
+      cariError ||
+      kasaError
+
+    if (ilkHata) {
+      setHata("Veriler alınamadı: " + ilkHata.message)
       setDashboard(bosDashboard)
       setLoading(false)
       return
     }
 
-    setDashboard(sonuc.data)
+    let gelir = 0
+    let gider = 0
+    let tahsilat = 0
+    let odeme = 0
+
+    ;(hareketData || []).forEach((item) => {
+      const tutar = Number(item.tutar || 0)
+      if (turEsles(item.tur, item.hareket_tipi, "gelir")) gelir += tutar
+      if (turEsles(item.tur, item.hareket_tipi, "gider")) gider += tutar
+      if (turEsles(item.tur, item.hareket_tipi, "tahsilat")) tahsilat += tutar
+      if (turEsles(item.tur, item.hareket_tipi, "odeme")) odeme += tutar
+    })
+
+    const acikFatura = (faturaData || []).filter(
+      (f) => f.durum === "bekliyor" || f.durum === "kismi_odendi"
+    ).length
+
+    setDashboard({
+      gelir,
+      gider,
+      tahsilat,
+      odeme,
+      netDurum: gelir + tahsilat - gider - odeme,
+      acikFatura,
+      cariSayisi: cariSayisi || 0,
+      kasaBankaSayisi: kasaBankaSayisi || 0,
+      sonHareketler: (sonHareketData || []) as SonHareket[],
+      sonFaturalar: (sonFaturaData || []) as SonFatura[],
+    })
     setLoading(false)
   }
 
-  function hareketEtiketi(h: FinanceDashboard["sonHareketler"][number]) {
+  function hareketEtiketi(h: SonHareket) {
     const tip = h.tur || h.hareket_tipi || "-"
     const etiketler: Record<string, string> = {
       gelir: "Gelir",
@@ -137,14 +281,14 @@ export default function MuhasebePage() {
     return etiketler[tip] || tip
   }
 
-  function hareketRenk(tur: string, hareketTipi?: string | null) {
+  function hareketRenk(tur: string | null, hareketTipi?: string | null) {
     const tip = tur || hareketTipi || ""
     if (tip === "gelir" || tip === "tahsilat") return "text-green-700"
     if (tip === "gider" || tip === "odeme") return "text-red-700"
     return "text-gray-900"
   }
 
-  function hareketIsaret(tur: string, hareketTipi?: string | null) {
+  function hareketIsaret(tur: string | null, hareketTipi?: string | null) {
     const tip = tur || hareketTipi || ""
     if (tip === "gelir" || tip === "tahsilat") return "+"
     if (tip === "gider" || tip === "odeme") return "-"

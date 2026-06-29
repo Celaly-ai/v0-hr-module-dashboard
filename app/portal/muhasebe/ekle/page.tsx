@@ -10,6 +10,76 @@ type Kategori = {
   tur: string
 }
 
+type Tur =
+  | "gider"
+  | "gelir"
+  | "tahsilat"
+  | "odeme"
+  | "avans"
+  | "maas"
+  | "yemek"
+  | "kesinti"
+  | "ek_odeme"
+
+type FormState = {
+  tur: Tur
+  kategori_id: string
+  tutar: string
+  odeme_yontemi: string
+  aciklama: string
+  detay_aciklama: string
+  fatura_no: string
+  belge_no: string
+  islem_yapan_ad_soyad: string
+  masrafi_yapan_ad_soyad: string
+  avans_personel_ad_soyad: string
+  masraf_yeri: string
+  belge_var_mi: boolean
+}
+
+function alanGorunur(tur: Tur, alan: keyof FormState | "fatura_no"): boolean {
+  switch (alan) {
+    case "kategori_id":
+      return tur === "gelir" || tur === "gider"
+    case "fatura_no":
+      return tur === "gelir" || tur === "gider"
+    case "masrafi_yapan_ad_soyad":
+      return tur === "gider"
+    case "islem_yapan_ad_soyad":
+      return tur === "gider"
+    case "masraf_yeri":
+      return tur === "gider"
+    case "avans_personel_ad_soyad":
+      return tur === "avans"
+    case "odeme_yontemi":
+    case "belge_no":
+    case "aciklama":
+    case "detay_aciklama":
+    case "belge_var_mi":
+      return (
+        tur === "gider" ||
+        tur === "gelir" ||
+        tur === "avans" ||
+        tur === "tahsilat" ||
+        tur === "odeme" ||
+        tur === "maas" ||
+        tur === "yemek" ||
+        tur === "kesinti" ||
+        tur === "ek_odeme"
+      )
+    case "tutar":
+      return true
+    default:
+      return false
+  }
+}
+
+const inputSinifi =
+  "w-full rounded-lg border border-gray-500 bg-white px-3 py-3 text-sm font-semibold text-gray-900 placeholder:text-gray-500"
+const selectSinifi =
+  "w-full rounded-lg border border-gray-500 bg-white px-3 py-3 text-sm font-bold text-gray-900"
+const labelSinifi = "mb-1 block text-sm font-bold text-gray-900"
+
 export default function MuhasebeEklePage() {
   const router = useRouter()
 
@@ -17,7 +87,7 @@ export default function MuhasebeEklePage() {
   const [kaydediliyor, setKaydediliyor] = useState(false)
   const [mesaj, setMesaj] = useState("")
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<FormState>({
     tur: "gider",
     kategori_id: "",
     tutar: "",
@@ -54,7 +124,7 @@ export default function MuhasebeEklePage() {
     setKategoriler(data || [])
   }
 
-  function formGuncelle(alan: string, deger: any) {
+  function formGuncelle<K extends keyof FormState>(alan: K, deger: FormState[K]) {
     setForm((onceki) => ({
       ...onceki,
       [alan]: deger,
@@ -164,6 +234,7 @@ export default function MuhasebeEklePage() {
   }
 
   const filtreliKategoriler = kategoriler.filter((k) => k.tur === form.tur)
+  const { tur } = form
 
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900">
@@ -192,18 +263,19 @@ export default function MuhasebeEklePage() {
         )}
 
         <div className="rounded-2xl border border-gray-300 bg-white p-4 shadow-sm space-y-4">
+          {/* Tür seçimi */}
           <div>
-            <label className="mb-1 block text-sm font-bold text-gray-900">Tür</label>
+            <label className={labelSinifi}>Tür</label>
             <select
               value={form.tur}
               onChange={(e) =>
                 setForm({
                   ...form,
-                  tur: e.target.value,
+                  tur: e.target.value as Tur,
                   kategori_id: "",
                 })
               }
-              className="w-full rounded-lg border border-gray-500 bg-white px-3 py-3 text-sm font-bold text-gray-900"
+              className={selectSinifi}
             >
               <option value="gider">Gider</option>
               <option value="gelir">Gelir</option>
@@ -217,15 +289,16 @@ export default function MuhasebeEklePage() {
             </select>
           </div>
 
-          {(form.tur === "gelir" || form.tur === "gider") && (
+          {/* Kategori — gelir / gider */}
+          {alanGorunur(tur, "kategori_id") && (
             <div>
-              <label className="mb-1 block text-sm font-bold text-gray-900">
-                Kategori
+              <label className={labelSinifi}>
+                Kategori <span className="text-red-600">*</span>
               </label>
               <select
                 value={form.kategori_id}
                 onChange={(e) => formGuncelle("kategori_id", e.target.value)}
-                className="w-full rounded-lg border border-gray-500 bg-white px-3 py-3 text-sm font-bold text-gray-900"
+                className={selectSinifi}
               >
                 <option value="">Kategori seçiniz</option>
                 {filtreliKategoriler.map((k) => (
@@ -237,65 +310,11 @@ export default function MuhasebeEklePage() {
             </div>
           )}
 
-          <div>
-            <label className="mb-1 block text-sm font-bold text-gray-900">Tutar</label>
-            <input
-              type="number"
-              value={form.tutar}
-              onChange={(e) => formGuncelle("tutar", e.target.value)}
-              placeholder="Örn: 1250"
-              className="w-full rounded-lg border border-gray-500 bg-white px-3 py-3 text-sm font-semibold text-gray-900 placeholder:text-gray-500"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-bold text-gray-900">
-              Ödeme Yöntemi
-            </label>
-            <select
-              value={form.odeme_yontemi}
-              onChange={(e) => formGuncelle("odeme_yontemi", e.target.value)}
-              className="w-full rounded-lg border border-gray-500 bg-white px-3 py-3 text-sm font-bold text-gray-900"
-            >
-              <option value="nakit">Nakit</option>
-              <option value="banka">Banka</option>
-              <option value="pos">POS</option>
-              <option value="kredi_karti">Kredi Kartı</option>
-              <option value="havale">Havale / EFT</option>
-              <option value="yemek_karti">Yemek Kartı</option>
-            </select>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* Avans verilen personel — avans */}
+          {alanGorunur(tur, "avans_personel_ad_soyad") && (
             <div>
-              <label className="mb-1 block text-sm font-bold text-gray-900">
-                Fatura No
-              </label>
-              <input
-                value={form.fatura_no}
-                onChange={(e) => formGuncelle("fatura_no", e.target.value)}
-                placeholder="Varsa fatura no"
-                className="w-full rounded-lg border border-gray-500 bg-white px-3 py-3 text-sm font-semibold"
-              />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-bold text-gray-900">
-                Belge / Dekont No
-              </label>
-              <input
-                value={form.belge_no}
-                onChange={(e) => formGuncelle("belge_no", e.target.value)}
-                placeholder="Varsa belge no"
-                className="w-full rounded-lg border border-gray-500 bg-white px-3 py-3 text-sm font-semibold"
-              />
-            </div>
-          </div>
-
-          {form.tur === "avans" && (
-            <div>
-              <label className="mb-1 block text-sm font-bold text-gray-900">
-                Avans Verilen Personel
+              <label className={labelSinifi}>
+                Avans Verilen Personel <span className="text-red-600">*</span>
               </label>
               <input
                 value={form.avans_personel_ad_soyad}
@@ -303,85 +322,159 @@ export default function MuhasebeEklePage() {
                   formGuncelle("avans_personel_ad_soyad", e.target.value)
                 }
                 placeholder="Örn: Mehmet Kaymaz"
-                className="w-full rounded-lg border border-red-500 bg-red-50 px-3 py-3 text-sm font-bold text-gray-900"
+                className="w-full rounded-lg border border-red-500 bg-red-50 px-3 py-3 text-sm font-bold text-gray-900 placeholder:text-gray-500"
               />
             </div>
           )}
 
-          <div>
-            <label className="mb-1 block text-sm font-bold text-gray-900">
-              Masrafı Yapan Personel
-            </label>
-            <input
-              value={form.masrafi_yapan_ad_soyad}
-              onChange={(e) =>
-                formGuncelle("masrafi_yapan_ad_soyad", e.target.value)
+          {/* Tutar — her zaman */}
+          {alanGorunur(tur, "tutar") && (
+            <div>
+              <label className={labelSinifi}>Tutar</label>
+              <input
+                type="number"
+                value={form.tutar}
+                onChange={(e) => formGuncelle("tutar", e.target.value)}
+                placeholder="Örn: 1250"
+                className={inputSinifi}
+              />
+            </div>
+          )}
+
+          {/* Ödeme yöntemi */}
+          {alanGorunur(tur, "odeme_yontemi") && (
+            <div>
+              <label className={labelSinifi}>Ödeme Yöntemi</label>
+              <select
+                value={form.odeme_yontemi}
+                onChange={(e) => formGuncelle("odeme_yontemi", e.target.value)}
+                className={selectSinifi}
+              >
+                <option value="nakit">Nakit</option>
+                <option value="banka">Banka</option>
+                <option value="pos">POS</option>
+                <option value="kredi_karti">Kredi Kartı</option>
+                <option value="havale">Havale / EFT</option>
+                <option value="yemek_karti">Yemek Kartı</option>
+              </select>
+            </div>
+          )}
+
+          {/* Fatura No + Belge No — gelir / gider için fatura da */}
+          {(alanGorunur(tur, "fatura_no") || alanGorunur(tur, "belge_no")) && (
+            <div
+              className={
+                alanGorunur(tur, "fatura_no")
+                  ? "grid grid-cols-1 md:grid-cols-2 gap-3"
+                  : "space-y-0"
               }
-              placeholder="Örn: Yakıtı alan / masrafı yapan kişi"
-              className="w-full rounded-lg border border-gray-500 bg-white px-3 py-3 text-sm font-semibold"
-            />
-          </div>
+            >
+              {alanGorunur(tur, "fatura_no") && (
+                <div>
+                  <label className={labelSinifi}>Fatura No</label>
+                  <input
+                    value={form.fatura_no}
+                    onChange={(e) => formGuncelle("fatura_no", e.target.value)}
+                    placeholder="Varsa fatura no"
+                    className={inputSinifi}
+                  />
+                </div>
+              )}
 
-          <div>
-            <label className="mb-1 block text-sm font-bold text-gray-900">
-              İşlemi Giren / Yapan Kişi
+              {alanGorunur(tur, "belge_no") && (
+                <div>
+                  <label className={labelSinifi}>Belge / Dekont No</label>
+                  <input
+                    value={form.belge_no}
+                    onChange={(e) => formGuncelle("belge_no", e.target.value)}
+                    placeholder="Varsa belge no"
+                    className={inputSinifi}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Gider'e özel personel alanları */}
+          {alanGorunur(tur, "masrafi_yapan_ad_soyad") && (
+            <div>
+              <label className={labelSinifi}>Masrafı Yapan Personel</label>
+              <input
+                value={form.masrafi_yapan_ad_soyad}
+                onChange={(e) =>
+                  formGuncelle("masrafi_yapan_ad_soyad", e.target.value)
+                }
+                placeholder="Örn: Yakıtı alan / masrafı yapan kişi"
+                className={inputSinifi}
+              />
+            </div>
+          )}
+
+          {alanGorunur(tur, "islem_yapan_ad_soyad") && (
+            <div>
+              <label className={labelSinifi}>İşlemi Giren / Yapan Kişi</label>
+              <input
+                value={form.islem_yapan_ad_soyad}
+                onChange={(e) =>
+                  formGuncelle("islem_yapan_ad_soyad", e.target.value)
+                }
+                placeholder="Boş kalırsa giriş yapan personel alınır"
+                className={inputSinifi}
+              />
+            </div>
+          )}
+
+          {alanGorunur(tur, "masraf_yeri") && (
+            <div>
+              <label className={labelSinifi}>
+                Masraf Yeri / Araç / Şube / Görev
+              </label>
+              <input
+                value={form.masraf_yeri}
+                onChange={(e) => formGuncelle("masraf_yeri", e.target.value)}
+                placeholder="Örn: Depo, servis aracı, müşteri işi"
+                className={inputSinifi}
+              />
+            </div>
+          )}
+
+          {/* Açıklamalar */}
+          {alanGorunur(tur, "aciklama") && (
+            <div>
+              <label className={labelSinifi}>Kısa Açıklama</label>
+              <textarea
+                value={form.aciklama}
+                onChange={(e) => formGuncelle("aciklama", e.target.value)}
+                placeholder="Kısa açıklama yazınız..."
+                rows={3}
+                className={`${inputSinifi} resize-none`}
+              />
+            </div>
+          )}
+
+          {alanGorunur(tur, "detay_aciklama") && (
+            <div>
+              <label className={labelSinifi}>Detay Açıklama</label>
+              <textarea
+                value={form.detay_aciklama}
+                onChange={(e) => formGuncelle("detay_aciklama", e.target.value)}
+                placeholder="Avans kime verildi, gideri kim yaptı, hangi iş için yapıldı?"
+                rows={4}
+                className={`${inputSinifi} resize-none`}
+              />
+            </div>
+          )}
+
+          {alanGorunur(tur, "belge_var_mi") && (
+            <label className="flex items-center gap-2 text-sm font-bold text-gray-900">
+              <input
+                type="checkbox"
+                checked={form.belge_var_mi}
+                onChange={(e) => formGuncelle("belge_var_mi", e.target.checked)}
+              />
+              Bu işleme ait fiş, fatura veya dekont var.
             </label>
-            <input
-              value={form.islem_yapan_ad_soyad}
-              onChange={(e) =>
-                formGuncelle("islem_yapan_ad_soyad", e.target.value)
-              }
-              placeholder="Boş kalırsa giriş yapan personel alınır"
-              className="w-full rounded-lg border border-gray-500 bg-white px-3 py-3 text-sm font-semibold"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-bold text-gray-900">
-              Masraf Yeri / Araç / Şube / Görev
-            </label>
-            <input
-              value={form.masraf_yeri}
-              onChange={(e) => formGuncelle("masraf_yeri", e.target.value)}
-              placeholder="Örn: Depo, servis aracı, müşteri işi"
-              className="w-full rounded-lg border border-gray-500 bg-white px-3 py-3 text-sm font-semibold"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-bold text-gray-900">
-              Kısa Açıklama
-            </label>
-            <textarea
-              value={form.aciklama}
-              onChange={(e) => formGuncelle("aciklama", e.target.value)}
-              placeholder="Kısa açıklama yazınız..."
-              rows={3}
-              className="w-full rounded-lg border border-gray-500 bg-white px-3 py-3 text-sm font-semibold text-gray-900 placeholder:text-gray-500 resize-none"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-bold text-gray-900">
-              Detay Açıklama
-            </label>
-            <textarea
-              value={form.detay_aciklama}
-              onChange={(e) => formGuncelle("detay_aciklama", e.target.value)}
-              placeholder="Avans kime verildi, gideri kim yaptı, hangi iş için yapıldı?"
-              rows={4}
-              className="w-full rounded-lg border border-gray-500 bg-white px-3 py-3 text-sm font-semibold text-gray-900 placeholder:text-gray-500 resize-none"
-            />
-          </div>
-
-          <label className="flex items-center gap-2 text-sm font-bold text-gray-900">
-            <input
-              type="checkbox"
-              checked={form.belge_var_mi}
-              onChange={(e) => formGuncelle("belge_var_mi", e.target.checked)}
-            />
-            Bu işleme ait fiş, fatura veya dekont var.
-          </label>
+          )}
 
           <button
             type="button"

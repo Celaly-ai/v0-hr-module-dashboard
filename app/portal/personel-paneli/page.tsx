@@ -107,7 +107,7 @@ export default function PersonelPaneliPage() {
       const user = session?.user
 
       if (!user) {
-        router.replace("/portal/giris")
+        router.replace("/login")
         return
       }
 
@@ -233,7 +233,7 @@ export default function PersonelPaneliPage() {
 
         <div className="grid grid-cols-2 gap-3">
           <button
-            onClick={() => router.push("/portal/giris-cikis")}
+            onClick={() => router.push("/login-cikis")}
             className="rounded-3xl border bg-white p-5 text-left shadow-sm active:scale-95"
           >
             <p className="text-3xl">📍</p>

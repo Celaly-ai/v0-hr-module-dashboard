@@ -24,7 +24,7 @@ export default function YetenekBeyaniPage() {
     const user = session?.user
 
     if (!user) {
-      router.replace("/portal/giris")
+      router.replace("/login")
       return
     }
 
@@ -35,7 +35,7 @@ export default function YetenekBeyaniPage() {
       .maybeSingle()
 
     if (!p) {
-      router.replace("/portal/giris")
+      router.replace("/login")
       return
     }
 

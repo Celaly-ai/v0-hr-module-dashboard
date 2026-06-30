@@ -272,7 +272,7 @@ export default function GirisCikisPage() {
       const user = session?.user
 
       if (!user) {
-        router.replace("/portal/giris")
+        router.replace("/login")
         return
       }
 

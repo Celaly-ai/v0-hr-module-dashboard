@@ -23,7 +23,7 @@ export default function SifreDegistirPage() {
       } = await supabase.auth.getSession()
 
       if (!session?.user) {
-        router.replace("/portal/giris")
+        router.replace("/login")
         return
       }
 
@@ -60,7 +60,7 @@ export default function SifreDegistirPage() {
     const user = sessionData.session?.user
 
     if (!user) {
-      router.replace("/portal/giris")
+      router.replace("/login")
       return
     }
 
@@ -89,7 +89,7 @@ export default function SifreDegistirPage() {
   async function cikisYap() {
     const supabase = createClient()
     await supabase.auth.signOut()
-    router.replace("/portal/giris")
+    router.replace("/login")
   }
 
   if (loading) {

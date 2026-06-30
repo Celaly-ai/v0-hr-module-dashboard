@@ -47,7 +47,7 @@ const ADMIN_ROLLERI = ["admin", "ceo"]
 
 const modulYollari: Record<string, string> = {
   ana_sayfa: "/portal",
-  mesai: "/portal/giris-cikis",
+  mesai: "/login-cikis",
   izin: "/portal/izin",
   talepler: "/portal/talepler",
   vardiya: "/portal/personel-paneli",
@@ -170,7 +170,7 @@ export default function PortalPage() {
     const user = session?.user
 
     if (!user) {
-      router.replace("/portal/giris")
+      router.replace("/login")
       return
     }
 
@@ -267,7 +267,7 @@ export default function PortalPage() {
   async function cikisYap() {
     const supabase = createClient()
     await supabase.auth.signOut()
-    router.replace("/portal/giris")
+    router.replace("/login")
   }
 
   function modulAc(modul: Modul) {

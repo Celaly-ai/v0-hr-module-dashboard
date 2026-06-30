@@ -43,7 +43,7 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl
   const isPublicRoute =
-    pathname === "/portal/giris" ||
+    pathname === "/login" ||
     pathname === "/signup" ||
     pathname.startsWith("/auth") ||
     pathname.startsWith("/_next") ||
@@ -51,13 +51,13 @@ export async function updateSession(request: NextRequest) {
 
   if (!user && !isPublicRoute) {
     const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = "/portal/giris"
+    redirectUrl.pathname = "/login"
     redirectUrl.searchParams.set("next", pathname)
     return NextResponse.redirect(redirectUrl)
   }
 
   // Already signed in — don't show the login/signup screens again.
-  if (user && (pathname === "/portal/giris" || pathname === "/signup")) {
+  if (user && (pathname === "/login" || pathname === "/signup")) {
     const redirectUrl = request.nextUrl.clone()
     redirectUrl.pathname = "/portal"
     redirectUrl.searchParams.delete("next")

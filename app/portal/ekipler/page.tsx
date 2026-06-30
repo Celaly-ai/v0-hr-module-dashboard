@@ -37,7 +37,7 @@ export default function EkiplerPage() {
     const user = session?.user
 
     if (!user) {
-      router.replace("/portal/giris")
+      router.replace("/login")
       return
     }
 
@@ -56,7 +56,7 @@ export default function EkiplerPage() {
       .maybeSingle()
 
     if (personelError || !p) {
-      router.replace("/portal/giris")
+      router.replace("/login")
       return
     }
 

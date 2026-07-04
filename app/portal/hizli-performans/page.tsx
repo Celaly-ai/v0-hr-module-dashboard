@@ -131,12 +131,22 @@ function numberValue(value: number | null | undefined) {
   return Number(value)
 }
 
-function jsonStringList(value: unknown) {
-  if (!Array.isArray(value)) return []
+function jsonStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
 
-  return value
-    .map((item) => String(item || "").trim())
-    .filter(Boolean)
+  const sonuc: string[] = []
+
+  for (const item of value) {
+    const metin = String(item || "").trim()
+
+    if (metin) {
+      sonuc.push(metin)
+    }
+  }
+
+  return sonuc
 }
 
 function sikayetDetayListesi(value: unknown): SikayetDetaySatiri[] {
@@ -335,9 +345,9 @@ export default function PerformansimPage() {
     AylikPerformans[]
   >([])
 
-  const [sikayetDetaylari, setSikayetDetaylari] = useState<SikayetDetay[]>(
-    [],
-  )
+  const [sikayetDetaylari, setSikayetDetaylari] = useState<
+    SikayetDetay[]
+  >([])
 
   const [acikAy, setAcikAy] = useState<number | null>(null)
 
@@ -385,7 +395,9 @@ export default function PerformansimPage() {
   }, [yillikPerformans])
 
   const sikayetMap = useMemo(() => {
-    return new Map(sikayetDetaylari.map((row) => [row.ay, row]))
+    return new Map(
+      sikayetDetaylari.map((row) => [row.ay, row]),
+    )
   }, [sikayetDetaylari])
 
   async function performansiGetir() {
@@ -412,11 +424,15 @@ export default function PerformansimPage() {
       const { data: personelData, error: personelError } = await supabase
         .from("personeller")
         .select("id, ad, soyad, auth_id, kullanici_id")
-        .or(`auth_id.eq.${user.id},kullanici_id.eq.${user.id}`)
+        .or(
+          `auth_id.eq.${user.id},kullanici_id.eq.${user.id}`,
+        )
         .maybeSingle()
 
       if (personelError) {
-        throw new Error(`Personel kaydı: ${personelError.message}`)
+        throw new Error(
+          `Personel kaydı: ${personelError.message}`,
+        )
       }
 
       if (!personelData) {
@@ -440,31 +456,44 @@ export default function PerformansimPage() {
       ])
 
       if (yillikReq.error) {
-        throw new Error(`Yıllık performans: ${yillikReq.error.message}`)
+        throw new Error(
+          `Yıllık performans: ${yillikReq.error.message}`,
+        )
       }
 
       if (aylikReq.error) {
-        throw new Error(`Aylık performans: ${aylikReq.error.message}`)
+        throw new Error(
+          `Aylık performans: ${aylikReq.error.message}`,
+        )
       }
 
       if (sikayetReq.error) {
-        throw new Error(`Şikayet detayı: ${sikayetReq.error.message}`)
+        throw new Error(
+          `Şikayet detayı: ${sikayetReq.error.message}`,
+        )
       }
 
-      const yillikListe = (yillikReq.data || []) as YillikPerformans[]
+      const yillikListe = (yillikReq.data ||
+        []) as YillikPerformans[]
 
-      const aylikListe = (aylikReq.data || []) as AylikPerformans[]
+      const aylikListe = (aylikReq.data ||
+        []) as AylikPerformans[]
 
-      const sikayetListe = (sikayetReq.data || []) as SikayetDetay[]
+      const sikayetListe = (sikayetReq.data ||
+        []) as SikayetDetay[]
 
       setYillikPerformans(yillikListe[0] || null)
 
       setAylikPerformanslar(
-        [...aylikListe].sort((a, b) => Number(b.ay) - Number(a.ay)),
+        [...aylikListe].sort(
+          (a, b) => Number(b.ay) - Number(a.ay),
+        ),
       )
 
       setSikayetDetaylari(
-        [...sikayetListe].sort((a, b) => Number(b.ay) - Number(a.ay)),
+        [...sikayetListe].sort(
+          (a, b) => Number(b.ay) - Number(a.ay),
+        ),
       )
     } catch (error) {
       setYillikPerformans(null)
@@ -545,7 +574,9 @@ export default function PerformansimPage() {
 
           <select
             value={yil}
-            onChange={(event) => setYil(Number(event.target.value))}
+            onChange={(event) =>
+              setYil(Number(event.target.value))
+            }
             className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-bold"
           >
             <option value={2026}>2026</option>
@@ -559,7 +590,9 @@ export default function PerformansimPage() {
               Performans bilgisi alınamadı
             </p>
 
-            <p className="mt-2 text-sm leading-6 text-red-800">{hata}</p>
+            <p className="mt-2 text-sm leading-6 text-red-800">
+              {hata}
+            </p>
           </section>
         )}
 
@@ -574,8 +607,8 @@ export default function PerformansimPage() {
             </h2>
 
             <p className="mt-2 text-sm leading-6 text-slate-700">
-              Performans hesabın gerçek personel kaydınla eşleştiğinde burada
-              yalnızca kendi sonucunu göreceksin.
+              Performans hesabın gerçek personel kaydınla
+              eşleştiğinde burada yalnızca kendi sonucunu göreceksin.
             </p>
           </section>
         )}
@@ -618,7 +651,8 @@ export default function PerformansimPage() {
                   </p>
 
                   <p className="mt-1 text-xs font-semibold text-slate-600">
-                    {yillikPerformans.toplam_teknisyen_sayisi} teknisyen içinde
+                    {yillikPerformans.toplam_teknisyen_sayisi} teknisyen
+                    içinde
                   </p>
                 </div>
 
@@ -661,7 +695,9 @@ export default function PerformansimPage() {
                 <div className="mt-4 rounded-2xl border border-slate-200 bg-white/90 p-3 text-center">
                   <p
                     className={`text-lg font-black ${
-                      degisim.fark >= 0 ? "text-emerald-700" : "text-red-700"
+                      degisim.fark >= 0
+                        ? "text-emerald-700"
+                        : "text-red-700"
                     }`}
                   >
                     {degisim.fark >= 0 ? "▲" : "▼"}{" "}
@@ -719,34 +755,36 @@ export default function PerformansimPage() {
               </p>
 
               <div className="mt-4 space-y-3">
-                {metrikleriOlustur(yillikPerformans).map((metrik) => (
-                  <div
-                    key={metrik.label}
-                    className={`rounded-2xl border p-4 ${metrikKartClass(
-                      metrik.puan,
-                    )}`}
-                  >
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="min-w-0">
-                        <p
-                          className={`font-black ${metrikBaslikClass(
-                            metrik.puan,
-                          )}`}
-                        >
-                          {metrik.label}
-                        </p>
+                {metrikleriOlustur(yillikPerformans).map(
+                  (metrik) => (
+                    <div
+                      key={metrik.label}
+                      className={`rounded-2xl border p-4 ${metrikKartClass(
+                        metrik.puan,
+                      )}`}
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="min-w-0">
+                          <p
+                            className={`font-black ${metrikBaslikClass(
+                              metrik.puan,
+                            )}`}
+                          >
+                            {metrik.label}
+                          </p>
 
-                        <p className="mt-1 text-xs font-semibold leading-5 text-slate-700">
-                          {metrikAciklama(metrik.puan)}
+                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-700">
+                            {metrikAciklama(metrik.puan)}
+                          </p>
+                        </div>
+
+                        <p className="shrink-0 text-2xl font-black text-slate-950">
+                          {formatNumber(metrik.puan)}
                         </p>
                       </div>
-
-                      <p className="shrink-0 text-2xl font-black text-slate-950">
-                        {formatNumber(metrik.puan)}
-                      </p>
                     </div>
-                  </div>
-                ))}
+                  ),
+                )}
               </div>
             </section>
 
@@ -757,8 +795,8 @@ export default function PerformansimPage() {
                 </h2>
 
                 <p className="mt-1 text-sm font-semibold text-slate-600">
-                  Yalnızca Randevuya Uyum kaydın bulunan çalıştığın aylar
-                  gösterilir.
+                  Yalnızca Randevuya Uyum kaydın bulunan çalıştığın
+                  aylar gösterilir.
                 </p>
               </div>
 
@@ -780,28 +818,37 @@ export default function PerformansimPage() {
                     )
                       .sort(
                         (a, b) =>
-                          Number(b.adet || 0) - Number(a.adet || 0),
+                          Number(b.adet || 0) -
+                          Number(a.adet || 0),
                       )
                       .slice(0, 5)
 
-                    const zayifAlanlar = jsonStringList(row.zayif_alanlar)
+                    const zayifAlanlar = jsonStringList(
+                      row.zayif_alanlar,
+                    )
 
-                    const gucluAlanlar = jsonStringList(row.guclu_alanlar)
+                    const gucluAlanlar = jsonStringList(
+                      row.guclu_alanlar,
+                    )
 
                     return (
                       <article
                         key={`${row.yil}-${row.ay}`}
                         className={`overflow-hidden rounded-3xl border bg-white shadow-sm ${
-                          row.harf_notu === "D" || row.harf_notu === "E"
+                          row.harf_notu === "D" ||
+                          row.harf_notu === "E"
                             ? "border-red-400"
                             : "border-slate-200"
                         }`}
                       >
                         <button
                           type="button"
-                          onClick={() => setAcikAy(acik ? null : row.ay)}
+                          onClick={() =>
+                            setAcikAy(acik ? null : row.ay)
+                          }
                           className={`flex w-full items-center justify-between p-4 text-left ${
-                            row.harf_notu === "D" || row.harf_notu === "E"
+                            row.harf_notu === "D" ||
+                            row.harf_notu === "E"
                               ? "bg-red-50"
                               : "bg-white"
                           }`}
@@ -817,7 +864,8 @@ export default function PerformansimPage() {
 
                             <p
                               className={`mt-1 text-sm font-black ${
-                                row.harf_notu === "D" || row.harf_notu === "E"
+                                row.harf_notu === "D" ||
+                                row.harf_notu === "E"
                                   ? "text-red-800"
                                   : "text-slate-700"
                               }`}
@@ -844,7 +892,10 @@ export default function PerformansimPage() {
                         {acik && (
                           <div className="border-t border-slate-200 p-4">
                             <div className="space-y-2">
-                              <AylikMetrik label="NPS" value={row.nps_puan} />
+                              <AylikMetrik
+                                label="NPS"
+                                value={row.nps_puan}
+                              />
 
                               <AylikMetrik
                                 label="Randevuya Uyum"
@@ -915,7 +966,9 @@ export default function PerformansimPage() {
                                 <div className="mt-3 space-y-3">
                                   <BilgiSatiri
                                     label="Bana ait şikayet"
-                                    value={formatNumber(sikayet.sikayet_deger)}
+                                    value={formatNumber(
+                                      sikayet.sikayet_deger,
+                                    )}
                                   />
 
                                   <BilgiSatiri
@@ -934,7 +987,9 @@ export default function PerformansimPage() {
 
                                   <BilgiSatiri
                                     label="Şikayet puanım"
-                                    value={formatNumber(sikayet.sikayet_puan)}
+                                    value={formatNumber(
+                                      sikayet.sikayet_puan,
+                                    )}
                                   />
                                 </div>
 
@@ -945,26 +1000,31 @@ export default function PerformansimPage() {
                                     </p>
 
                                     <p className="mt-1 text-xs font-semibold leading-5 text-amber-800">
-                                      Şikayet nedenleri puanını değiştirmez.
-                                      Gelişim alanlarını görmen için gösterilir.
+                                      Şikayet nedenleri puanını
+                                      değiştirmez. Gelişim alanlarını
+                                      görmen için gösterilir.
                                     </p>
 
                                     <div className="mt-3 space-y-2">
-                                      {detaylar.map((detay, index) => (
-                                        <div
-                                          key={`${detay.sikayet_nedeni}-${index}`}
-                                          className="flex items-start justify-between gap-3 rounded-xl border border-amber-100 bg-white p-3"
-                                        >
-                                          <p className="text-sm font-semibold leading-5 text-slate-800">
-                                            {detay.sikayet_nedeni ||
-                                              "Şikayet detayı"}
-                                          </p>
+                                      {detaylar.map(
+                                        (detay, index) => (
+                                          <div
+                                            key={`${detay.sikayet_nedeni}-${index}`}
+                                            className="flex items-start justify-between gap-3 rounded-xl border border-amber-100 bg-white p-3"
+                                          >
+                                            <p className="text-sm font-semibold leading-5 text-slate-800">
+                                              {detay.sikayet_nedeni ||
+                                                "Şikayet detayı"}
+                                            </p>
 
-                                          <span className="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-900">
-                                            {formatNumber(detay.adet)}
-                                          </span>
-                                        </div>
-                                      ))}
+                                            <span className="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-900">
+                                              {formatNumber(
+                                                detay.adet,
+                                              )}
+                                            </span>
+                                          </div>
+                                        ),
+                                      )}
                                     </div>
                                   </div>
                                 )}
@@ -1006,7 +1066,9 @@ function AylikMetrik({
 }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-3">
-      <span className="text-sm font-bold text-slate-700">{label}</span>
+      <span className="text-sm font-bold text-slate-700">
+        {label}
+      </span>
 
       <span className="text-base font-black text-slate-950">
         {formatNumber(value)}
@@ -1024,7 +1086,9 @@ function BilgiSatiri({
 }) {
   return (
     <div className="flex items-center justify-between gap-4">
-      <span className="text-sm font-bold text-amber-900">{label}</span>
+      <span className="text-sm font-bold text-amber-900">
+        {label}
+      </span>
 
       <span className="shrink-0 text-sm font-black text-amber-950">
         {value}

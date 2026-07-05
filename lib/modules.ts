@@ -1,14 +1,24 @@
 /**
- * Canonical list of application modules. Slugs match:
- *  - sidebar `title` strings in components/hr-sidebar.tsx
- *  - `activeSection` keys in app/page.tsx
- *  - `role_permissions.modules[]` entries in Supabase
+ * FeyRoute canonical application module list.
  *
- * If you add a new module, add it here AND update the seed in
- * scripts/002_seed_role_permissions.sql (or via the admin UI).
+ * Modül adları:
+ * - role_permissions.modules[] kayıtlarında kullanılabilir.
+ * - Uygulama içi fallback rol yetkilerinde kullanılır.
+ *
+ * ÖNEMLİ:
+ * Performansım kişisel performans merkezidir.
+ * Menü erişimi bütün personel rollerine açık olabilir.
+ * Gerçek performans verisi auth.uid() bağlantılı güvenli RPC katmanından
+ * yalnız giriş yapan personel için okunur.
+ *
+ * Teknik test route'ları ve alt modül sayfaları burada ana portal
+ * modülü olarak tanımlanmaz.
  */
+
 export const ALL_MODULES = [
   "Panel",
+
+  // İnsan Kaynakları
   "Calisanlar",
   "Izin Talepleri",
   "Varliklar",
@@ -19,17 +29,51 @@ export const ALL_MODULES = [
   "Puantaj",
   "Vardiya Plani",
   "Giris Cikis",
-  "Performans Degerlendirme",
   "Fazla Mesai",
   "Departmanlar",
+
+  // Performans
+  "Performans Degerlendirme",
+  "Hizli Performans",
+  "Performans Eslestirme",
+  "Performansim",
+
+  // Operasyon
+  "AI Canli Operasyon Merkezi",
+  "AI Gorev Merkezi",
+  "Operasyon Havuzu",
+  "Operasyon Zimmet",
+  "Adres Konum Teyit",
+  "Adres Konum Rapor",
+  "Yonetici Bildirimleri",
+
+  // Ürün
+  "Urun Merkezi",
+  "Urun Operasyon Dashboard",
+
+  // Bayi
+  "Bayi Operasyon Merkezi",
+
+  // Mali
+  "Muhasebe",
+
+  // Kurumsal yönetim
+  "KYM",
+  "Sirket Kunyesi",
+
+  // Yönetim ve yetki
+  "Rol Atama",
+  "Yetki Yonetimi",
+  "Rol Gecmisi",
+
+  // Genel
   "Raporlar",
   "Bildirimler",
   "Ayarlar",
-   "Araclar",
-    "Belge Arsivi",
+  "Araclar",
+  "Belge Arsivi",
   "Teknik Destek",
 ] as const
-
 
 export type ModuleSlug = (typeof ALL_MODULES)[number]
 
@@ -44,21 +88,29 @@ export const APP_ROLES = [
 export type AppRole = (typeof APP_ROLES)[number]
 
 export const ROLE_LABELS: Record<AppRole, string> = {
-  admin: "Yonetici",
-  servis_yoneticisi: "Servis Yoneticisi",
-  ik_yoneticisi: "IK Yoneticisi",
-  urun_sorumlusu: "Urun Sorumlusu",
-  calisan: "Calisan",
+  admin: "Yönetici",
+  servis_yoneticisi: "Servis Yöneticisi",
+  ik_yoneticisi: "İK Yöneticisi",
+  urun_sorumlusu: "Ürün Sorumlusu",
+  calisan: "Çalışan",
 }
 
 /**
- * Fallback permissions used when the `role_permissions` table cannot be
- * reached (first load, offline, etc.). The real source of truth is the DB.
+ * Fallback permissions.
+ *
+ * Veritabanındaki role_permissions tablosuna ulaşılamadığında
+ * kullanılacak varsayılan modül yetkileridir.
+ *
+ * Bu liste yalnız fallback davranışıdır.
+ * Portal navigasyonundaki kritik yönetim modülleri ayrıca rol bazlı
+ * görünürlük kontrolüne sahiptir.
  */
 export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, ModuleSlug[]> = {
   admin: [...ALL_MODULES],
+
   servis_yoneticisi: [
     "Panel",
+
     "Calisanlar",
     "Izin Talepleri",
     "Varliklar",
@@ -69,17 +121,41 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, ModuleSlug[]> = {
     "Puantaj",
     "Vardiya Plani",
     "Giris Cikis",
-    "Performans Degerlendirme",
     "Fazla Mesai",
     "Departmanlar",
+
+    "Performans Degerlendirme",
+    "Hizli Performans",
+    "Performans Eslestirme",
+    "Performansim",
+
+    "AI Canli Operasyon Merkezi",
+    "AI Gorev Merkezi",
+    "Operasyon Havuzu",
+    "Operasyon Zimmet",
+    "Adres Konum Teyit",
+    "Adres Konum Rapor",
+    "Yonetici Bildirimleri",
+
+    "Urun Merkezi",
+    "Urun Operasyon Dashboard",
+
+    "Bayi Operasyon Merkezi",
+
+    "Muhasebe",
+
+    "KYM",
+
     "Raporlar",
     "Bildirimler",
-        "Araclar",
+    "Araclar",
     "Belge Arsivi",
     "Teknik Destek",
   ],
+
   ik_yoneticisi: [
     "Panel",
+
     "Calisanlar",
     "Izin Talepleri",
     "Varliklar",
@@ -88,29 +164,57 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, ModuleSlug[]> = {
     "Puantaj",
     "Vardiya Plani",
     "Giris Cikis",
-    "Performans Degerlendirme",
     "Fazla Mesai",
     "Departmanlar",
+
+    "Performans Degerlendirme",
+    "Hizli Performans",
+    "Performans Eslestirme",
+    "Performansim",
+
+    "Adres Konum Teyit",
+    "Adres Konum Rapor",
+    "Yonetici Bildirimleri",
+
+    "KYM",
+
     "Raporlar",
     "Bildirimler",
     "Ayarlar",
   ],
-    urun_sorumlusu: [
+
+  urun_sorumlusu: [
     "Panel",
 
     "Calisanlar",
     "Varliklar",
     "Satislar",
     "Belge Takibi",
+
+    "Performansim",
+
+    "Operasyon Havuzu",
+    "Operasyon Zimmet",
+
+    "Urun Merkezi",
+    "Urun Operasyon Dashboard",
+
     "Raporlar",
     "Bildirimler",
   ],
+
   calisan: [
     "Panel",
+
     "Izin Talepleri",
     "Puantaj",
     "Vardiya Plani",
     "Giris Cikis",
+
+    "Performansim",
+
+    "Adres Konum Teyit",
+
     "Bildirimler",
   ],
 }

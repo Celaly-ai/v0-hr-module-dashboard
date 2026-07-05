@@ -326,27 +326,6 @@ const navigationItems: NavGroup[] = [
           "/portal/urun-operasyon-dashboard",
         allowedRoles: URUN_ROLLERI,
       },
-
-      {
-        title: "Ürün Kabul",
-        icon: Package,
-        href: "/portal/urun-kabul",
-        allowedRoles: URUN_ROLLERI,
-      },
-
-      {
-        title: "Ürün Devir",
-        icon: Truck,
-        href: "/portal/urun-devir",
-        allowedRoles: URUN_ROLLERI,
-      },
-
-      {
-        title: "Ürün Fişleri",
-        icon: FileText,
-        href: "/portal/urun-fisleri",
-        allowedRoles: URUN_ROLLERI,
-      },
     ],
   },
 

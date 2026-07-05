@@ -109,9 +109,6 @@ const modulYollari: Record<string, string> = {
   sirket_kunyesi: "/portal/sirket-kunyesi",
 
   urun_merkezi: "/portal/urun-merkezi",
-  urun_kabul: "/portal/urun-kabul",
-  urun_devir: "/portal/urun-devir",
-  urun_fisleri: "/portal/urun-fisleri",
   cihaz_teslim: "/portal/cihaz-teslim",
   cihaz_iade: "/portal/cihaz-iade",
 
@@ -157,9 +154,6 @@ const modulIkonlari: Record<string, any> = {
   sirket_kunyesi: Home,
 
   urun_merkezi: Boxes,
-  urun_kabul: Package,
-  urun_devir: Users,
-  urun_fisleri: FileSpreadsheet,
   cihaz_teslim: Package,
   cihaz_iade: FileSpreadsheet,
 

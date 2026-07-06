@@ -5,8 +5,9 @@ import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
 function ekipAktifMi(ekip: { aktif?: boolean | null; durum?: string | null }) {
-  if (ekip.aktif === true || ekip.durum === "aktif") return true
-  if (ekip.aktif === false || ekip.durum === "pasif") return false
+  const durum = String(ekip.durum ?? "").trim().toLowerCase()
+  if (ekip.aktif === false || durum === "pasif") return false
+  if (ekip.aktif === true || durum === "aktif") return true
   return false
 }
 
@@ -44,6 +45,10 @@ function gorevTipiEtiketi(value?: string | null) {
   return GOREV_TIPI_SECENEKLERI.find((secenek) => secenek.value === value)?.label || value || "-"
 }
 
+function gorevTipiGecerliMi(value?: string | null) {
+  return GOREV_TIPI_SECENEKLERI.some((secenek) => secenek.value === value)
+}
+
 export default function YonetimEkiplerPage() {
   const router = useRouter()
 
@@ -56,6 +61,7 @@ export default function YonetimEkiplerPage() {
   const [loading, setLoading] = useState(true)
   const [kaydediliyor, setKaydediliyor] = useState(false)
   const [durumGuncelleniyorId, setDurumGuncelleniyorId] = useState("")
+  const [uyeEkleniyor, setUyeEkleniyor] = useState(false)
 
   const [form, setForm] = useState({
     ekip_adi: "",
@@ -177,10 +183,12 @@ export default function YonetimEkiplerPage() {
       return
     }
 
-    if (!form.gorev_tipi) {
+    if (!gorevTipiGecerliMi(form.gorev_tipi)) {
       setHata("Görev tipi seçmelisiniz.")
       return
     }
+
+    const gorevTipi = form.gorev_tipi
 
     setKaydediliyor(true)
     const supabase = createClient()
@@ -195,7 +203,10 @@ export default function YonetimEkiplerPage() {
       return
     }
 
-    if (aktifEkipAdiVarMi(ekipAdi, aktifEkipKayitlari || [])) {
+    if (
+      aktifEkipAdiVarMi(ekipAdi, aktifEkipKayitlari || []) ||
+      aktifEkipAdiVarMi(ekipAdi, ekipler)
+    ) {
       setHata("Bu isimde aktif bir ekip zaten var.")
       setKaydediliyor(false)
       return
@@ -234,7 +245,7 @@ export default function YonetimEkiplerPage() {
         arac_varlik_id: form.arac_varlik_id || null,
         bolge: form.bolge.trim() || null,
         gorev: form.gorev.trim() || null,
-        gorev_tipi: form.gorev_tipi,
+        gorev_tipi: gorevTipi,
         aciklama: form.aciklama.trim() || null,
         durum: "aktif",
         aktif: true,
@@ -248,41 +259,32 @@ export default function YonetimEkiplerPage() {
       return
     }
 
-    const liderUyeKaydi = uyeler.find(
-      (uye) => uye.ekip_id === yeniEkip.id && uye.personel_id === form.lider_personel_id,
-    )
-    const sorumluUyeKaydi = uyeler.find(
-      (uye) => uye.ekip_id === yeniEkip.id && uye.personel_id === form.sorumlu_personel_id,
-    )
+    const { error: liderUyeError } = await supabase.from("ekip_uyeleri").insert({
+      ekip_id: yeniEkip.id,
+      personel_id: form.lider_personel_id,
+      rol: "lider",
+      durum: "aktif",
+      aktif: true,
+    })
 
-    if (liderUyeKaydi) {
-      await supabase
-        .from("ekip_uyeleri")
-        .update({ rol: "lider", durum: "aktif", aktif: true })
-        .eq("id", liderUyeKaydi.id)
-    } else {
-      await supabase.from("ekip_uyeleri").insert({
-        ekip_id: yeniEkip.id,
-        personel_id: form.lider_personel_id,
-        rol: "lider",
-        durum: "aktif",
-        aktif: true,
-      })
+    if (liderUyeError) {
+      setHata("Ekip lideri eklenemedi: " + liderUyeError.message)
+      setKaydediliyor(false)
+      return
     }
 
-    if (sorumluUyeKaydi) {
-      await supabase
-        .from("ekip_uyeleri")
-        .update({ rol: "sorumlu", durum: "aktif", aktif: true })
-        .eq("id", sorumluUyeKaydi.id)
-    } else {
-      await supabase.from("ekip_uyeleri").insert({
-        ekip_id: yeniEkip.id,
-        personel_id: form.sorumlu_personel_id,
-        rol: "sorumlu",
-        durum: "aktif",
-        aktif: true,
-      })
+    const { error: sorumluUyeError } = await supabase.from("ekip_uyeleri").insert({
+      ekip_id: yeniEkip.id,
+      personel_id: form.sorumlu_personel_id,
+      rol: "sorumlu",
+      durum: "aktif",
+      aktif: true,
+    })
+
+    if (sorumluUyeError) {
+      setHata("Ekip sorumlusu eklenemedi: " + sorumluUyeError.message)
+      setKaydediliyor(false)
+      return
     }
 
     setForm({
@@ -372,16 +374,27 @@ export default function YonetimEkiplerPage() {
       return
     }
 
-    const mevcutUye = uyeler.find(
-      (uye) => uye.ekip_id === seciliEkipId && uye.personel_id === seciliPersonelId,
-    )
+    setUyeEkleniyor(true)
+    const supabase = createClient()
 
-    if (mevcutUye && ekipUyesiAktifMi(mevcutUye)) {
-      setHata("Seçilen personel zaten bu ekibin aktif üyesi.")
+    const { data: mevcutUye, error: uyeKontrolError } = await supabase
+      .from("ekip_uyeleri")
+      .select("id, ekip_id, personel_id, rol, durum, aktif")
+      .eq("ekip_id", seciliEkipId)
+      .eq("personel_id", seciliPersonelId)
+      .maybeSingle()
+
+    if (uyeKontrolError) {
+      setHata("Üyelik kontrolü yapılamadı: " + uyeKontrolError.message)
+      setUyeEkleniyor(false)
       return
     }
 
-    const supabase = createClient()
+    if (mevcutUye && ekipUyesiAktifMi(mevcutUye)) {
+      setHata("Seçilen personel zaten bu ekibin aktif üyesi.")
+      setUyeEkleniyor(false)
+      return
+    }
 
     let error = null
 
@@ -405,6 +418,8 @@ export default function YonetimEkiplerPage() {
       })
       error = sonuc.error
     }
+
+    setUyeEkleniyor(false)
 
     if (error) {
       setHata("Üye eklenemedi: " + error.message)
@@ -597,10 +612,12 @@ export default function YonetimEkiplerPage() {
             </select>
 
             <button
-              onClick={uyeEkle}
-              className="md:col-span-2 rounded-lg bg-green-700 px-4 py-2 text-sm font-black text-white"
+              type="button"
+              onClick={() => void uyeEkle()}
+              disabled={uyeEkleniyor}
+              className="md:col-span-2 rounded-lg bg-green-700 px-4 py-2 text-sm font-black text-white disabled:opacity-50"
             >
-              Ekle
+              {uyeEkleniyor ? "Ekleniyor..." : "Ekle"}
             </button>
           </div>
         </div>

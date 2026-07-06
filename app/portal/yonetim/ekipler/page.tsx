@@ -81,9 +81,34 @@ function calismaTipiGecerliMi(value: string | null | undefined, secenekler: { ko
   return secenekler.some((secenek) => secenek.kod === value)
 }
 
+const ONCELIK_SEVIYELERI = [
+  { deger: 10, etiket: "🔴 Kritik" },
+  { deger: 30, etiket: "🟠 Yüksek" },
+  { deger: 50, etiket: "🟡 Normal" },
+  { deger: 70, etiket: "🔵 Düşük" },
+  { deger: 90, etiket: "⚪ Yedek" },
+] as const
+
+const VARSAYILAN_ONCELIK = 50
+
 function oncelikDegeri(value: string | number | null | undefined) {
   const parsed = Number(String(value ?? "").trim())
-  return Number.isFinite(parsed) ? parsed : 50
+  const gecerliSeviye = ONCELIK_SEVIYELERI.find((seviye) => seviye.deger === parsed)
+  if (gecerliSeviye) return gecerliSeviye.deger
+  if (!Number.isFinite(parsed)) return VARSAYILAN_ONCELIK
+
+  return ONCELIK_SEVIYELERI.reduce((enYakin, seviye) =>
+    Math.abs(seviye.deger - parsed) < Math.abs(enYakin.deger - parsed) ? seviye : enYakin,
+  ).deger
+}
+
+function oncelikSelectDegeri(value: string | number | null | undefined) {
+  return String(oncelikDegeri(value))
+}
+
+function oncelikEtiketi(value: string | number | null | undefined) {
+  const hedef = oncelikDegeri(value)
+  return ONCELIK_SEVIYELERI.find((seviye) => seviye.deger === hedef)?.etiket || "🟡 Normal"
 }
 
 function ekipAdiNormalize(value?: string | null) {
@@ -501,7 +526,7 @@ export default function YonetimEkiplerPage() {
     setDuzenlemeForm({
       gorev_tipi: ekip.gorev_tipi || "",
       calisma_tipi: ekip.calisma_tipi || "normal",
-      oncelik: ekip.oncelik != null ? String(ekip.oncelik) : "50",
+      oncelik: oncelikSelectDegeri(ekip.oncelik),
       bolge: ekip.bolge || "",
       gorev: ekip.gorev || "",
       aciklama: ekip.aciklama || "",
@@ -779,13 +804,18 @@ export default function YonetimEkiplerPage() {
               ))}
             </select>
 
-            <input
-              type="number"
+            <select
               value={form.oncelik}
               onChange={(e) => setForm({ ...form, oncelik: e.target.value })}
-              placeholder="Öncelik"
-              className="md:col-span-3 rounded-lg border border-gray-500 px-3 py-2 font-semibold"
-            />
+              aria-label="Öncelik Seviyesi"
+              className="md:col-span-3 rounded-lg border border-gray-500 px-3 py-2 font-bold"
+            >
+              {ONCELIK_SEVIYELERI.map((seviye) => (
+                <option key={seviye.deger} value={String(seviye.deger)}>
+                  {seviye.etiket}
+                </option>
+              ))}
+            </select>
 
             <input
               value={form.gorev}
@@ -878,7 +908,7 @@ export default function YonetimEkiplerPage() {
                     <p className="text-sm font-semibold text-gray-700">
                       Görev tipi: {gorevTipiEtiketi(e.gorev_tipi, gorevTipiKayitlari)} · Çalışma tipi:{" "}
                       {calismaTipiEtiketi(e.calisma_tipi, calismaTipiKayitlari)} · Öncelik:{" "}
-                      {e.oncelik ?? 50} · Görev: {e.gorev || "-"} · Bölge: {e.bolge || "-"}
+                      {oncelikEtiketi(e.oncelik)} · Görev: {e.gorev || "-"} · Bölge: {e.bolge || "-"}
                     </p>
                     {e.aciklama && (
                       <p className="text-sm font-semibold text-gray-700 mt-1">
@@ -978,18 +1008,22 @@ export default function YonetimEkiplerPage() {
 
                       <div>
                         <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor={`duzenle_oncelik_${e.id}`}>
-                          Öncelik
+                          Öncelik Seviyesi
                         </label>
-                        <input
+                        <select
                           id={`duzenle_oncelik_${e.id}`}
-                          type="number"
                           value={duzenlemeForm.oncelik}
                           onChange={(ev) =>
                             setDuzenlemeForm({ ...duzenlemeForm, oncelik: ev.target.value })
                           }
-                          placeholder="Öncelik"
-                          className="w-full rounded-lg border border-gray-500 px-3 py-2 font-semibold"
-                        />
+                          className="w-full rounded-lg border border-gray-500 px-3 py-2 font-bold"
+                        >
+                          {ONCELIK_SEVIYELERI.map((seviye) => (
+                            <option key={seviye.deger} value={String(seviye.deger)}>
+                              {seviye.etiket}
+                            </option>
+                          ))}
+                        </select>
                       </div>
 
                       <div>

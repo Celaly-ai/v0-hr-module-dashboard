@@ -15,10 +15,27 @@ function personelAktifMi(personel: { durum?: string | null }) {
   return String(personel.durum ?? "").trim().toLowerCase() === "aktif"
 }
 
-const GOREV_TIPI_SECENEKLERI = [
-  { value: "ariza", label: "Arıza" },
-  { value: "nakliye_montaj", label: "Nakliye Montaj" },
-] as const
+type GorevTipiKayit = {
+  kod: string
+  ad: string
+  sira: number
+}
+
+const GOREV_TIPI_FALLBACK: GorevTipiKayit[] = [
+  { kod: "ariza", ad: "Arıza", sira: 10 },
+  { kod: "montaj", ad: "Montaj", sira: 20 },
+  { kod: "nakliye", ad: "Nakliye", sira: 30 },
+  { kod: "nakliye_montaj", ad: "Nakliye + Montaj", sira: 40 },
+  { kod: "servis", ad: "Genel Servis", sira: 50 },
+]
+
+function gorevTipiEtiketi(value: string | null | undefined, kayitlar: GorevTipiKayit[]) {
+  return kayitlar.find((kayit) => kayit.kod === value)?.ad || value || "-"
+}
+
+function gorevTipiGecerliMi(value: string | null | undefined, secenekler: { kod: string }[]) {
+  return secenekler.some((secenek) => secenek.kod === value)
+}
 
 function ekipAdiNormalize(value?: string | null) {
   return String(value ?? "").trim().toLowerCase()
@@ -39,14 +56,6 @@ function ekipUyesiAktifMi(uye: { durum?: string | null; aktif?: boolean | null }
   if (uye.aktif === false) return false
   if (uye.aktif === true) return true
   return String(uye.durum ?? "").trim().toLowerCase() === "aktif"
-}
-
-function gorevTipiEtiketi(value?: string | null) {
-  return GOREV_TIPI_SECENEKLERI.find((secenek) => secenek.value === value)?.label || value || "-"
-}
-
-function gorevTipiGecerliMi(value?: string | null) {
-  return GOREV_TIPI_SECENEKLERI.some((secenek) => secenek.value === value)
 }
 
 export default function YonetimEkiplerPage() {
@@ -85,6 +94,7 @@ export default function YonetimEkiplerPage() {
   const [seciliEkipId, setSeciliEkipId] = useState("")
   const [seciliPersonelId, setSeciliPersonelId] = useState("")
   const [durumFiltre, setDurumFiltre] = useState("")
+  const [gorevTipiKayitlari, setGorevTipiKayitlari] = useState<GorevTipiKayit[]>(GOREV_TIPI_FALLBACK)
 
   useEffect(() => {
     yukle()
@@ -124,12 +134,35 @@ export default function YonetimEkiplerPage() {
       .select("id, ekip_id, personel_id, rol, durum, aktif, created_at")
       .order("created_at", { ascending: true })
 
+    const { data: gorevTipiData, error: gorevTipiError } = await supabase
+      .from("ekip_gorev_tipleri")
+      .select("kod, ad, sira")
+      .eq("aktif", true)
+      .order("sira", { ascending: true })
+
+    if (gorevTipiError || !gorevTipiData?.length) {
+      setGorevTipiKayitlari(GOREV_TIPI_FALLBACK)
+    } else {
+      setGorevTipiKayitlari(
+        gorevTipiData.map((kayit) => ({
+          kod: kayit.kod,
+          ad: kayit.ad,
+          sira: kayit.sira ?? 100,
+        })),
+      )
+    }
+
     setPersoneller(aktifPersonelListesi)
     setAraclar(aracData || [])
     setEkipler(ekipData || [])
     setUyeler(uyeData || [])
     setLoading(false)
   }
+
+  const aktifGorevTipiSecenekleri = useMemo(
+    () => [...gorevTipiKayitlari].sort((a, b) => a.sira - b.sira),
+    [gorevTipiKayitlari],
+  )
 
   const secilebilirPersoneller = useMemo(
     () => personeller.filter(personelAktifMi),
@@ -191,7 +224,7 @@ export default function YonetimEkiplerPage() {
       return
     }
 
-    if (!gorevTipiGecerliMi(form.gorev_tipi)) {
+    if (!gorevTipiGecerliMi(form.gorev_tipi, aktifGorevTipiSecenekleri)) {
       setHata("Görev tipi seçmelisiniz.")
       return
     }
@@ -395,7 +428,7 @@ export default function YonetimEkiplerPage() {
     setMesaj("")
     setHata("")
 
-    if (!gorevTipiGecerliMi(duzenlemeForm.gorev_tipi)) {
+    if (!gorevTipiGecerliMi(duzenlemeForm.gorev_tipi, aktifGorevTipiSecenekleri)) {
       setHata("Görev tipi seçmelisiniz.")
       return
     }
@@ -621,9 +654,9 @@ export default function YonetimEkiplerPage() {
               className="md:col-span-3 rounded-lg border border-gray-500 px-3 py-2 font-bold"
             >
               <option value="">Görev tipi seç *</option>
-              {GOREV_TIPI_SECENEKLERI.map((secenek) => (
-                <option key={secenek.value} value={secenek.value}>
-                  {secenek.label}
+              {aktifGorevTipiSecenekleri.map((secenek) => (
+                <option key={secenek.kod} value={secenek.kod}>
+                  {secenek.ad}
                 </option>
               ))}
             </select>
@@ -714,7 +747,63 @@ export default function YonetimEkiplerPage() {
               <div key={e.id} className="rounded-2xl border border-gray-200 bg-white p-4">
                 <p className="text-lg font-black">{e.ekip_adi}</p>
 
-                {duzenlemeModu ? (
+                {!duzenlemeModu && (
+                  <>
+                    <p className="text-sm font-semibold text-gray-700">
+                      Görev tipi: {gorevTipiEtiketi(e.gorev_tipi, gorevTipiKayitlari)} · Görev: {e.gorev || "-"} · Bölge:{" "}
+                      {e.bolge || "-"}
+                    </p>
+                    {e.aciklama && (
+                      <p className="text-sm font-semibold text-gray-700 mt-1">
+                        Açıklama: {e.aciklama}
+                      </p>
+                    )}
+                    {liderSorumluParcalari.length > 0 && (
+                      <p className="text-xs font-bold text-gray-600 mt-1">
+                        {liderSorumluParcalari.join(" · ")}
+                      </p>
+                    )}
+                    <p className="text-xs font-bold text-gray-600">
+                      Araç: {aracAdi(e.arac_varlik_id)}
+                    </p>
+                  </>
+                )}
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => duzenlemeBaslat(e)}
+                    disabled={
+                      duzenlemeKaydediliyor ||
+                      duzenlemeModu ||
+                      (duzenlenenEkipId !== "" && duzenlenenEkipId !== e.id)
+                    }
+                    className="rounded bg-blue-700 px-3 py-2 text-xs font-black text-white disabled:opacity-50"
+                  >
+                    Düzenle
+                  </button>
+                  {ekipAktifMi(e) ? (
+                    <button
+                      type="button"
+                      onClick={() => void ekipPasifYap(e.id)}
+                      disabled={durumGuncelleniyorId === e.id || duzenlemeModu}
+                      className="rounded bg-red-700 px-3 py-2 text-xs font-black text-white disabled:opacity-50"
+                    >
+                      {durumGuncelleniyorId === e.id ? "Kaydediliyor..." : "Pasif Yap"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void ekipAktifYap(e.id)}
+                      disabled={durumGuncelleniyorId === e.id || duzenlemeModu}
+                      className="rounded bg-green-700 px-3 py-2 text-xs font-black text-white disabled:opacity-50"
+                    >
+                      {durumGuncelleniyorId === e.id ? "Kaydediliyor..." : "Aktif Yap"}
+                    </button>
+                  )}
+                </div>
+
+                {duzenlemeModu && (
                   <div className="mt-3 space-y-3 rounded-xl border border-blue-200 bg-blue-50 p-3">
                     <p className="text-sm font-black text-blue-900">Ekip Düzenle</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -731,9 +820,9 @@ export default function YonetimEkiplerPage() {
                           className="w-full rounded-lg border border-gray-500 px-3 py-2 font-bold"
                         >
                           <option value="">Görev tipi seç *</option>
-                          {GOREV_TIPI_SECENEKLERI.map((secenek) => (
-                            <option key={secenek.value} value={secenek.value}>
-                              {secenek.label}
+                          {aktifGorevTipiSecenekleri.map((secenek) => (
+                            <option key={secenek.kod} value={secenek.kod}>
+                              {secenek.ad}
                             </option>
                           ))}
                         </select>
@@ -769,17 +858,18 @@ export default function YonetimEkiplerPage() {
                         />
                       </div>
 
-                      <div>
+                      <div className="md:col-span-2">
                         <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor={`duzenle_aciklama_${e.id}`}>
                           Açıklama
                         </label>
-                        <input
+                        <textarea
                           id={`duzenle_aciklama_${e.id}`}
                           value={duzenlemeForm.aciklama}
                           onChange={(ev) =>
                             setDuzenlemeForm({ ...duzenlemeForm, aciklama: ev.target.value })
                           }
                           placeholder="Açıklama"
+                          rows={3}
                           className="w-full rounded-lg border border-gray-500 px-3 py-2 font-semibold"
                         />
                       </div>
@@ -800,65 +890,11 @@ export default function YonetimEkiplerPage() {
                         disabled={duzenlemeKaydediliyor}
                         className="rounded bg-gray-500 px-3 py-2 text-xs font-black text-white disabled:opacity-50"
                       >
-                        Vazgeç
+                        İptal
                       </button>
                     </div>
                   </div>
-                ) : (
-                  <>
-                    <p className="text-sm font-semibold text-gray-700">
-                      Görev tipi: {gorevTipiEtiketi(e.gorev_tipi)} · Görev: {e.gorev || "-"} · Bölge:{" "}
-                      {e.bolge || "-"}
-                    </p>
-                    {e.aciklama && (
-                      <p className="text-sm font-semibold text-gray-700 mt-1">
-                        Açıklama: {e.aciklama}
-                      </p>
-                    )}
-                  </>
                 )}
-
-                {!duzenlemeModu && liderSorumluParcalari.length > 0 && (
-                  <p className="text-xs font-bold text-gray-600 mt-1">
-                    {liderSorumluParcalari.join(" · ")}
-                  </p>
-                )}
-                {!duzenlemeModu && (
-                  <p className="text-xs font-bold text-gray-600">
-                    Araç: {aracAdi(e.arac_varlik_id)}
-                  </p>
-                )}
-                <div className="mt-3 flex gap-2">
-                  {!duzenlemeModu && (
-                    <button
-                      type="button"
-                      onClick={() => duzenlemeBaslat(e)}
-                      disabled={duzenlenenEkipId !== "" && duzenlenenEkipId !== e.id}
-                      className="rounded bg-blue-700 px-3 py-2 text-xs font-black text-white disabled:opacity-50"
-                    >
-                      Düzenle
-                    </button>
-                  )}
-                  {ekipAktifMi(e) ? (
-                    <button
-                      type="button"
-                      onClick={() => void ekipPasifYap(e.id)}
-                      disabled={durumGuncelleniyorId === e.id}
-                      className="rounded bg-red-700 px-3 py-2 text-xs font-black text-white disabled:opacity-50"
-                    >
-                      {durumGuncelleniyorId === e.id ? "Kaydediliyor..." : "Pasif Yap"}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => void ekipAktifYap(e.id)}
-                      disabled={durumGuncelleniyorId === e.id}
-                      className="rounded bg-green-700 px-3 py-2 text-xs font-black text-white disabled:opacity-50"
-                    >
-                      {durumGuncelleniyorId === e.id ? "Kaydediliyor..." : "Aktif Yap"}
-                    </button>
-                  )}
-                </div>
                 <div className="mt-3 rounded-xl bg-gray-50 border p-3">
                   <p className="text-xs font-black mb-2">Üyeler</p>
 

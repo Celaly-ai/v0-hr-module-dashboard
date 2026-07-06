@@ -62,6 +62,14 @@ export default function YonetimEkiplerPage() {
   const [kaydediliyor, setKaydediliyor] = useState(false)
   const [durumGuncelleniyorId, setDurumGuncelleniyorId] = useState("")
   const [uyeEkleniyor, setUyeEkleniyor] = useState(false)
+  const [duzenlenenEkipId, setDuzenlenenEkipId] = useState("")
+  const [duzenlemeForm, setDuzenlemeForm] = useState({
+    gorev_tipi: "",
+    bolge: "",
+    gorev: "",
+    aciklama: "",
+  })
+  const [duzenlemeKaydediliyor, setDuzenlemeKaydediliyor] = useState(false)
 
   const [form, setForm] = useState({
     ekip_adi: "",
@@ -108,7 +116,7 @@ export default function YonetimEkiplerPage() {
 
     const { data: ekipData } = await supabase
       .from("ekipler")
-      .select("id, ekip_adi, lider_personel_id, sorumlu_personel_id, arac_varlik_id, bolge, gorev, gorev_tipi, durum, aktif, created_at")
+      .select("id, ekip_adi, lider_personel_id, sorumlu_personel_id, arac_varlik_id, bolge, gorev, gorev_tipi, aciklama, durum, aktif, created_at")
       .order("created_at", { ascending: false })
 
     const { data: uyeData } = await supabase
@@ -352,6 +360,69 @@ export default function YonetimEkiplerPage() {
     }
 
     setMesaj("Ekip pasif yapıldı.")
+    await yukle()
+  }
+
+  function duzenlemeBaslat(ekip: {
+    id: string
+    gorev_tipi?: string | null
+    bolge?: string | null
+    gorev?: string | null
+    aciklama?: string | null
+  }) {
+    setMesaj("")
+    setHata("")
+    setDuzenlenenEkipId(ekip.id)
+    setDuzenlemeForm({
+      gorev_tipi: ekip.gorev_tipi || "",
+      bolge: ekip.bolge || "",
+      gorev: ekip.gorev || "",
+      aciklama: ekip.aciklama || "",
+    })
+  }
+
+  function duzenlemeIptal() {
+    setDuzenlenenEkipId("")
+    setDuzenlemeForm({
+      gorev_tipi: "",
+      bolge: "",
+      gorev: "",
+      aciklama: "",
+    })
+  }
+
+  async function ekipGuncelle(ekipId: string) {
+    setMesaj("")
+    setHata("")
+
+    if (!gorevTipiGecerliMi(duzenlemeForm.gorev_tipi)) {
+      setHata("Görev tipi seçmelisiniz.")
+      return
+    }
+
+    setDuzenlemeKaydediliyor(true)
+    const supabase = createClient()
+
+    const { error } = await supabase
+      .from("ekipler")
+      .update({
+        gorev_tipi: duzenlemeForm.gorev_tipi,
+        bolge: duzenlemeForm.bolge.trim() || null,
+        gorev: duzenlemeForm.gorev.trim() || null,
+        aciklama: duzenlemeForm.aciklama.trim() || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", ekipId)
+
+    setDuzenlemeKaydediliyor(false)
+
+    if (error) {
+      setHata("Ekip güncellenemedi: " + error.message)
+      return
+    }
+
+    duzenlemeIptal()
+    setMesaj("Ekip bilgileri güncellendi.")
     await yukle()
   }
 
@@ -637,23 +708,137 @@ export default function YonetimEkiplerPage() {
                 liderAdi !== "-" ? `Lider: ${liderAdi}` : null,
                 sorumluAdi !== "-" ? `Sorumlu: ${sorumluAdi}` : null,
               ].filter(Boolean)
+              const duzenlemeModu = duzenlenenEkipId === e.id
 
               return (
               <div key={e.id} className="rounded-2xl border border-gray-200 bg-white p-4">
                 <p className="text-lg font-black">{e.ekip_adi}</p>
-                <p className="text-sm font-semibold text-gray-700">
-                  Görev tipi: {gorevTipiEtiketi(e.gorev_tipi)} · Görev: {e.gorev || "-"} · Bölge:{" "}
-                  {e.bolge || "-"}
-                </p>
-                {liderSorumluParcalari.length > 0 && (
+
+                {duzenlemeModu ? (
+                  <div className="mt-3 space-y-3 rounded-xl border border-blue-200 bg-blue-50 p-3">
+                    <p className="text-sm font-black text-blue-900">Ekip Düzenle</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor={`duzenle_gorev_tipi_${e.id}`}>
+                          Görev tipi *
+                        </label>
+                        <select
+                          id={`duzenle_gorev_tipi_${e.id}`}
+                          value={duzenlemeForm.gorev_tipi}
+                          onChange={(ev) =>
+                            setDuzenlemeForm({ ...duzenlemeForm, gorev_tipi: ev.target.value })
+                          }
+                          className="w-full rounded-lg border border-gray-500 px-3 py-2 font-bold"
+                        >
+                          <option value="">Görev tipi seç *</option>
+                          {GOREV_TIPI_SECENEKLERI.map((secenek) => (
+                            <option key={secenek.value} value={secenek.value}>
+                              {secenek.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor={`duzenle_bolge_${e.id}`}>
+                          Bölge
+                        </label>
+                        <input
+                          id={`duzenle_bolge_${e.id}`}
+                          value={duzenlemeForm.bolge}
+                          onChange={(ev) =>
+                            setDuzenlemeForm({ ...duzenlemeForm, bolge: ev.target.value })
+                          }
+                          placeholder="Bölge"
+                          className="w-full rounded-lg border border-gray-500 px-3 py-2 font-semibold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor={`duzenle_gorev_${e.id}`}>
+                          Görev
+                        </label>
+                        <input
+                          id={`duzenle_gorev_${e.id}`}
+                          value={duzenlemeForm.gorev}
+                          onChange={(ev) =>
+                            setDuzenlemeForm({ ...duzenlemeForm, gorev: ev.target.value })
+                          }
+                          placeholder="Görev açıklaması"
+                          className="w-full rounded-lg border border-gray-500 px-3 py-2 font-semibold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor={`duzenle_aciklama_${e.id}`}>
+                          Açıklama
+                        </label>
+                        <input
+                          id={`duzenle_aciklama_${e.id}`}
+                          value={duzenlemeForm.aciklama}
+                          onChange={(ev) =>
+                            setDuzenlemeForm({ ...duzenlemeForm, aciklama: ev.target.value })
+                          }
+                          placeholder="Açıklama"
+                          className="w-full rounded-lg border border-gray-500 px-3 py-2 font-semibold"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void ekipGuncelle(e.id)}
+                        disabled={duzenlemeKaydediliyor}
+                        className="rounded bg-blue-700 px-3 py-2 text-xs font-black text-white disabled:opacity-50"
+                      >
+                        {duzenlemeKaydediliyor ? "Kaydediliyor..." : "Kaydet"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={duzenlemeIptal}
+                        disabled={duzenlemeKaydediliyor}
+                        className="rounded bg-gray-500 px-3 py-2 text-xs font-black text-white disabled:opacity-50"
+                      >
+                        Vazgeç
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold text-gray-700">
+                      Görev tipi: {gorevTipiEtiketi(e.gorev_tipi)} · Görev: {e.gorev || "-"} · Bölge:{" "}
+                      {e.bolge || "-"}
+                    </p>
+                    {e.aciklama && (
+                      <p className="text-sm font-semibold text-gray-700 mt-1">
+                        Açıklama: {e.aciklama}
+                      </p>
+                    )}
+                  </>
+                )}
+
+                {!duzenlemeModu && liderSorumluParcalari.length > 0 && (
                   <p className="text-xs font-bold text-gray-600 mt-1">
                     {liderSorumluParcalari.join(" · ")}
                   </p>
                 )}
-                <p className="text-xs font-bold text-gray-600">
-                  Araç: {aracAdi(e.arac_varlik_id)}
-                </p>
+                {!duzenlemeModu && (
+                  <p className="text-xs font-bold text-gray-600">
+                    Araç: {aracAdi(e.arac_varlik_id)}
+                  </p>
+                )}
                 <div className="mt-3 flex gap-2">
+                  {!duzenlemeModu && (
+                    <button
+                      type="button"
+                      onClick={() => duzenlemeBaslat(e)}
+                      disabled={duzenlenenEkipId !== "" && duzenlenenEkipId !== e.id}
+                      className="rounded bg-blue-700 px-3 py-2 text-xs font-black text-white disabled:opacity-50"
+                    >
+                      Düzenle
+                    </button>
+                  )}
                   {ekipAktifMi(e) ? (
                     <button
                       type="button"

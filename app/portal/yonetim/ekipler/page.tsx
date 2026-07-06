@@ -1,8 +1,18 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
+
+function ekipAktifMi(ekip: { aktif?: boolean | null; durum?: string | null }) {
+  if (ekip.aktif === true || ekip.durum === "aktif") return true
+  if (ekip.aktif === false || ekip.durum === "pasif") return false
+  return false
+}
+
+function personelAktifMi(personel: { durum?: string | null }) {
+  return String(personel.durum ?? "").trim().toLowerCase() === "aktif"
+}
 
 export default function YonetimEkiplerPage() {
   const router = useRouter()
@@ -12,8 +22,10 @@ export default function YonetimEkiplerPage() {
   const [ekipler, setEkipler] = useState<any[]>([])
   const [uyeler, setUyeler] = useState<any[]>([])
   const [mesaj, setMesaj] = useState("")
+  const [hata, setHata] = useState("")
   const [loading, setLoading] = useState(true)
   const [kaydediliyor, setKaydediliyor] = useState(false)
+  const [durumGuncelleniyorId, setDurumGuncelleniyorId] = useState("")
 
   const [form, setForm] = useState({
     ekip_adi: "",
@@ -27,6 +39,7 @@ export default function YonetimEkiplerPage() {
 
   const [seciliEkipId, setSeciliEkipId] = useState("")
   const [seciliPersonelId, setSeciliPersonelId] = useState("")
+  const [durumFiltre, setDurumFiltre] = useState("")
 
   useEffect(() => {
     yukle()
@@ -36,10 +49,19 @@ export default function YonetimEkiplerPage() {
     setLoading(true)
     const supabase = createClient()
 
-    const { data: personelData } = await supabase
+    const { data: personelData, error: personelError } = await supabase
       .from("personeller")
-      .select("id, ad, soyad")
+      .select("id, ad, soyad, durum")
+      .eq("durum", "aktif")
       .order("ad", { ascending: true })
+
+    if (personelError) {
+      setHata("Personeller alınamadı: " + personelError.message)
+      setLoading(false)
+      return
+    }
+
+    const aktifPersonelListesi = (personelData || []).filter(personelAktifMi)
 
     const { data: aracData } = await supabase
       .from("varliklar")
@@ -49,7 +71,7 @@ export default function YonetimEkiplerPage() {
 
     const { data: ekipData } = await supabase
       .from("ekipler")
-      .select("id, ekip_adi, lider_personel_id, sorumlu_personel_id, arac_varlik_id, bolge, gorev, created_at")
+      .select("id, ekip_adi, lider_personel_id, sorumlu_personel_id, arac_varlik_id, bolge, gorev, durum, aktif, created_at")
       .order("created_at", { ascending: false })
 
     const { data: uyeData } = await supabase
@@ -57,15 +79,26 @@ export default function YonetimEkiplerPage() {
       .select("id, ekip_id, personel_id, rol, created_at")
       .order("created_at", { ascending: true })
 
-    setPersoneller(personelData || [])
+    setPersoneller(aktifPersonelListesi)
     setAraclar(aracData || [])
     setEkipler(ekipData || [])
     setUyeler(uyeData || [])
     setLoading(false)
   }
 
-  function personelAdi(id: string) {
-    const p = personeller.find((x) => x.id === id)
+  const secilebilirPersoneller = useMemo(
+    () => personeller.filter(personelAktifMi),
+    [personeller],
+  )
+
+  const aktifPersonelIdSet = useMemo(
+    () => new Set(secilebilirPersoneller.map((p) => p.id)),
+    [secilebilirPersoneller],
+  )
+
+  function personelAdi(id?: string | null) {
+    if (!id) return "-"
+    const p = secilebilirPersoneller.find((x) => x.id === id)
     return p ? `${p.ad || ""} ${p.soyad || ""}`.trim() : "-"
   }
 
@@ -79,8 +112,20 @@ export default function YonetimEkiplerPage() {
     return uyeler.filter((u) => u.ekip_id === ekipId)
   }
 
+  function ekipUyeleriGosterilen(ekipId: string) {
+    return ekipUyeleri(ekipId).filter((u) => aktifPersonelIdSet.has(u.personel_id))
+  }
+
+  const filtreliEkipler = useMemo(() => {
+    if (!durumFiltre) return ekipler
+    if (durumFiltre === "aktif") return ekipler.filter((e) => ekipAktifMi(e))
+    if (durumFiltre === "pasif") return ekipler.filter((e) => !ekipAktifMi(e))
+    return ekipler
+  }, [ekipler, durumFiltre])
+
   async function ekipOlustur() {
     setMesaj("")
+    setHata("")
 
     if (!form.ekip_adi.trim()) {
       setMesaj("Ekip adı zorunludur.")
@@ -135,6 +180,7 @@ export default function YonetimEkiplerPage() {
         gorev: form.gorev.trim() || null,
         aciklama: form.aciklama.trim() || null,
         durum: "aktif",
+        aktif: true,
       })
       .select("id")
       .maybeSingle()
@@ -176,6 +222,58 @@ export default function YonetimEkiplerPage() {
     setMesaj("Ekip başarıyla oluşturuldu.")
     await yukle()
     setKaydediliyor(false)
+  }
+
+  async function ekipAktifYap(ekipId: string) {
+    setMesaj("")
+    setHata("")
+    setDurumGuncelleniyorId(ekipId)
+
+    const supabase = createClient()
+
+    const { error } = await supabase
+      .from("ekipler")
+      .update({
+        aktif: true,
+        durum: "aktif",
+      })
+      .eq("id", ekipId)
+
+    setDurumGuncelleniyorId("")
+
+    if (error) {
+      setHata("Ekip aktif yapılamadı: " + error.message)
+      return
+    }
+
+    setMesaj("Ekip aktif yapıldı.")
+    await yukle()
+  }
+
+  async function ekipPasifYap(ekipId: string) {
+    setMesaj("")
+    setHata("")
+    setDurumGuncelleniyorId(ekipId)
+
+    const supabase = createClient()
+
+    const { error } = await supabase
+      .from("ekipler")
+      .update({
+        aktif: false,
+        durum: "pasif",
+      })
+      .eq("id", ekipId)
+
+    setDurumGuncelleniyorId("")
+
+    if (error) {
+      setHata("Ekip pasif yapılamadı: " + error.message)
+      return
+    }
+
+    setMesaj("Ekip pasif yapıldı.")
+    await yukle()
   }
 
   async function uyeEkle() {
@@ -236,11 +334,33 @@ export default function YonetimEkiplerPage() {
       </div>
 
       <div className="p-4 max-w-6xl mx-auto space-y-4">
+        {hata && (
+          <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-bold text-red-900">
+            {hata}
+          </div>
+        )}
+
         {mesaj && (
           <div className="rounded-xl border border-blue-300 bg-blue-50 p-4 text-sm font-bold text-blue-900">
             {mesaj}
           </div>
         )}
+
+        <div className="rounded-2xl border border-gray-300 bg-white p-4 shadow-sm">
+          <label className="mb-1 block text-sm font-bold text-gray-900" htmlFor="durum_filtre">
+            Durum
+          </label>
+          <select
+            id="durum_filtre"
+            value={durumFiltre}
+            onChange={(e) => setDurumFiltre(e.target.value)}
+            className="w-full max-w-xs rounded-lg border border-gray-500 px-3 py-2 font-bold"
+          >
+            <option value="">Tümü</option>
+            <option value="aktif">Aktif</option>
+            <option value="pasif">Pasif</option>
+          </select>
+        </div>
 
         <div className="rounded-2xl border border-gray-300 bg-white p-4 shadow-sm space-y-4">
           <h2 className="text-lg font-black">Yeni Ekip Oluştur</h2>
@@ -259,7 +379,7 @@ export default function YonetimEkiplerPage() {
               className="md:col-span-3 rounded-lg border border-gray-500 px-3 py-2 font-bold"
             >
               <option value="">Lider seç</option>
-              {personeller.map((p) => (
+              {secilebilirPersoneller.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.ad} {p.soyad}
                 </option>
@@ -272,7 +392,7 @@ export default function YonetimEkiplerPage() {
               className="md:col-span-3 rounded-lg border border-gray-500 px-3 py-2 font-bold"
             >
               <option value="">Sorumlu seç</option>
-              {personeller.map((p) => (
+              {secilebilirPersoneller.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.ad} {p.soyad}
                 </option>
@@ -346,7 +466,7 @@ export default function YonetimEkiplerPage() {
               className="md:col-span-5 rounded-lg border border-gray-500 px-3 py-2 font-bold"
             >
               <option value="">Personel seç</option>
-              {personeller.map((p) => (
+              {secilebilirPersoneller.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.ad} {p.soyad}
                 </option>
@@ -365,48 +485,61 @@ export default function YonetimEkiplerPage() {
         <div className="rounded-2xl border border-gray-300 bg-white p-4 shadow-sm space-y-4">
           <h2 className="text-lg font-black">Ekip Listesi</h2>
 
-          {ekipler.length === 0 ? (
+          {filtreliEkipler.length === 0 ? (
             <div className="rounded-xl border border-gray-200 bg-gray-50 p-6 text-center font-bold text-gray-600">
               Ekip kaydı yok.
             </div>
           ) : (
-            ekipler.map((e) => (
+            filtreliEkipler.map((e) => {
+              const liderAdi = personelAdi(e.lider_personel_id)
+              const sorumluAdi = personelAdi(e.sorumlu_personel_id)
+              const liderSorumluParcalari = [
+                liderAdi !== "-" ? `Lider: ${liderAdi}` : null,
+                sorumluAdi !== "-" ? `Sorumlu: ${sorumluAdi}` : null,
+              ].filter(Boolean)
+
+              return (
               <div key={e.id} className="rounded-2xl border border-gray-200 bg-white p-4">
                 <p className="text-lg font-black">{e.ekip_adi}</p>
                 <p className="text-sm font-semibold text-gray-700">
                   Görev: {e.gorev || "-"} · Bölge: {e.bolge || "-"}
                 </p>
-                <p className="text-xs font-bold text-gray-600 mt-1">
-                  Lider: {personelAdi(e.lider_personel_id)} · Sorumlu:{" "}
-                  {personelAdi(e.sorumlu_personel_id)}
-                </p>
+                {liderSorumluParcalari.length > 0 && (
+                  <p className="text-xs font-bold text-gray-600 mt-1">
+                    {liderSorumluParcalari.join(" · ")}
+                  </p>
+                )}
                 <p className="text-xs font-bold text-gray-600">
                   Araç: {aracAdi(e.arac_varlik_id)}
                 </p>
                 <div className="mt-3 flex gap-2">
-  {e.aktif ? (
-    <button
-      onClick={() => alert('Ekip durum değiştirme işlemi sonraki sürümde aktif edilecektir.')}
-      className="rounded bg-orange-600 px-3 py-2 text-xs font-black text-white"
-    >
-      Pasife Al
-    </button>
-  ) : (
-    <button
-      onClick={() => alert('Ekip durum değiştirme işlemi sonraki sürümde aktif edilecektir.')}
-      className="rounded bg-green-700 px-3 py-2 text-xs font-black text-white"
-    >
-      Aktif Yap
-    </button>
-  )}
-</div>
+                  {ekipAktifMi(e) ? (
+                    <button
+                      type="button"
+                      onClick={() => void ekipPasifYap(e.id)}
+                      disabled={durumGuncelleniyorId === e.id}
+                      className="rounded bg-red-700 px-3 py-2 text-xs font-black text-white disabled:opacity-50"
+                    >
+                      {durumGuncelleniyorId === e.id ? "Kaydediliyor..." : "Pasif Yap"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void ekipAktifYap(e.id)}
+                      disabled={durumGuncelleniyorId === e.id}
+                      className="rounded bg-green-700 px-3 py-2 text-xs font-black text-white disabled:opacity-50"
+                    >
+                      {durumGuncelleniyorId === e.id ? "Kaydediliyor..." : "Aktif Yap"}
+                    </button>
+                  )}
+                </div>
                 <div className="mt-3 rounded-xl bg-gray-50 border p-3">
                   <p className="text-xs font-black mb-2">Üyeler</p>
 
-                  {ekipUyeleri(e.id).length === 0 ? (
+                  {ekipUyeleriGosterilen(e.id).length === 0 ? (
                     <p className="text-xs font-semibold text-gray-600">Üye yok.</p>
                   ) : (
-                    ekipUyeleri(e.id).map((u) => (
+                    ekipUyeleriGosterilen(e.id).map((u) => (
                       <div
                         key={u.id}
                         className="flex items-center justify-between rounded-lg bg-white border px-2 py-2 mb-1"
@@ -425,7 +558,8 @@ export default function YonetimEkiplerPage() {
                   )}
                 </div>
               </div>
-            ))
+            )
+            })
           )}
         </div>
       </div>

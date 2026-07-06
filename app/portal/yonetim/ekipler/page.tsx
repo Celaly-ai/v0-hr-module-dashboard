@@ -37,6 +37,55 @@ function gorevTipiGecerliMi(value: string | null | undefined, secenekler: { kod:
   return secenekler.some((secenek) => secenek.kod === value)
 }
 
+type CalismaTipiKayit = {
+  kod: string
+  ad: string
+  sira: number
+}
+
+const CALISMA_TIPI_KODLARI = [
+  "normal",
+  "joker",
+  "mobil",
+  "proje",
+  "gece",
+  "hafta_sonu",
+  "vip",
+  "yedek",
+] as const
+
+const CALISMA_TIPI_KOD_SET = new Set<string>(CALISMA_TIPI_KODLARI)
+
+const CALISMA_TIPI_FALLBACK: CalismaTipiKayit[] = [
+  { kod: "normal", ad: "Normal", sira: 10 },
+  { kod: "joker", ad: "Joker", sira: 20 },
+  { kod: "mobil", ad: "Mobil", sira: 30 },
+  { kod: "proje", ad: "Proje", sira: 40 },
+  { kod: "gece", ad: "Gece", sira: 50 },
+  { kod: "hafta_sonu", ad: "Hafta Sonu", sira: 60 },
+  { kod: "vip", ad: "VIP", sira: 70 },
+  { kod: "yedek", ad: "Yedek", sira: 80 },
+]
+
+function calismaTipiSecenekleriniHazirla(kayitlar: CalismaTipiKayit[]) {
+  const filtrelenmis = kayitlar.filter((kayit) => CALISMA_TIPI_KOD_SET.has(kayit.kod))
+  const kaynak = filtrelenmis.length > 0 ? filtrelenmis : CALISMA_TIPI_FALLBACK
+  return [...kaynak].sort((a, b) => a.sira - b.sira)
+}
+
+function calismaTipiEtiketi(value: string | null | undefined, kayitlar: CalismaTipiKayit[]) {
+  return kayitlar.find((kayit) => kayit.kod === value)?.ad || value || "-"
+}
+
+function calismaTipiGecerliMi(value: string | null | undefined, secenekler: { kod: string }[]) {
+  return secenekler.some((secenek) => secenek.kod === value)
+}
+
+function oncelikDegeri(value: string | number | null | undefined) {
+  const parsed = Number(String(value ?? "").trim())
+  return Number.isFinite(parsed) ? parsed : 50
+}
+
 function ekipAdiNormalize(value?: string | null) {
   return String(value ?? "").trim().toLowerCase()
 }
@@ -74,6 +123,8 @@ export default function YonetimEkiplerPage() {
   const [duzenlenenEkipId, setDuzenlenenEkipId] = useState("")
   const [duzenlemeForm, setDuzenlemeForm] = useState({
     gorev_tipi: "",
+    calisma_tipi: "",
+    oncelik: "",
     bolge: "",
     gorev: "",
     aciklama: "",
@@ -88,6 +139,8 @@ export default function YonetimEkiplerPage() {
     bolge: "",
     gorev: "",
     gorev_tipi: "",
+    calisma_tipi: "normal",
+    oncelik: "50",
     aciklama: "",
   })
 
@@ -95,6 +148,7 @@ export default function YonetimEkiplerPage() {
   const [seciliPersonelId, setSeciliPersonelId] = useState("")
   const [durumFiltre, setDurumFiltre] = useState("")
   const [gorevTipiKayitlari, setGorevTipiKayitlari] = useState<GorevTipiKayit[]>(GOREV_TIPI_FALLBACK)
+  const [calismaTipiKayitlari, setCalismaTipiKayitlari] = useState<CalismaTipiKayit[]>(CALISMA_TIPI_FALLBACK)
 
   useEffect(() => {
     yukle()
@@ -126,7 +180,7 @@ export default function YonetimEkiplerPage() {
 
     const { data: ekipData } = await supabase
       .from("ekipler")
-      .select("id, ekip_adi, lider_personel_id, sorumlu_personel_id, arac_varlik_id, bolge, gorev, gorev_tipi, aciklama, durum, aktif, created_at")
+      .select("id, ekip_adi, lider_personel_id, sorumlu_personel_id, arac_varlik_id, bolge, gorev, gorev_tipi, calisma_tipi, oncelik, aciklama, durum, aktif, created_at")
       .order("created_at", { ascending: false })
 
     const { data: uyeData } = await supabase
@@ -152,6 +206,26 @@ export default function YonetimEkiplerPage() {
       )
     }
 
+    const { data: calismaTipiData, error: calismaTipiError } = await supabase
+      .from("ekip_calisma_tipleri")
+      .select("kod, ad, sira")
+      .eq("aktif", true)
+      .order("sira", { ascending: true })
+
+    if (calismaTipiError || !calismaTipiData?.length) {
+      setCalismaTipiKayitlari(CALISMA_TIPI_FALLBACK)
+    } else {
+      setCalismaTipiKayitlari(
+        calismaTipiSecenekleriniHazirla(
+          calismaTipiData.map((kayit) => ({
+            kod: kayit.kod,
+            ad: kayit.ad,
+            sira: kayit.sira ?? 100,
+          })),
+        ),
+      )
+    }
+
     setPersoneller(aktifPersonelListesi)
     setAraclar(aracData || [])
     setEkipler(ekipData || [])
@@ -162,6 +236,11 @@ export default function YonetimEkiplerPage() {
   const aktifGorevTipiSecenekleri = useMemo(
     () => [...gorevTipiKayitlari].sort((a, b) => a.sira - b.sira),
     [gorevTipiKayitlari],
+  )
+
+  const aktifCalismaTipiSecenekleri = useMemo(
+    () => calismaTipiSecenekleriniHazirla(calismaTipiKayitlari),
+    [calismaTipiKayitlari],
   )
 
   const secilebilirPersoneller = useMemo(
@@ -229,7 +308,14 @@ export default function YonetimEkiplerPage() {
       return
     }
 
+    if (!calismaTipiGecerliMi(form.calisma_tipi, aktifCalismaTipiSecenekleri)) {
+      setHata("Çalışma tipi seçmelisiniz.")
+      return
+    }
+
     const gorevTipi = form.gorev_tipi
+    const calismaTipi = form.calisma_tipi
+    const oncelik = oncelikDegeri(form.oncelik)
 
     setKaydediliyor(true)
     const supabase = createClient()
@@ -287,6 +373,8 @@ export default function YonetimEkiplerPage() {
         bolge: form.bolge.trim() || null,
         gorev: form.gorev.trim() || null,
         gorev_tipi: gorevTipi,
+        calisma_tipi: calismaTipi,
+        oncelik,
         aciklama: form.aciklama.trim() || null,
         durum: "aktif",
         aktif: true,
@@ -336,6 +424,8 @@ export default function YonetimEkiplerPage() {
       bolge: "",
       gorev: "",
       gorev_tipi: "",
+      calisma_tipi: "normal",
+      oncelik: "50",
       aciklama: "",
     })
 
@@ -399,6 +489,8 @@ export default function YonetimEkiplerPage() {
   function duzenlemeBaslat(ekip: {
     id: string
     gorev_tipi?: string | null
+    calisma_tipi?: string | null
+    oncelik?: number | null
     bolge?: string | null
     gorev?: string | null
     aciklama?: string | null
@@ -408,6 +500,8 @@ export default function YonetimEkiplerPage() {
     setDuzenlenenEkipId(ekip.id)
     setDuzenlemeForm({
       gorev_tipi: ekip.gorev_tipi || "",
+      calisma_tipi: ekip.calisma_tipi || "normal",
+      oncelik: ekip.oncelik != null ? String(ekip.oncelik) : "50",
       bolge: ekip.bolge || "",
       gorev: ekip.gorev || "",
       aciklama: ekip.aciklama || "",
@@ -418,6 +512,8 @@ export default function YonetimEkiplerPage() {
     setDuzenlenenEkipId("")
     setDuzenlemeForm({
       gorev_tipi: "",
+      calisma_tipi: "",
+      oncelik: "",
       bolge: "",
       gorev: "",
       aciklama: "",
@@ -433,6 +529,13 @@ export default function YonetimEkiplerPage() {
       return
     }
 
+    if (!calismaTipiGecerliMi(duzenlemeForm.calisma_tipi, aktifCalismaTipiSecenekleri)) {
+      setHata("Çalışma tipi seçmelisiniz.")
+      return
+    }
+
+    const oncelik = oncelikDegeri(duzenlemeForm.oncelik)
+
     setDuzenlemeKaydediliyor(true)
     const supabase = createClient()
 
@@ -440,6 +543,8 @@ export default function YonetimEkiplerPage() {
       .from("ekipler")
       .update({
         gorev_tipi: duzenlemeForm.gorev_tipi,
+        calisma_tipi: duzenlemeForm.calisma_tipi,
+        oncelik,
         bolge: duzenlemeForm.bolge.trim() || null,
         gorev: duzenlemeForm.gorev.trim() || null,
         aciklama: duzenlemeForm.aciklama.trim() || null,
@@ -661,6 +766,27 @@ export default function YonetimEkiplerPage() {
               ))}
             </select>
 
+            <select
+              value={form.calisma_tipi}
+              onChange={(e) => setForm({ ...form, calisma_tipi: e.target.value })}
+              className="md:col-span-3 rounded-lg border border-gray-500 px-3 py-2 font-bold"
+            >
+              <option value="">Çalışma tipi seç *</option>
+              {aktifCalismaTipiSecenekleri.map((calismaSecenegi) => (
+                <option key={`calisma-${calismaSecenegi.kod}`} value={calismaSecenegi.kod}>
+                  {calismaSecenegi.ad}
+                </option>
+              ))}
+            </select>
+
+            <input
+              type="number"
+              value={form.oncelik}
+              onChange={(e) => setForm({ ...form, oncelik: e.target.value })}
+              placeholder="Öncelik"
+              className="md:col-span-3 rounded-lg border border-gray-500 px-3 py-2 font-semibold"
+            />
+
             <input
               value={form.gorev}
               onChange={(e) => setForm({ ...form, gorev: e.target.value })}
@@ -750,8 +876,9 @@ export default function YonetimEkiplerPage() {
                 {!duzenlemeModu && (
                   <>
                     <p className="text-sm font-semibold text-gray-700">
-                      Görev tipi: {gorevTipiEtiketi(e.gorev_tipi, gorevTipiKayitlari)} · Görev: {e.gorev || "-"} · Bölge:{" "}
-                      {e.bolge || "-"}
+                      Görev tipi: {gorevTipiEtiketi(e.gorev_tipi, gorevTipiKayitlari)} · Çalışma tipi:{" "}
+                      {calismaTipiEtiketi(e.calisma_tipi, calismaTipiKayitlari)} · Öncelik:{" "}
+                      {e.oncelik ?? 50} · Görev: {e.gorev || "-"} · Bölge: {e.bolge || "-"}
                     </p>
                     {e.aciklama && (
                       <p className="text-sm font-semibold text-gray-700 mt-1">
@@ -826,6 +953,43 @@ export default function YonetimEkiplerPage() {
                             </option>
                           ))}
                         </select>
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor={`duzenle_calisma_tipi_${e.id}`}>
+                          Çalışma tipi *
+                        </label>
+                        <select
+                          id={`duzenle_calisma_tipi_${e.id}`}
+                          value={duzenlemeForm.calisma_tipi}
+                          onChange={(ev) =>
+                            setDuzenlemeForm({ ...duzenlemeForm, calisma_tipi: ev.target.value })
+                          }
+                          className="w-full rounded-lg border border-gray-500 px-3 py-2 font-bold"
+                        >
+                          <option value="">Çalışma tipi seç *</option>
+                          {aktifCalismaTipiSecenekleri.map((calismaSecenegi) => (
+                            <option key={`calisma-duzenle-${calismaSecenegi.kod}`} value={calismaSecenegi.kod}>
+                              {calismaSecenegi.ad}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor={`duzenle_oncelik_${e.id}`}>
+                          Öncelik
+                        </label>
+                        <input
+                          id={`duzenle_oncelik_${e.id}`}
+                          type="number"
+                          value={duzenlemeForm.oncelik}
+                          onChange={(ev) =>
+                            setDuzenlemeForm({ ...duzenlemeForm, oncelik: ev.target.value })
+                          }
+                          placeholder="Öncelik"
+                          className="w-full rounded-lg border border-gray-500 px-3 py-2 font-semibold"
+                        />
                       </div>
 
                       <div>

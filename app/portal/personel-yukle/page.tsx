@@ -15,11 +15,26 @@ const BOS_FORM = {
   soyad: "",
   telefon: "",
   rol: "calisan",
-  durum: "active",
+  durum: "aktif",
   lokasyon: "Merkez",
   bolge: "Merkez",
   ise_giris_tarihi: "",
   notlar: "",
+}
+
+const PERSONEL_DURUM_SECENEKLERI = ["aktif", "pasif"] as const
+
+function durumFormDegeri(value?: string | null) {
+  const durum = String(value ?? "")
+    .trim()
+    .toLowerCase()
+  if (durum === "pasif" || durum === "izinli") return "pasif"
+  if (durum === "active" || durum === "aktif") return "aktif"
+  return "aktif"
+}
+
+function durumEtiketi(value?: string | null) {
+  return durumFormDegeri(value)
 }
 
 function normalizePhone(value: string) {
@@ -81,7 +96,7 @@ export default function PersonelYuklePage() {
 
       if (filtre.arama && !metin.includes(filtre.arama.toLocaleLowerCase("tr-TR"))) return false
       if (filtre.rol && p.rol !== filtre.rol) return false
-      if (filtre.durum && p.durum !== filtre.durum) return false
+      if (filtre.durum && durumFormDegeri(p.durum) !== filtre.durum) return false
       if (filtre.lokasyon && p.lokasyon !== filtre.lokasyon) return false
 
       return true
@@ -90,10 +105,6 @@ export default function PersonelYuklePage() {
 
   const roller = useMemo(() => {
     return Array.from(new Set(personeller.map((p) => p.rol).filter(Boolean))).sort()
-  }, [personeller])
-
-  const durumlar = useMemo(() => {
-    return Array.from(new Set(personeller.map((p) => p.durum).filter(Boolean))).sort()
   }, [personeller])
 
   const lokasyonlar = useMemo(() => {
@@ -169,7 +180,7 @@ export default function PersonelYuklePage() {
       soyad: p.soyad || "",
       telefon: p.tel || p.telefon || p.telefon_normalized || "",
       rol: p.rol || "calisan",
-      durum: p.durum || "active",
+      durum: durumFormDegeri(p.durum),
       lokasyon: p.lokasyon || "Merkez",
       bolge: p.bolge || "Merkez",
       ise_giris_tarihi: p.ise_giris_tarihi || "",
@@ -266,7 +277,7 @@ export default function PersonelYuklePage() {
         soyad: form.soyad,
         telefon: form.telefon,
         rol: form.rol,
-        durum: form.durum,
+        durum: durumFormDegeri(form.durum),
         lokasyon: form.lokasyon,
         bolge: form.bolge,
         ise_giris_tarihi: form.ise_giris_tarihi,
@@ -414,14 +425,15 @@ export default function PersonelYuklePage() {
             <div className="md:col-span-2">
               <label className="mb-1 block text-sm font-bold text-gray-900">Durum</label>
               <select
-                value={form.durum}
+                value={durumFormDegeri(form.durum)}
                 onChange={(e) => formGuncelle("durum", e.target.value)}
                 className="w-full rounded-lg border border-gray-500 bg-white px-3 py-2 text-sm font-bold text-gray-900"
               >
-                <option value="active">active</option>
-                <option value="aktif">aktif</option>
-                <option value="pasif">pasif</option>
-                <option value="izinli">izinli</option>
+                {PERSONEL_DURUM_SECENEKLERI.map((durum) => (
+                  <option key={durum} value={durum}>
+                    {durum}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -477,7 +489,8 @@ export default function PersonelYuklePage() {
           <div>
             <h2 className="text-lg font-black text-gray-900">Excel ile Toplu Personel Yükle</h2>
             <p className="text-xs font-semibold text-gray-700">
-              Kolonlar: personel_kodu, ad, soyad, telefon, rol, durum, lokasyon, bolge, ise_giris_tarihi
+              Kolonlar: personel_kodu, ad, soyad, telefon, rol, durum, lokasyon, bolge, ise_giris_tarihi.
+              Durum için geçerli değerler: aktif, pasif.
             </p>
           </div>
 
@@ -545,8 +558,10 @@ export default function PersonelYuklePage() {
                 className="w-full rounded-lg border border-gray-500 bg-white px-3 py-2 text-sm font-bold text-gray-900"
               >
                 <option value="">Tümü</option>
-                {durumlar.map((d) => (
-                  <option key={d} value={d}>{d}</option>
+                {PERSONEL_DURUM_SECENEKLERI.map((durum) => (
+                  <option key={durum} value={durum}>
+                    {durum}
+                  </option>
                 ))}
               </select>
             </div>
@@ -611,7 +626,7 @@ export default function PersonelYuklePage() {
                     <td className="border border-gray-400 p-2 font-bold">{p.ad || "-"} {p.soyad || ""}</td>
                     <td className="border border-gray-400 p-2">{p.tel || p.telefon_normalized || "-"}</td>
                     <td className="border border-gray-400 p-2">{p.rol || "-"}</td>
-                    <td className="border border-gray-400 p-2">{p.durum || "-"}</td>
+                    <td className="border border-gray-400 p-2">{durumEtiketi(p.durum)}</td>
                     <td className="border border-gray-400 p-2">{p.lokasyon || "-"}</td>
                     <td className="border border-gray-400 p-2">{p.bolge || "-"}</td>
                     <td className="border border-gray-400 p-2">{p.ise_giris_tarihi || "-"}</td>

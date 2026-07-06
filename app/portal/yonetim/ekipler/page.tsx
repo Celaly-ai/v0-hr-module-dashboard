@@ -14,6 +14,36 @@ function personelAktifMi(personel: { durum?: string | null }) {
   return String(personel.durum ?? "").trim().toLowerCase() === "aktif"
 }
 
+const GOREV_TIPI_SECENEKLERI = [
+  { value: "ariza", label: "Arıza" },
+  { value: "nakliye_montaj", label: "Nakliye Montaj" },
+] as const
+
+function ekipAdiNormalize(value?: string | null) {
+  return String(value ?? "").trim().toLowerCase()
+}
+
+function aktifEkipAdiVarMi(
+  ekipAdi: string,
+  kaynak: { ekip_adi?: string | null; aktif?: boolean | null; durum?: string | null }[],
+) {
+  const hedef = ekipAdiNormalize(ekipAdi)
+  if (!hedef) return false
+  return kaynak.some(
+    (ekip) => ekipAktifMi(ekip) && ekipAdiNormalize(ekip.ekip_adi) === hedef,
+  )
+}
+
+function ekipUyesiAktifMi(uye: { durum?: string | null; aktif?: boolean | null }) {
+  if (uye.aktif === false) return false
+  if (uye.aktif === true) return true
+  return String(uye.durum ?? "").trim().toLowerCase() === "aktif"
+}
+
+function gorevTipiEtiketi(value?: string | null) {
+  return GOREV_TIPI_SECENEKLERI.find((secenek) => secenek.value === value)?.label || value || "-"
+}
+
 export default function YonetimEkiplerPage() {
   const router = useRouter()
 
@@ -34,6 +64,7 @@ export default function YonetimEkiplerPage() {
     arac_varlik_id: "",
     bolge: "",
     gorev: "",
+    gorev_tipi: "",
     aciklama: "",
   })
 
@@ -71,12 +102,12 @@ export default function YonetimEkiplerPage() {
 
     const { data: ekipData } = await supabase
       .from("ekipler")
-      .select("id, ekip_adi, lider_personel_id, sorumlu_personel_id, arac_varlik_id, bolge, gorev, durum, aktif, created_at")
+      .select("id, ekip_adi, lider_personel_id, sorumlu_personel_id, arac_varlik_id, bolge, gorev, gorev_tipi, durum, aktif, created_at")
       .order("created_at", { ascending: false })
 
     const { data: uyeData } = await supabase
       .from("ekip_uyeleri")
-      .select("id, ekip_id, personel_id, rol, created_at")
+      .select("id, ekip_id, personel_id, rol, durum, aktif, created_at")
       .order("created_at", { ascending: true })
 
     setPersoneller(aktifPersonelListesi)
@@ -113,7 +144,9 @@ export default function YonetimEkiplerPage() {
   }
 
   function ekipUyeleriGosterilen(ekipId: string) {
-    return ekipUyeleri(ekipId).filter((u) => aktifPersonelIdSet.has(u.personel_id))
+    return ekipUyeleri(ekipId).filter(
+      (u) => aktifPersonelIdSet.has(u.personel_id) && ekipUyesiAktifMi(u),
+    )
   }
 
   const filtreliEkipler = useMemo(() => {
@@ -127,8 +160,10 @@ export default function YonetimEkiplerPage() {
     setMesaj("")
     setHata("")
 
-    if (!form.ekip_adi.trim()) {
-      setMesaj("Ekip adı zorunludur.")
+    const ekipAdi = form.ekip_adi.trim()
+
+    if (!ekipAdi) {
+      setHata("Ekip adı zorunludur.")
       return
     }
 
@@ -142,8 +177,29 @@ export default function YonetimEkiplerPage() {
       return
     }
 
+    if (!form.gorev_tipi) {
+      setHata("Görev tipi seçmelisiniz.")
+      return
+    }
+
     setKaydediliyor(true)
     const supabase = createClient()
+
+    const { data: aktifEkipKayitlari, error: aktifEkipError } = await supabase
+      .from("ekipler")
+      .select("id, ekip_adi, durum, aktif")
+
+    if (aktifEkipError) {
+      setHata("Ekip kontrolü yapılamadı: " + aktifEkipError.message)
+      setKaydediliyor(false)
+      return
+    }
+
+    if (aktifEkipAdiVarMi(ekipAdi, aktifEkipKayitlari || [])) {
+      setHata("Bu isimde aktif bir ekip zaten var.")
+      setKaydediliyor(false)
+      return
+    }
 
     const {
       data: { session },
@@ -172,12 +228,13 @@ export default function YonetimEkiplerPage() {
       .from("ekipler")
       .insert({
         sirket_id: mevcutPersonel.sirket_id,
-        ekip_adi: form.ekip_adi.trim(),
+        ekip_adi: ekipAdi,
         lider_personel_id: form.lider_personel_id,
         sorumlu_personel_id: form.sorumlu_personel_id,
         arac_varlik_id: form.arac_varlik_id || null,
         bolge: form.bolge.trim() || null,
         gorev: form.gorev.trim() || null,
+        gorev_tipi: form.gorev_tipi,
         aciklama: form.aciklama.trim() || null,
         durum: "aktif",
         aktif: true,
@@ -186,28 +243,47 @@ export default function YonetimEkiplerPage() {
       .maybeSingle()
 
     if (error || !yeniEkip?.id) {
-      setMesaj("Ekip oluşturulamadı: " + (error?.message || "Bilinmeyen hata"))
+      setHata("Ekip oluşturulamadı: " + (error?.message || "Bilinmeyen hata"))
       setKaydediliyor(false)
       return
     }
 
-    await supabase.from("ekip_uyeleri").upsert(
-      [
-        {
-          ekip_id: yeniEkip.id,
-          personel_id: form.lider_personel_id,
-          rol: "lider",
-          durum: "aktif",
-        },
-        {
-          ekip_id: yeniEkip.id,
-          personel_id: form.sorumlu_personel_id,
-          rol: "sorumlu",
-          durum: "aktif",
-        },
-      ],
-      { onConflict: "ekip_id,personel_id" },
+    const liderUyeKaydi = uyeler.find(
+      (uye) => uye.ekip_id === yeniEkip.id && uye.personel_id === form.lider_personel_id,
     )
+    const sorumluUyeKaydi = uyeler.find(
+      (uye) => uye.ekip_id === yeniEkip.id && uye.personel_id === form.sorumlu_personel_id,
+    )
+
+    if (liderUyeKaydi) {
+      await supabase
+        .from("ekip_uyeleri")
+        .update({ rol: "lider", durum: "aktif", aktif: true })
+        .eq("id", liderUyeKaydi.id)
+    } else {
+      await supabase.from("ekip_uyeleri").insert({
+        ekip_id: yeniEkip.id,
+        personel_id: form.lider_personel_id,
+        rol: "lider",
+        durum: "aktif",
+        aktif: true,
+      })
+    }
+
+    if (sorumluUyeKaydi) {
+      await supabase
+        .from("ekip_uyeleri")
+        .update({ rol: "sorumlu", durum: "aktif", aktif: true })
+        .eq("id", sorumluUyeKaydi.id)
+    } else {
+      await supabase.from("ekip_uyeleri").insert({
+        ekip_id: yeniEkip.id,
+        personel_id: form.sorumlu_personel_id,
+        rol: "sorumlu",
+        durum: "aktif",
+        aktif: true,
+      })
+    }
 
     setForm({
       ekip_adi: "",
@@ -216,6 +292,7 @@ export default function YonetimEkiplerPage() {
       arac_varlik_id: "",
       bolge: "",
       gorev: "",
+      gorev_tipi: "",
       aciklama: "",
     })
 
@@ -278,26 +355,59 @@ export default function YonetimEkiplerPage() {
 
   async function uyeEkle() {
     setMesaj("")
+    setHata("")
 
-    if (!seciliEkipId || !seciliPersonelId) {
-      setMesaj("Ekip ve personel seçmelisiniz.")
+    if (!seciliEkipId) {
+      setHata("Ekip seçmelisiniz.")
+      return
+    }
+
+    if (!seciliPersonelId) {
+      setHata("Personel seçmelisiniz.")
+      return
+    }
+
+    if (!aktifPersonelIdSet.has(seciliPersonelId)) {
+      setHata("Pasif personel ekibe eklenemez.")
+      return
+    }
+
+    const mevcutUye = uyeler.find(
+      (uye) => uye.ekip_id === seciliEkipId && uye.personel_id === seciliPersonelId,
+    )
+
+    if (mevcutUye && ekipUyesiAktifMi(mevcutUye)) {
+      setHata("Seçilen personel zaten bu ekibin aktif üyesi.")
       return
     }
 
     const supabase = createClient()
 
-    const { error } = await supabase.from("ekip_uyeleri").upsert(
-      {
+    let error = null
+
+    if (mevcutUye) {
+      const sonuc = await supabase
+        .from("ekip_uyeleri")
+        .update({
+          rol: "eleman",
+          durum: "aktif",
+          aktif: true,
+        })
+        .eq("id", mevcutUye.id)
+      error = sonuc.error
+    } else {
+      const sonuc = await supabase.from("ekip_uyeleri").insert({
         ekip_id: seciliEkipId,
         personel_id: seciliPersonelId,
         rol: "eleman",
         durum: "aktif",
-      },
-      { onConflict: "ekip_id,personel_id" },
-    )
+        aktif: true,
+      })
+      error = sonuc.error
+    }
 
     if (error) {
-      setMesaj("Üye eklenemedi: " + error.message)
+      setHata("Üye eklenemedi: " + error.message)
       return
     }
 
@@ -419,10 +529,23 @@ export default function YonetimEkiplerPage() {
               className="md:col-span-3 rounded-lg border border-gray-500 px-3 py-2 font-semibold"
             />
 
+            <select
+              value={form.gorev_tipi}
+              onChange={(e) => setForm({ ...form, gorev_tipi: e.target.value })}
+              className="md:col-span-3 rounded-lg border border-gray-500 px-3 py-2 font-bold"
+            >
+              <option value="">Görev tipi seç *</option>
+              {GOREV_TIPI_SECENEKLERI.map((secenek) => (
+                <option key={secenek.value} value={secenek.value}>
+                  {secenek.label}
+                </option>
+              ))}
+            </select>
+
             <input
               value={form.gorev}
               onChange={(e) => setForm({ ...form, gorev: e.target.value })}
-              placeholder="Görev"
+              placeholder="Görev açıklaması"
               className="md:col-span-3 rounded-lg border border-gray-500 px-3 py-2 font-semibold"
             />
 
@@ -502,7 +625,8 @@ export default function YonetimEkiplerPage() {
               <div key={e.id} className="rounded-2xl border border-gray-200 bg-white p-4">
                 <p className="text-lg font-black">{e.ekip_adi}</p>
                 <p className="text-sm font-semibold text-gray-700">
-                  Görev: {e.gorev || "-"} · Bölge: {e.bolge || "-"}
+                  Görev tipi: {gorevTipiEtiketi(e.gorev_tipi)} · Görev: {e.gorev || "-"} · Bölge:{" "}
+                  {e.bolge || "-"}
                 </p>
                 {liderSorumluParcalari.length > 0 && (
                   <p className="text-xs font-bold text-gray-600 mt-1">

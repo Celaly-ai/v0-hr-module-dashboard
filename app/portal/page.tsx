@@ -15,8 +15,12 @@ import {
   CalendarDays,
   Car,
   ClipboardList,
+  ClipboardCheck,
+  Clock,
   FileSpreadsheet,
+  Gauge,
   Home,
+  Link2,
   LogIn,
   LogOut,
   MapPin,
@@ -64,6 +68,46 @@ const PERFORMANSIM_MODULU: Modul = {
   sira: 6,
 }
 
+const PERFORMANS_YONETIM_ROLLERI = new Set([
+  "admin",
+  "ceo",
+  "servis_yoneticisi",
+  "ik_yoneticisi",
+])
+
+const PERFORMANS_YONETIM_MODULLERI: Modul[] = [
+  {
+    kod: "performans_yonetim_v2",
+    ad: "Performans Yönetim V2",
+    aciklama:
+      "V2 performans sonuçlarını yönetici görünümünde salt okunur inceleyin.",
+    kategori: "performans",
+    standart: false,
+    aktif: true,
+    sira: 71,
+  },
+  {
+    kod: "performans_eslestirme",
+    ad: "Performans Eşleştirme",
+    aciklama:
+      "Performans teknisyen kayıtlarını personel profilleri ile eşleştirin.",
+    kategori: "performans",
+    standart: false,
+    aktif: true,
+    sira: 72,
+  },
+  {
+    kod: "performans_veri_girisi",
+    ad: "Performans Veri Girişi",
+    aciklama:
+      "Performans matris verilerini yükleyin ve normalize kayıtları yönetin.",
+    kategori: "performans",
+    standart: false,
+    aktif: true,
+    sira: 73,
+  },
+]
+
 const PERSONEL_STANDART_MODUL_KODLARI = [
   "mesai",
   "izin",
@@ -79,9 +123,16 @@ const PERSONEL_GIZLI_MODUL_KODLARI = new Set([
   "vardiya",
 ])
 
+const KALDIRILAN_MODUL_KODLARI = new Set([
+  "urun_kabul",
+  "urun_devir",
+  "urun_fisleri",
+])
+
 const modulYollari: Record<string, string> = {
   ana_sayfa: "/portal/personel-paneli",
   mesai: "/portal/giris-cikis",
+  gorevlerim: "/portal/gorevlerim",
   izin: "/portal/izin",
   talepler: "/portal/talepler",
   vardiya: "",
@@ -89,6 +140,9 @@ const modulYollari: Record<string, string> = {
   iletisim: "/portal/iletisim",
   adres_konum_teyit: "/portal/adres-konum-teyit",
   performansim: "/portal/performansim",
+  performans_yonetim_v2: "/portal/performans-yonetim-v2",
+  performans_eslestirme: "/portal/performans-eslestirme",
+  performans_veri_girisi: "/portal/hizli-performans",
   adres_konum_rapor: "/portal/adres-konum-rapor",
 
   yetki_yonetimi: "/portal/yetki-yonetimi",
@@ -118,6 +172,8 @@ const modulYollari: Record<string, string> = {
 
   ai_gorev_merkezi: "/portal/ai-gorev-merkezi",
   ai_canli_operasyon_merkezi: "/portal/ai-canli-operasyon-merkezi",
+  akilli_atama_merkezi: "/portal/akilli-atama-merkezi",
+  hizmet_sure_katalogu: "/portal/hizmet-sure-katalogu",
 
   bayi_operasyon_merkezi: "/portal/bayi-operasyon-merkezi",
 
@@ -128,6 +184,7 @@ const modulYollari: Record<string, string> = {
 const modulIkonlari: Record<string, any> = {
   ana_sayfa: Home,
   mesai: LogIn,
+  gorevlerim: ClipboardCheck,
   izin: ClipboardList,
   talepler: ClipboardList,
   vardiya: CalendarDays,
@@ -135,6 +192,9 @@ const modulIkonlari: Record<string, any> = {
   iletisim: MessageCircle,
   adres_konum_teyit: MapPin,
   performansim: Trophy,
+  performans_yonetim_v2: BarChart3,
+  performans_eslestirme: Link2,
+  performans_veri_girisi: Gauge,
   adres_konum_rapor: MapPin,
 
   yetki_yonetimi: ShieldCheck,
@@ -163,6 +223,8 @@ const modulIkonlari: Record<string, any> = {
 
   ai_gorev_merkezi: Activity,
   ai_canli_operasyon_merkezi: BarChart3,
+  akilli_atama_merkezi: ClipboardCheck,
+  hizmet_sure_katalogu: Clock,
 
   bayi_operasyon_merkezi: Store,
 
@@ -188,6 +250,7 @@ function adSoyad(personel: Personel | null) {
 
 function kategoriBaslik(kategori: string) {
   if (kategori === "standart") return "Standart Modüller"
+  if (kategori === "performans") return "Performans"
   if (kategori === "yonetim") return "Yönetim"
   if (kategori === "operasyon") return "Operasyon"
   if (kategori === "anket") return "Anket"
@@ -220,6 +283,24 @@ function performansModulunuGarantiEt(moduller: Modul[]) {
   }
 
   return [...moduller, PERFORMANSIM_MODULU]
+}
+
+function performansYonetimRoluMu(rol?: string | null) {
+  return PERFORMANS_YONETIM_ROLLERI.has(normalizeRol(rol))
+}
+
+function performansYonetimModulleriniEkle(moduller: Modul[], rol?: string | null) {
+  if (!performansYonetimRoluMu(rol)) {
+    return moduller
+  }
+
+  const mevcutKodlar = new Set(moduller.map((modul) => modul.kod))
+
+  const eklenecek = PERFORMANS_YONETIM_MODULLERI.filter(
+    (modul) => !mevcutKodlar.has(modul.kod),
+  )
+
+  return [...moduller, ...eklenecek]
 }
 
 export default function PortalPage() {
@@ -341,6 +422,10 @@ export default function PortalPage() {
     const garantiModuller = performansModulunuGarantiEt(
       (modulData || []) as Modul[],
     )
+    const rolTabanliModuller = performansYonetimModulleriniEkle(
+      garantiModuller,
+      aktifRol,
+    )
 
     let yetkiKodlari: string[] = []
 
@@ -354,7 +439,7 @@ export default function PortalPage() {
       if (yetkiError) {
         setHata("Modül yetkileri okunamadı: " + yetkiError.message)
 
-        setModuller(garantiModuller)
+        setModuller(rolTabanliModuller)
         setYetkiliModulKodlari([])
         setLoading(false)
         setModulLoading(false)
@@ -367,7 +452,7 @@ export default function PortalPage() {
         .filter(Boolean) as string[]
     }
 
-    setModuller(garantiModuller)
+    setModuller(rolTabanliModuller)
     setYetkiliModulKodlari(yetkiKodlari)
     setLoading(false)
     setModulLoading(false)
@@ -389,7 +474,8 @@ export default function PortalPage() {
       .filter(
         (modul) =>
           modul.standart &&
-          kodSirasi.has(modul.kod),
+          kodSirasi.has(modul.kod) &&
+          !KALDIRILAN_MODUL_KODLARI.has(modul.kod),
       )
       .sort(
         (a, b) =>
@@ -400,25 +486,31 @@ export default function PortalPage() {
 
   const opsiyonelModuller = useMemo(() => {
     const filtre = (modul: Modul) =>
-      !PERSONEL_GIZLI_MODUL_KODLARI.has(modul.kod)
+      !PERSONEL_GIZLI_MODUL_KODLARI.has(modul.kod) &&
+      !KALDIRILAN_MODUL_KODLARI.has(modul.kod)
 
-    if (isAdmin) {
-      return moduller.filter(
-        (modul) => !modul.standart && filtre(modul),
-      )
-    }
+    const performansYonetimGorebilir = performansYonetimRoluMu(personel?.rol)
 
     return moduller.filter((modul) => {
-      return (
-        !modul.standart &&
-        yetkiliModulKodlari.includes(modul.kod) &&
-        filtre(modul)
-      )
+      if (modul.standart || !filtre(modul)) {
+        return false
+      }
+
+      if (modul.kategori === "performans" && performansYonetimGorebilir) {
+        return true
+      }
+
+      if (isAdmin) {
+        return true
+      }
+
+      return yetkiliModulKodlari.includes(modul.kod)
     })
-  }, [moduller, isAdmin, yetkiliModulKodlari])
+  }, [moduller, isAdmin, yetkiliModulKodlari, personel?.rol])
 
   const opsiyonelGruplar = useMemo(() => {
     const kategoriSirasi = [
+      "performans",
       "yonetim",
       "operasyon",
       "anket",

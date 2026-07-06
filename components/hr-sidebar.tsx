@@ -52,7 +52,6 @@ import {
   Gauge,
   KeyRound,
   Landmark,
-  LayoutDashboard,
   Link2,
   LogOut,
   MapPinned,
@@ -127,17 +126,6 @@ const ADMIN_ROLLERI: AppRole[] = [
 
 const navigationItems: NavGroup[] = [
   {
-    title: "Genel Bakış",
-
-    items: [
-      {
-        title: "Panel",
-        icon: LayoutDashboard,
-      },
-    ],
-  },
-
-  {
     title: "İK Yönetimi",
 
     items: [
@@ -211,16 +199,23 @@ const navigationItems: NavGroup[] = [
       },
 
       {
-        title: "Hızlı Performans",
+        title: "Performans Veri Girişi",
         icon: Gauge,
         href: "/portal/hizli-performans",
-        allowedRoles: SERVIS_YONETIM_ROLLERI,
+        allowedRoles: YONETICI_ROLLER,
       },
 
       {
         title: "Performans Eşleştirme",
         icon: Link2,
         href: "/portal/performans-eslestirme",
+        allowedRoles: YONETICI_ROLLER,
+      },
+
+      {
+        title: "Performans Yönetim V2",
+        icon: BarChart3,
+        href: "/portal/performans-yonetim-v2",
         allowedRoles: YONETICI_ROLLER,
       },
 
@@ -248,6 +243,20 @@ const navigationItems: NavGroup[] = [
         icon: Bot,
         href: "/portal/ai-gorev-merkezi",
         allowedRoles: SERVIS_YONETIM_ROLLERI,
+      },
+
+      {
+        title: "Akıllı Atama Merkezi",
+        icon: Warehouse,
+        href: "/portal/akilli-atama-merkezi",
+        allowedRoles: OPERASYON_ROLLERI,
+      },
+
+      {
+        title: "Hizmet Süre Kataloğu",
+        icon: Clock,
+        href: "/portal/hizmet-sure-katalogu",
+        allowedRoles: OPERASYON_ROLLERI,
       },
 
       {
@@ -528,12 +537,6 @@ export function HRSidebar({
               )
             ) {
               return false
-            }
-
-            if (
-              item.title === "Panel"
-            ) {
-              return true
             }
 
             if (

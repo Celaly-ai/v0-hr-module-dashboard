@@ -34,15 +34,19 @@ export const ALL_MODULES = [
 
   // Performans
   "Performans Degerlendirme",
-  "Hizli Performans",
+  "Performans Veri Girisi",
   "Performans Eslestirme",
+  "Performans Yonetim V2",
   "Performansim",
 
   // Operasyon
   "AI Canli Operasyon Merkezi",
   "AI Gorev Merkezi",
   "Operasyon Havuzu",
+  "Akilli Atama Merkezi",
+  "Hizmet Sure Katalogu",
   "Operasyon Zimmet",
+  "Gorevlerim",
   "Adres Konum Teyit",
   "Adres Konum Rapor",
   "Yonetici Bildirimleri",
@@ -125,13 +129,16 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, ModuleSlug[]> = {
     "Departmanlar",
 
     "Performans Degerlendirme",
-    "Hizli Performans",
+    "Performans Veri Girisi",
     "Performans Eslestirme",
+    "Performans Yonetim V2",
     "Performansim",
 
     "AI Canli Operasyon Merkezi",
     "AI Gorev Merkezi",
     "Operasyon Havuzu",
+    "Akilli Atama Merkezi",
+    "Hizmet Sure Katalogu",
     "Operasyon Zimmet",
     "Adres Konum Teyit",
     "Adres Konum Rapor",
@@ -168,8 +175,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, ModuleSlug[]> = {
     "Departmanlar",
 
     "Performans Degerlendirme",
-    "Hizli Performans",
+    "Performans Veri Girisi",
     "Performans Eslestirme",
+    "Performans Yonetim V2",
     "Performansim",
 
     "Adres Konum Teyit",
@@ -217,4 +225,42 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, ModuleSlug[]> = {
 
     "Bildirimler",
   ],
+}
+
+export type PortalModuleDefinition = {
+  kod: string
+  ad: string
+  route: string
+  aciklama: string
+}
+
+export const PORTAL_MODULE_DEFINITIONS: Record<string, PortalModuleDefinition> = {
+  gorevlerim: {
+    kod: "gorevlerim",
+    ad: "Görevlerim",
+    route: "/portal/gorevlerim",
+    aciklama:
+      "Atanmış saha görevlerinizi görüntüleyin ve operasyon işlemlerini yürütün.",
+  },
+  performans_yonetim_v2: {
+    kod: "performans_yonetim_v2",
+    ad: "Performans Yönetim V2",
+    route: "/portal/performans-yonetim-v2",
+    aciklama:
+      "V2 performans sonuçlarını yönetici görünümünde salt okunur inceleyin.",
+  },
+  performans_eslestirme: {
+    kod: "performans_eslestirme",
+    ad: "Performans Eşleştirme",
+    route: "/portal/performans-eslestirme",
+    aciklama:
+      "Performans teknisyen kayıtlarını personel profilleri ile eşleştirin.",
+  },
+  performans_veri_girisi: {
+    kod: "performans_veri_girisi",
+    ad: "Performans Veri Girişi",
+    route: "/portal/hizli-performans",
+    aciklama:
+      "Performans matris verilerini yükleyin ve normalize kayıtları yönetin.",
+  },
 }

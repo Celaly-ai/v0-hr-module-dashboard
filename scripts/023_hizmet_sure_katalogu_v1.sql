@@ -16,6 +16,8 @@ create table if not exists public.hizmet_sure_katalogu (
   kaynak              text not null default 'manuel'
                         check (kaynak in ('manuel', 'saha_ogrenimi')),
   aciklama            text,
+  ogrenmeye_acik      boolean not null default true,
+  ai_guncelleyebilir  boolean not null default false,
   created_at          timestamptz not null default now(),
   updated_at          timestamptz not null default now(),
   constraint hizmet_sure_katalogu_kod_unique unique (hizmet_kodu)
@@ -26,6 +28,26 @@ create index if not exists hizmet_sure_katalogu_aktif_idx
 
 create index if not exists hizmet_sure_katalogu_is_tipi_idx
   on public.hizmet_sure_katalogu (is_tipi);
+
+alter table public.hizmet_sure_katalogu
+  add column if not exists ogrenmeye_acik boolean not null default true;
+
+alter table public.hizmet_sure_katalogu
+  add column if not exists ai_guncelleyebilir boolean not null default false;
+
+create table if not exists public.hizmet_sure_katalogu_yukleme_loglari (
+  id              uuid primary key default gen_random_uuid(),
+  dosya_adi       text not null,
+  toplam_satir    integer not null default 0,
+  yeni_eklenen    integer not null default 0,
+  guncellenen     integer not null default 0,
+  hatali          integer not null default 0,
+  hata_detayi     jsonb,
+  created_at      timestamptz not null default now()
+);
+
+create index if not exists hizmet_sure_katalogu_yukleme_loglari_created_idx
+  on public.hizmet_sure_katalogu_yukleme_loglari (created_at desc);
 
 insert into public.hizmet_sure_katalogu (
   hizmet_kodu,

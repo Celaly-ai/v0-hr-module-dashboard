@@ -81,9 +81,37 @@ function calismaTipiGecerliMi(value: string | null | undefined, secenekler: { ko
   return secenekler.some((secenek) => secenek.kod === value)
 }
 
+const ONCELIK_SEVIYELERI = [
+  { deger: 10, etiket: "🔴 Kritik" },
+  { deger: 30, etiket: "🟠 Yüksek" },
+  { deger: 50, etiket: "🟡 Normal" },
+  { deger: 70, etiket: "🔵 Düşük" },
+  { deger: 90, etiket: "⚪ Yedek" },
+] as const
+
+const VARSAYILAN_ONCELIK = 50
+
+const JOKER_BILGI_METNI =
+  "Joker ekipler AI tarafından acil işler ve yük dengeleme için öncelikli değerlendirilebilir."
+
 function oncelikDegeri(value: string | number | null | undefined) {
   const parsed = Number(String(value ?? "").trim())
-  return Number.isFinite(parsed) ? parsed : 50
+  const gecerliSeviye = ONCELIK_SEVIYELERI.find((seviye) => seviye.deger === parsed)
+  if (gecerliSeviye) return gecerliSeviye.deger
+  if (!Number.isFinite(parsed)) return VARSAYILAN_ONCELIK
+
+  return ONCELIK_SEVIYELERI.reduce((enYakin, seviye) =>
+    Math.abs(seviye.deger - parsed) < Math.abs(enYakin.deger - parsed) ? seviye : enYakin,
+  ).deger
+}
+
+function oncelikSelectDegeri(value: string | number | null | undefined) {
+  return String(oncelikDegeri(value))
+}
+
+function oncelikEtiketi(value: string | number | null | undefined) {
+  const hedef = oncelikDegeri(value)
+  return ONCELIK_SEVIYELERI.find((seviye) => seviye.deger === hedef)?.etiket || "🟡 Normal"
 }
 
 function ekipAdiNormalize(value?: string | null) {
@@ -139,7 +167,7 @@ export default function YonetimEkiplerPage() {
     bolge: "",
     gorev: "",
     gorev_tipi: "",
-    calisma_tipi: "normal",
+    calisma_tipi: "",
     oncelik: "50",
     aciklama: "",
   })
@@ -424,7 +452,7 @@ export default function YonetimEkiplerPage() {
       bolge: "",
       gorev: "",
       gorev_tipi: "",
-      calisma_tipi: "normal",
+      calisma_tipi: "",
       oncelik: "50",
       aciklama: "",
     })
@@ -500,8 +528,8 @@ export default function YonetimEkiplerPage() {
     setDuzenlenenEkipId(ekip.id)
     setDuzenlemeForm({
       gorev_tipi: ekip.gorev_tipi || "",
-      calisma_tipi: ekip.calisma_tipi || "normal",
-      oncelik: ekip.oncelik != null ? String(ekip.oncelik) : "50",
+      calisma_tipi: ekip.calisma_tipi || "",
+      oncelik: oncelikSelectDegeri(ekip.oncelik),
       bolge: ekip.bolge || "",
       gorev: ekip.gorev || "",
       aciklama: ekip.aciklama || "",
@@ -699,108 +727,184 @@ export default function YonetimEkiplerPage() {
         <div className="rounded-2xl border border-gray-300 bg-white p-4 shadow-sm space-y-4">
           <h2 className="text-lg font-black">Yeni Ekip Oluştur</h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-            <input
-              value={form.ekip_adi}
-              onChange={(e) => setForm({ ...form, ekip_adi: e.target.value })}
-              placeholder="Ekip adı"
-              className="md:col-span-3 rounded-lg border border-gray-500 px-3 py-2 font-semibold"
-            />
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+              <div className="md:col-span-3">
+                <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor="yeni_ekip_adi">
+                  Ekip Adı
+                </label>
+                <input
+                  id="yeni_ekip_adi"
+                  value={form.ekip_adi}
+                  onChange={(e) => setForm({ ...form, ekip_adi: e.target.value })}
+                  placeholder="Ekip adı"
+                  className="w-full rounded-lg border border-gray-500 px-3 py-2 font-semibold"
+                />
+              </div>
 
-            <select
-              value={form.lider_personel_id}
-              onChange={(e) => setForm({ ...form, lider_personel_id: e.target.value })}
-              className="md:col-span-3 rounded-lg border border-gray-500 px-3 py-2 font-bold"
-            >
-              <option value="">Lider seç</option>
-              {secilebilirPersoneller.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.ad} {p.soyad}
-                </option>
-              ))}
-            </select>
+              <div className="md:col-span-3">
+                <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor="yeni_lider">
+                  Lider
+                </label>
+                <select
+                  id="yeni_lider"
+                  value={form.lider_personel_id}
+                  onChange={(e) => setForm({ ...form, lider_personel_id: e.target.value })}
+                  className="w-full rounded-lg border border-gray-500 px-3 py-2 font-bold"
+                >
+                  <option value="">Lider seç</option>
+                  {secilebilirPersoneller.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.ad} {p.soyad}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <select
-              value={form.sorumlu_personel_id}
-              onChange={(e) => setForm({ ...form, sorumlu_personel_id: e.target.value })}
-              className="md:col-span-3 rounded-lg border border-gray-500 px-3 py-2 font-bold"
-            >
-              <option value="">Sorumlu seç</option>
-              {secilebilirPersoneller.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.ad} {p.soyad}
-                </option>
-              ))}
-            </select>
+              <div className="md:col-span-3">
+                <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor="yeni_sorumlu">
+                  Sorumlu
+                </label>
+                <select
+                  id="yeni_sorumlu"
+                  value={form.sorumlu_personel_id}
+                  onChange={(e) => setForm({ ...form, sorumlu_personel_id: e.target.value })}
+                  className="w-full rounded-lg border border-gray-500 px-3 py-2 font-bold"
+                >
+                  <option value="">Sorumlu seç</option>
+                  {secilebilirPersoneller.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.ad} {p.soyad}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <select
-              value={form.arac_varlik_id}
-              onChange={(e) => setForm({ ...form, arac_varlik_id: e.target.value })}
-              className="md:col-span-3 rounded-lg border border-gray-500 px-3 py-2 font-bold"
-            >
-              <option value="">Araç seç</option>
-              {araclar.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.plaka || a.demirbas_no || a.ad} {a.marka || ""} {a.model || ""}
-                </option>
-              ))}
-            </select>
+              <div className="md:col-span-3">
+                <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor="yeni_arac">
+                  Araç
+                </label>
+                <select
+                  id="yeni_arac"
+                  value={form.arac_varlik_id}
+                  onChange={(e) => setForm({ ...form, arac_varlik_id: e.target.value })}
+                  className="w-full rounded-lg border border-gray-500 px-3 py-2 font-bold"
+                >
+                  <option value="">Araç seç</option>
+                  {araclar.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.plaka || a.demirbas_no || a.ad} {a.marka || ""} {a.model || ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
-            <input
-              value={form.bolge}
-              onChange={(e) => setForm({ ...form, bolge: e.target.value })}
-              placeholder="Bölge"
-              className="md:col-span-3 rounded-lg border border-gray-500 px-3 py-2 font-semibold"
-            />
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+              <div className="md:col-span-3">
+                <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor="yeni_bolge">
+                  Bölge
+                </label>
+                <input
+                  id="yeni_bolge"
+                  value={form.bolge}
+                  onChange={(e) => setForm({ ...form, bolge: e.target.value })}
+                  placeholder="Bölge"
+                  className="w-full rounded-lg border border-gray-500 px-3 py-2 font-semibold"
+                />
+              </div>
 
-            <select
-              value={form.gorev_tipi}
-              onChange={(e) => setForm({ ...form, gorev_tipi: e.target.value })}
-              className="md:col-span-3 rounded-lg border border-gray-500 px-3 py-2 font-bold"
-            >
-              <option value="">Görev tipi seç *</option>
-              {aktifGorevTipiSecenekleri.map((secenek) => (
-                <option key={secenek.kod} value={secenek.kod}>
-                  {secenek.ad}
-                </option>
-              ))}
-            </select>
+              <div className="md:col-span-3">
+                <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor="yeni_gorev_tipi">
+                  Görev Tipi
+                </label>
+                <select
+                  id="yeni_gorev_tipi"
+                  value={form.gorev_tipi}
+                  onChange={(e) => setForm({ ...form, gorev_tipi: e.target.value })}
+                  className="w-full rounded-lg border border-gray-500 px-3 py-2 font-bold"
+                >
+                  <option value="">Görev tipi seç *</option>
+                  {aktifGorevTipiSecenekleri.map((secenek) => (
+                    <option key={secenek.kod} value={secenek.kod}>
+                      {secenek.ad}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <select
-              value={form.calisma_tipi}
-              onChange={(e) => setForm({ ...form, calisma_tipi: e.target.value })}
-              className="md:col-span-3 rounded-lg border border-gray-500 px-3 py-2 font-bold"
-            >
-              <option value="">Çalışma tipi seç *</option>
-              {aktifCalismaTipiSecenekleri.map((calismaSecenegi) => (
-                <option key={`calisma-${calismaSecenegi.kod}`} value={calismaSecenegi.kod}>
-                  {calismaSecenegi.ad}
-                </option>
-              ))}
-            </select>
+              <div className="md:col-span-3">
+                <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor="yeni_calisma_tipi">
+                  Çalışma Tipi
+                </label>
+                <select
+                  id="yeni_calisma_tipi"
+                  value={form.calisma_tipi}
+                  onChange={(e) => setForm({ ...form, calisma_tipi: e.target.value })}
+                  className="w-full rounded-lg border border-gray-500 px-3 py-2 font-bold"
+                >
+                  <option value="">Çalışma tipi seç *</option>
+                  {aktifCalismaTipiSecenekleri.map((calismaSecenegi) => (
+                    <option key={`calisma-${calismaSecenegi.kod}`} value={calismaSecenegi.kod}>
+                      {calismaSecenegi.ad}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <input
-              type="number"
-              value={form.oncelik}
-              onChange={(e) => setForm({ ...form, oncelik: e.target.value })}
-              placeholder="Öncelik"
-              className="md:col-span-3 rounded-lg border border-gray-500 px-3 py-2 font-semibold"
-            />
+              <div className="md:col-span-3">
+                <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor="yeni_oncelik">
+                  AI Öncelik Seviyesi
+                </label>
+                <select
+                  id="yeni_oncelik"
+                  value={form.oncelik}
+                  onChange={(e) => setForm({ ...form, oncelik: e.target.value })}
+                  className="w-full rounded-lg border border-gray-500 px-3 py-2 font-bold"
+                >
+                  {ONCELIK_SEVIYELERI.map((seviye) => (
+                    <option key={seviye.deger} value={String(seviye.deger)}>
+                      {seviye.etiket}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
-            <input
-              value={form.gorev}
-              onChange={(e) => setForm({ ...form, gorev: e.target.value })}
-              placeholder="Görev açıklaması"
-              className="md:col-span-3 rounded-lg border border-gray-500 px-3 py-2 font-semibold"
-            />
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+              <div className="md:col-span-6">
+                <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor="yeni_gorev">
+                  Görev Açıklaması
+                </label>
+                <input
+                  id="yeni_gorev"
+                  value={form.gorev}
+                  onChange={(e) => setForm({ ...form, gorev: e.target.value })}
+                  placeholder="Görev açıklaması"
+                  className="w-full rounded-lg border border-gray-500 px-3 py-2 font-semibold"
+                />
+              </div>
 
-            <input
-              value={form.aciklama}
-              onChange={(e) => setForm({ ...form, aciklama: e.target.value })}
-              placeholder="Açıklama"
-              className="md:col-span-6 rounded-lg border border-gray-500 px-3 py-2 font-semibold"
-            />
+              <div className="md:col-span-6">
+                <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor="yeni_aciklama">
+                  Açıklama
+                </label>
+                <input
+                  id="yeni_aciklama"
+                  value={form.aciklama}
+                  onChange={(e) => setForm({ ...form, aciklama: e.target.value })}
+                  placeholder="Açıklama"
+                  className="w-full rounded-lg border border-gray-500 px-3 py-2 font-semibold"
+                />
+              </div>
+            </div>
           </div>
+
+          {form.calisma_tipi === "joker" && (
+            <p className="text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              {JOKER_BILGI_METNI}
+            </p>
+          )}
 
           <button
             onClick={ekipOlustur}
@@ -877,8 +981,8 @@ export default function YonetimEkiplerPage() {
                   <>
                     <p className="text-sm font-semibold text-gray-700">
                       Görev tipi: {gorevTipiEtiketi(e.gorev_tipi, gorevTipiKayitlari)} · Çalışma tipi:{" "}
-                      {calismaTipiEtiketi(e.calisma_tipi, calismaTipiKayitlari)} · Öncelik:{" "}
-                      {e.oncelik ?? 50} · Görev: {e.gorev || "-"} · Bölge: {e.bolge || "-"}
+                      {calismaTipiEtiketi(e.calisma_tipi, calismaTipiKayitlari)} · AI Öncelik:{" "}
+                      {oncelikEtiketi(e.oncelik)} · Görev: {e.gorev || "-"} · Bölge: {e.bolge || "-"}
                     </p>
                     {e.aciklama && (
                       <p className="text-sm font-semibold text-gray-700 mt-1">
@@ -933,96 +1037,104 @@ export default function YonetimEkiplerPage() {
                 {duzenlemeModu && (
                   <div className="mt-3 space-y-3 rounded-xl border border-blue-200 bg-blue-50 p-3">
                     <p className="text-sm font-black text-blue-900">Ekip Düzenle</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor={`duzenle_gorev_tipi_${e.id}`}>
-                          Görev tipi *
-                        </label>
-                        <select
-                          id={`duzenle_gorev_tipi_${e.id}`}
-                          value={duzenlemeForm.gorev_tipi}
-                          onChange={(ev) =>
-                            setDuzenlemeForm({ ...duzenlemeForm, gorev_tipi: ev.target.value })
-                          }
-                          className="w-full rounded-lg border border-gray-500 px-3 py-2 font-bold"
-                        >
-                          <option value="">Görev tipi seç *</option>
-                          {aktifGorevTipiSecenekleri.map((secenek) => (
-                            <option key={secenek.kod} value={secenek.kod}>
-                              {secenek.ad}
-                            </option>
-                          ))}
-                        </select>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                          <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor={`duzenle_gorev_tipi_${e.id}`}>
+                            Görev Tipi
+                          </label>
+                          <select
+                            id={`duzenle_gorev_tipi_${e.id}`}
+                            value={duzenlemeForm.gorev_tipi}
+                            onChange={(ev) =>
+                              setDuzenlemeForm({ ...duzenlemeForm, gorev_tipi: ev.target.value })
+                            }
+                            className="w-full rounded-lg border border-gray-500 px-3 py-2 font-bold"
+                          >
+                            <option value="">Görev tipi seç *</option>
+                            {aktifGorevTipiSecenekleri.map((secenek) => (
+                              <option key={secenek.kod} value={secenek.kod}>
+                                {secenek.ad}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor={`duzenle_calisma_tipi_${e.id}`}>
+                            Çalışma Tipi
+                          </label>
+                          <select
+                            id={`duzenle_calisma_tipi_${e.id}`}
+                            value={duzenlemeForm.calisma_tipi}
+                            onChange={(ev) =>
+                              setDuzenlemeForm({ ...duzenlemeForm, calisma_tipi: ev.target.value })
+                            }
+                            className="w-full rounded-lg border border-gray-500 px-3 py-2 font-bold"
+                          >
+                            <option value="">Çalışma tipi seç *</option>
+                            {aktifCalismaTipiSecenekleri.map((calismaSecenegi) => (
+                              <option key={`calisma-duzenle-${calismaSecenegi.kod}`} value={calismaSecenegi.kod}>
+                                {calismaSecenegi.ad}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor={`duzenle_oncelik_${e.id}`}>
+                            AI Öncelik Seviyesi
+                          </label>
+                          <select
+                            id={`duzenle_oncelik_${e.id}`}
+                            value={duzenlemeForm.oncelik}
+                            onChange={(ev) =>
+                              setDuzenlemeForm({ ...duzenlemeForm, oncelik: ev.target.value })
+                            }
+                            className="w-full rounded-lg border border-gray-500 px-3 py-2 font-bold"
+                          >
+                            {ONCELIK_SEVIYELERI.map((seviye) => (
+                              <option key={seviye.deger} value={String(seviye.deger)}>
+                                {seviye.etiket}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor={`duzenle_bolge_${e.id}`}>
+                            Bölge
+                          </label>
+                          <input
+                            id={`duzenle_bolge_${e.id}`}
+                            value={duzenlemeForm.bolge}
+                            onChange={(ev) =>
+                              setDuzenlemeForm({ ...duzenlemeForm, bolge: ev.target.value })
+                            }
+                            placeholder="Bölge"
+                            className="w-full rounded-lg border border-gray-500 px-3 py-2 font-semibold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor={`duzenle_gorev_${e.id}`}>
+                            Görev Açıklaması
+                          </label>
+                          <input
+                            id={`duzenle_gorev_${e.id}`}
+                            value={duzenlemeForm.gorev}
+                            onChange={(ev) =>
+                              setDuzenlemeForm({ ...duzenlemeForm, gorev: ev.target.value })
+                            }
+                            placeholder="Görev açıklaması"
+                            className="w-full rounded-lg border border-gray-500 px-3 py-2 font-semibold"
+                          />
+                        </div>
                       </div>
 
                       <div>
-                        <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor={`duzenle_calisma_tipi_${e.id}`}>
-                          Çalışma tipi *
-                        </label>
-                        <select
-                          id={`duzenle_calisma_tipi_${e.id}`}
-                          value={duzenlemeForm.calisma_tipi}
-                          onChange={(ev) =>
-                            setDuzenlemeForm({ ...duzenlemeForm, calisma_tipi: ev.target.value })
-                          }
-                          className="w-full rounded-lg border border-gray-500 px-3 py-2 font-bold"
-                        >
-                          <option value="">Çalışma tipi seç *</option>
-                          {aktifCalismaTipiSecenekleri.map((calismaSecenegi) => (
-                            <option key={`calisma-duzenle-${calismaSecenegi.kod}`} value={calismaSecenegi.kod}>
-                              {calismaSecenegi.ad}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor={`duzenle_oncelik_${e.id}`}>
-                          Öncelik
-                        </label>
-                        <input
-                          id={`duzenle_oncelik_${e.id}`}
-                          type="number"
-                          value={duzenlemeForm.oncelik}
-                          onChange={(ev) =>
-                            setDuzenlemeForm({ ...duzenlemeForm, oncelik: ev.target.value })
-                          }
-                          placeholder="Öncelik"
-                          className="w-full rounded-lg border border-gray-500 px-3 py-2 font-semibold"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor={`duzenle_bolge_${e.id}`}>
-                          Bölge
-                        </label>
-                        <input
-                          id={`duzenle_bolge_${e.id}`}
-                          value={duzenlemeForm.bolge}
-                          onChange={(ev) =>
-                            setDuzenlemeForm({ ...duzenlemeForm, bolge: ev.target.value })
-                          }
-                          placeholder="Bölge"
-                          className="w-full rounded-lg border border-gray-500 px-3 py-2 font-semibold"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor={`duzenle_gorev_${e.id}`}>
-                          Görev
-                        </label>
-                        <input
-                          id={`duzenle_gorev_${e.id}`}
-                          value={duzenlemeForm.gorev}
-                          onChange={(ev) =>
-                            setDuzenlemeForm({ ...duzenlemeForm, gorev: ev.target.value })
-                          }
-                          placeholder="Görev açıklaması"
-                          className="w-full rounded-lg border border-gray-500 px-3 py-2 font-semibold"
-                        />
-                      </div>
-
-                      <div className="md:col-span-2">
                         <label className="mb-1 block text-xs font-bold text-gray-700" htmlFor={`duzenle_aciklama_${e.id}`}>
                           Açıklama
                         </label>
@@ -1038,6 +1150,12 @@ export default function YonetimEkiplerPage() {
                         />
                       </div>
                     </div>
+
+                    {duzenlemeForm.calisma_tipi === "joker" && (
+                      <p className="text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                        {JOKER_BILGI_METNI}
+                      </p>
+                    )}
 
                     <div className="flex gap-2">
                       <button

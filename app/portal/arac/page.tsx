@@ -45,6 +45,12 @@ type Personel = {
 
 const ADMIN_ROLLERI = ["admin", "ceo"]
 
+const KALDIRILAN_MODUL_KODLARI = new Set([
+  "urun_kabul",
+  "urun_devir",
+  "urun_fisleri",
+])
+
 const modulYollari: Record<string, string> = {
   ana_sayfa: "/portal",
   mesai: "/login-cikis",
@@ -70,6 +76,7 @@ const modulYollari: Record<string, string> = {
   varliklar: "/portal/varliklar",
 
   urun_merkezi: "/portal/urun-merkezi",
+
   anket_is_havuzu: "/portal/anket-is-havuzu",
   musteri_anketi: "/portal/anket",
   riskli_anket_takibi: "/portal/anket?odak=tekrar-aranacaklar",
@@ -106,6 +113,7 @@ const modulIkonlari: Record<string, any> = {
   varliklar: Boxes,
 
   urun_merkezi: Boxes,
+
   anket_is_havuzu: FileSpreadsheet,
   musteri_anketi: Bot,
   riskli_anket_takibi: AlertTriangle,
@@ -234,14 +242,22 @@ export default function PortalPage() {
   }, [yukle])
 
   const standartModuller = useMemo(() => {
-    return moduller.filter((modul) => modul.standart)
+    return moduller.filter(
+      (modul) => modul.standart && !KALDIRILAN_MODUL_KODLARI.has(modul.kod),
+    )
   }, [moduller])
 
   const opsiyonelModuller = useMemo(() => {
-    if (isAdmin) return moduller.filter((modul) => !modul.standart)
+    const filtre = (modul: Modul) => !KALDIRILAN_MODUL_KODLARI.has(modul.kod)
+
+    if (isAdmin) return moduller.filter((modul) => !modul.standart && filtre(modul))
 
     return moduller.filter((modul) => {
-      return !modul.standart && yetkiliModulKodlari.includes(modul.kod)
+      return (
+        !modul.standart &&
+        yetkiliModulKodlari.includes(modul.kod) &&
+        filtre(modul)
+      )
     })
   }, [moduller, isAdmin, yetkiliModulKodlari])
 

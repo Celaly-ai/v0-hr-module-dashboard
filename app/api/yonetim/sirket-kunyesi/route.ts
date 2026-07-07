@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import {
+  kunyeZorunluEksikleriniBul,
+  sirketKaydindanKunyeOlustur,
+} from "@/lib/services/sirket-kunye-service"
 
 function getAdminClient() {
   const supabaseUrl =
@@ -32,20 +36,9 @@ function sayi(value: unknown) {
   return Number.isFinite(n) ? n : null
 }
 
-function kunyeTamamMi(payload: any) {
-  return Boolean(
-    temiz(payload.ad) &&
-      temiz(payload.unvan) &&
-      temiz(payload.vergi_no) &&
-      temiz(payload.tel) &&
-      temiz(payload.email) &&
-      temiz(payload.il) &&
-      temiz(payload.ilce) &&
-      temiz(payload.mahalle) &&
-      temiz(payload.acik_adres) &&
-      sayi(payload.giris_cikis_lat) !== null &&
-      sayi(payload.giris_cikis_lng) !== null,
-  )
+function kunyeTamamMi(payload: Record<string, unknown>, sirketId?: string | null) {
+  const kunye = sirketKaydindanKunyeOlustur(payload, sirketId)
+  return kunyeZorunluEksikleriniBul(kunye, sirketId || kunye.id).length === 0
 }
 
 export async function GET() {
@@ -100,7 +93,10 @@ export async function POST(request: Request) {
 
       giris_cikis_lat: sayi(body?.giris_cikis_lat),
       giris_cikis_lng: sayi(body?.giris_cikis_lng),
-      giris_cikis_mesafe_limiti: sayi(body?.giris_cikis_mesafe_limiti) || 50,
+      giris_cikis_mesafe_limiti: sayi(body?.giris_cikis_mesafe_limiti),
+
+      standart_mesai_baslangic: temiz(body?.standart_mesai_baslangic),
+      standart_mesai_bitis: temiz(body?.standart_mesai_bitis),
 
       yetkili_ad_soyad: temiz(body?.yetkili_ad_soyad),
       yetkili_telefon: temiz(body?.yetkili_telefon),
@@ -109,12 +105,12 @@ export async function POST(request: Request) {
       updated_at: new Date().toISOString(),
     }
 
+    const id = temiz(body?.id)
+
     const finalPayload = {
       ...payload,
-      kunye_tamamlandi: kunyeTamamMi(payload),
+      kunye_tamamlandi: kunyeTamamMi(payload, id),
     }
-
-    const id = temiz(body?.id)
 
     const query = id
       ? supabase.from("sirketler").update(finalPayload).eq("id", id).select("*").single()
@@ -130,6 +126,26 @@ export async function POST(request: Request) {
         { error: error.message, code: error.code, details: error.details },
         { status: 500 },
       )
+    }
+
+    if (data?.id) {
+      const kunyeTamam = kunyeTamamMi(data as Record<string, unknown>, data.id)
+
+      if (Boolean(data.kunye_tamamlandi) !== kunyeTamam) {
+        const { data: guncel, error: guncellemeError } = await supabase
+          .from("sirketler")
+          .update({ kunye_tamamlandi: kunyeTamam })
+          .eq("id", data.id)
+          .select("*")
+          .single()
+
+        if (!guncellemeError && guncel) {
+          return NextResponse.json({
+            success: true,
+            sirket: guncel,
+          })
+        }
+      }
     }
 
     return NextResponse.json({

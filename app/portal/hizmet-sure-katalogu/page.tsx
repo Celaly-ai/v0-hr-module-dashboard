@@ -24,6 +24,18 @@ const EXCEL_KOLONLARI = [
 
 const KATALOG_SELECT = `${HIZMET_SURE_SELECT}, ogrenmeye_acik, ai_guncelleyebilir`
 
+type HizmetTipiKaydi = {
+  kod: string
+  ad: string
+  sira: number
+}
+
+const IS_TIPI_FALLBACK: HizmetTipiKaydi[] = [
+  { kod: "N", ad: "Nakliye", sira: 10 },
+  { kod: "M", ad: "Montaj", sira: 20 },
+  { kod: "NM", ad: "Nakliye + Montaj", sira: 30 },
+]
+
 type KatalogKaydi = HizmetSureKaydi & {
   ogrenmeye_acik?: boolean | null
   ai_guncelleyebilir?: boolean | null
@@ -171,8 +183,36 @@ export default function HizmetSureKataloguPage() {
   const [excelYukleniyor, setExcelYukleniyor] = useState(false)
   const [excelDosya, setExcelDosya] = useState<File | null>(null)
   const [yuklemeOzeti, setYuklemeOzeti] = useState<YuklemeOzeti | null>(null)
+  const [hizmetTipleri, setHizmetTipleri] = useState<HizmetTipiKaydi[]>(IS_TIPI_FALLBACK)
   const [mesaj, setMesaj] = useState("")
   const [hata, setHata] = useState("")
+
+  const isTipiSecenekleri = useMemo(() => {
+    const kaynak = hizmetTipleri.length > 0 ? hizmetTipleri : IS_TIPI_FALLBACK
+    return [...kaynak].sort((a, b) => a.sira - b.sira || a.ad.localeCompare(b.ad, "tr"))
+  }, [hizmetTipleri])
+
+  const hizmetTipleriniYukle = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("hizmet_tipleri")
+      .select("kod, ad, sira")
+      .eq("aktif", true)
+      .order("sira", { ascending: true })
+      .order("ad", { ascending: true })
+
+    if (error || !data?.length) {
+      setHizmetTipleri(IS_TIPI_FALLBACK)
+      return
+    }
+
+    setHizmetTipleri(
+      data.map((kayit) => ({
+        kod: kayit.kod,
+        ad: kayit.ad,
+        sira: kayit.sira ?? 100,
+      })),
+    )
+  }, [supabase])
 
   const yukle = useCallback(async () => {
     setLoading(true)
@@ -192,8 +232,9 @@ export default function HizmetSureKataloguPage() {
   }, [supabase])
 
   useEffect(() => {
+    void hizmetTipleriniYukle()
     void yukle()
-  }, [yukle])
+  }, [hizmetTipleriniYukle, yukle])
 
   function formuDoldur(kayit: KatalogKaydi) {
     setDuzenleId(kayit.id)
@@ -535,16 +576,22 @@ export default function HizmetSureKataloguPage() {
                 required
               />
             </Field>
-            <Field label="İş Tipi (N/M/NM)">
+            <Field label="İş Tipi">
               <select
                 className={inputSinifi}
                 value={form.is_tipi}
                 onChange={(e) => setForm((f) => ({ ...f, is_tipi: e.target.value }))}
               >
                 <option value="">Seçilmedi</option>
-                <option value="N">N — Nakliye</option>
-                <option value="M">M — Montaj</option>
-                <option value="NM">NM — Nakliye + Montaj</option>
+                {isTipiSecenekleri.map((tip) => (
+                  <option key={tip.kod} value={tip.kod}>
+                    {tip.kod} — {tip.ad}
+                  </option>
+                ))}
+                {form.is_tipi &&
+                  !isTipiSecenekleri.some((tip) => tip.kod === form.is_tipi) && (
+                    <option value={form.is_tipi}>{form.is_tipi} — (mevcut kayıt)</option>
+                  )}
               </select>
             </Field>
             <Field label="Gerekli Yetenek">

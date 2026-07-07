@@ -108,6 +108,12 @@ const PERFORMANS_YONETIM_MODULLERI: Modul[] = [
   },
 ]
 
+const PERFORMANS_VERI_GIRISI_MODULU = PERFORMANS_YONETIM_MODULLERI.find(
+  (modul) => modul.kod === "performans_veri_girisi",
+)!
+
+const PERFORMANS_YONETIM_ESKI_KODLARI = new Set(["hizli_performans"])
+
 const PERSONEL_STANDART_MODUL_KODLARI = [
   "mesai",
   "izin",
@@ -294,13 +300,54 @@ function performansYonetimModulleriniEkle(moduller: Modul[], rol?: string | null
     return moduller
   }
 
-  const mevcutKodlar = new Set(moduller.map((modul) => modul.kod))
+  const yonetimTanimlari = new Map(
+    PERFORMANS_YONETIM_MODULLERI.map((modul) => [modul.kod, modul]),
+  )
+
+  const temizModuller = moduller.filter(
+    (modul) => !PERFORMANS_YONETIM_ESKI_KODLARI.has(modul.kod),
+  )
+
+  const mevcutKodlar = new Set(temizModuller.map((modul) => modul.kod))
+
+  const birlestirilmis = temizModuller.map((modul) => {
+    const tanim = yonetimTanimlari.get(modul.kod)
+
+    if (!tanim) {
+      return modul
+    }
+
+    return {
+      ...modul,
+      ...tanim,
+    }
+  })
 
   const eklenecek = PERFORMANS_YONETIM_MODULLERI.filter(
     (modul) => !mevcutKodlar.has(modul.kod),
   )
 
-  return [...moduller, ...eklenecek]
+  return [...birlestirilmis, ...eklenecek]
+}
+
+function performansVeriGirisiModulunuGarantiEt(
+  moduller: Modul[],
+  rol?: string | null,
+  adminMi = false,
+) {
+  if (!performansYonetimRoluMu(rol) && !adminMi) {
+    return moduller
+  }
+
+  const veriGirisiVar = moduller.some(
+    (modul) => modul.kod === PERFORMANS_VERI_GIRISI_MODULU.kod,
+  )
+
+  if (veriGirisiVar) {
+    return moduller
+  }
+
+  return [...moduller, PERFORMANS_VERI_GIRISI_MODULU]
 }
 
 export default function PortalPage() {
@@ -491,8 +538,19 @@ export default function PortalPage() {
 
     const performansYonetimGorebilir = performansYonetimRoluMu(personel?.rol)
 
-    return moduller.filter((modul) => {
-      if (modul.standart || !filtre(modul)) {
+    const filtrelenmis = moduller.filter((modul) => {
+      if (!filtre(modul)) {
+        return false
+      }
+
+      if (
+        modul.kod === PERFORMANS_VERI_GIRISI_MODULU.kod &&
+        (performansYonetimGorebilir || isAdmin)
+      ) {
+        return true
+      }
+
+      if (modul.standart) {
         return false
       }
 
@@ -506,6 +564,12 @@ export default function PortalPage() {
 
       return yetkiliModulKodlari.includes(modul.kod)
     })
+
+    return performansVeriGirisiModulunuGarantiEt(
+      filtrelenmis,
+      personel?.rol,
+      isAdmin,
+    )
   }, [moduller, isAdmin, yetkiliModulKodlari, personel?.rol])
 
   const opsiyonelGruplar = useMemo(() => {

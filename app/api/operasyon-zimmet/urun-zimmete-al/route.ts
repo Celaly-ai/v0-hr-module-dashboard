@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { kullaniciDetayaYetkiliMi } from "@/lib/services/gorev-yetki-service"
 
 function temiz(value: unknown) {
   const v = String(value ?? "").trim()
@@ -18,67 +19,98 @@ export async function POST(request: Request) {
   const detayId = temiz(body?.detay_id)
   const okunanBarkod = temiz(body?.barkod)
   const okunanSeriNo = temiz(body?.seri_no)
-  const ekipId = temiz(body?.ekip_id)
-  const ekipAdi = temiz(body?.ekip_adi)
 
-  if (!detayId || !okunanBarkod || !okunanSeriNo || !ekipId || !ekipAdi) {
+  if (!detayId || !okunanBarkod || !okunanSeriNo) {
     return Response.json(
-      { error: "Detay, barkod, seri no ve ekip bilgisi zorunludur." },
+      { error: "Detay, barkod ve seri no zorunludur." },
       { status: 400 },
     )
   }
 
-  const { data: detay, error: detayError } = await supabase
+  const { data: detayKayit, error: detayLookupError } = await supabase
     .from("operasyon_zimmet_detaylari")
-    .select("id, barkod, seri_no")
+    .select("id, operasyon_zimmet_id, barkod, seri_no")
     .eq("id", detayId)
-    .single()
+    .maybeSingle()
 
-  if (detayError || !detay) {
+  if (detayLookupError) {
+    return Response.json({ error: detayLookupError.message }, { status: 500 })
+  }
+
+  if (!detayKayit?.operasyon_zimmet_id) {
     return Response.json({ error: "Ürün detayı bulunamadı." }, { status: 404 })
   }
 
-  const kayitliBarkod = temiz(detay.barkod)
-  const kayitliSeriNo = temiz(detay.seri_no)
+  const yetki = await kullaniciDetayaYetkiliMi(supabase, detayId)
 
-  const ilkTanimlama = !kayitliBarkod && !kayitliSeriNo
-
-  if (!ilkTanimlama) {
-    const barkodEslesiyor = kayitliBarkod === okunanBarkod
-    const seriEslesiyor = kayitliSeriNo === okunanSeriNo
-
-    if (!barkodEslesiyor || !seriEslesiyor) {
-      const hata = [
-        !barkodEslesiyor ? "Barkod kayıtlı ürünle eşleşmedi." : null,
-        !seriEslesiyor ? "Seri no kayıtlı ürünle eşleşmedi." : null,
-      ]
-        .filter(Boolean)
-        .join(" ")
-
-      await supabase
-        .from("operasyon_zimmet_detaylari")
-        .update({
-          barkod_okundu: Boolean(okunanBarkod),
-          seri_no_okundu: Boolean(okunanSeriNo),
-          barkod_dogrulandi: barkodEslesiyor,
-          seri_no_dogrulandi: seriEslesiyor,
-          dogrulama_hatasi: hata,
-          dogrulama_zamani: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", detayId)
-
-      return Response.json({ error: hata, mod: "dogrulama" }, { status: 400 })
-    }
+  if (!yetki.ok) {
+    return Response.json({ error: yetki.error }, { status: yetki.status ?? 403 })
   }
+
+  const { data: zimmet, error: zimmetError } = await supabase
+    .from("operasyon_zimmetleri")
+    .select("id, ekip_id, ekip_adi")
+    .eq("id", detayKayit.operasyon_zimmet_id)
+    .maybeSingle()
+
+  if (zimmetError) {
+    return Response.json({ error: zimmetError.message }, { status: 500 })
+  }
+
+  const ekipId = temiz(zimmet?.ekip_id)
+  const ekipAdi = temiz(zimmet?.ekip_adi)
+
+  if (!ekipId || !ekipAdi) {
+    return Response.json(
+      {
+        error:
+          "Operasyon zimmetinde ekip bilgisi eksik. Ürün zimmete alınamaz.",
+      },
+      { status: 400 },
+    )
+  }
+
+  const kayitliBarkod = temiz(detayKayit.barkod)
+  const kayitliSeriNo = temiz(detayKayit.seri_no)
+
+  const barkodEslesiyor = !kayitliBarkod || kayitliBarkod === okunanBarkod
+  const seriEslesiyor = !kayitliSeriNo || kayitliSeriNo === okunanSeriNo
+
+  if (!barkodEslesiyor || !seriEslesiyor) {
+    const hata = [
+      !barkodEslesiyor ? "Barkod kayıtlı ürünle eşleşmedi." : null,
+      !seriEslesiyor ? "Seri no kayıtlı ürünle eşleşmedi." : null,
+    ]
+      .filter(Boolean)
+      .join(" ")
+
+    await supabase
+      .from("operasyon_zimmet_detaylari")
+      .update({
+        barkod_okundu: Boolean(okunanBarkod),
+        seri_no_okundu: Boolean(okunanSeriNo),
+        barkod_dogrulandi: barkodEslesiyor,
+        seri_no_dogrulandi: seriEslesiyor,
+        dogrulama_hatasi: hata,
+        dogrulama_zamani: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", detayId)
+
+    return Response.json({ error: hata, mod: "dogrulama" }, { status: 400 })
+  }
+
+  const sonucBarkod = kayitliBarkod || okunanBarkod
+  const sonucSeriNo = kayitliSeriNo || okunanSeriNo
+  const ilkTanimlama = !kayitliBarkod || !kayitliSeriNo
 
   const now = new Date().toISOString()
 
   const { error: updateError } = await supabase
     .from("operasyon_zimmet_detaylari")
     .update({
-      barkod: ilkTanimlama ? okunanBarkod : kayitliBarkod,
-      seri_no: ilkTanimlama ? okunanSeriNo : kayitliSeriNo,
+      barkod: sonucBarkod,
+      seri_no: sonucSeriNo,
 
       barkod_okundu: true,
       seri_no_okundu: true,

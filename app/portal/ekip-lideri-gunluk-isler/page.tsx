@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { bugunGorevTarihiTr } from "@/lib/services/operasyon-tarih-service"
 
 export const dynamic = "force-dynamic"
 
@@ -52,7 +53,7 @@ export default async function EkipLideriGunlukIslerPage() {
       is_bitis_zamani,
       notlar
     `)
-    .eq("gorev_tarihi", new Date().toISOString().slice(0, 10))
+    .eq("gorev_tarihi", bugunGorevTarihiTr())
     .order("ekip_adi", { ascending: true })
     .order("rota_sirasi", { ascending: true })
 

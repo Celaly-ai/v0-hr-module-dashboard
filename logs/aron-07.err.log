@@ -1,0 +1,34 @@
+Cron hata: Error: Command failed: /opt/homebrew/Cellar/node/25.9.0_3/bin/node scripts/aron-operasyon-havuzu.mjs
+Havuz aktarım hatası: 521653611 TypeError: fetch failed
+
+    at genericNodeError (node:internal/errors:998:15)
+    at wrappedFn (node:internal/errors:543:14)
+    at ChildProcess.exithandler (node:child_process:417:12)
+    at ChildProcess.emit (node:events:509:20)
+    at maybeClose (node:internal/child_process:1108:16)
+    at ChildProcess._handle.onexit (node:internal/child_process:305:5) {
+  code: 1,
+  killed: false,
+  signal: null,
+  cmd: '/opt/homebrew/Cellar/node/25.9.0_3/bin/node scripts/aron-operasyon-havuzu.mjs',
+  stdout: '',
+  stderr: 'Havuz aktarım hatası: 521653611 TypeError: fetch failed\n'
+}
+Cron hata: Error: Command failed: /opt/homebrew/Cellar/node/25.9.0_3/bin/node scripts/aron-operasyon-havuzu.mjs
+Ham veri okunamadı: TypeError: terminated
+
+    at genericNodeError (node:internal/errors:998:15)
+    at wrappedFn (node:internal/errors:543:14)
+    at ChildProcess.exithandler (node:child_process:417:12)
+    at ChildProcess.emit (node:events:509:20)
+    at maybeClose (node:internal/child_process:1108:16)
+    at Socket.<anonymous> (node:internal/child_process:480:11)
+    at Socket.emit (node:events:509:20)
+    at Pipe.<anonymous> (node:net:350:12) {
+  code: 1,
+  killed: false,
+  signal: null,
+  cmd: '/opt/homebrew/Cellar/node/25.9.0_3/bin/node scripts/aron-operasyon-havuzu.mjs',
+  stdout: '',
+  stderr: 'Ham veri okunamadı: TypeError: terminated\n'
+}

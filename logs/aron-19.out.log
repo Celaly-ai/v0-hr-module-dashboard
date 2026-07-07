@@ -1,0 +1,55 @@
+Çalışıyor: scripts/aron-import.mjs
+Okunan kayıt: 292
+Aktarılacak kayıt: 292
+Aktarıldı: 100/292
+Aktarıldı: 200/292
+Aktarıldı: 292/292
+ARON açık fiş verileri başarıyla aktarıldı.
+
+Çalışıyor: scripts/aron-operasyon-havuzu.mjs
+Toplam ham kayıt: 292
+Operasyon kapsamına giren: 191
+Atama bekleyen: 49
+Atanmış izleme: 142
+aktif_operasyon_havuzu_v2 aktarımı tamamlandı.
+
+19:00 ARON operasyon zinciri tamamlandı.
+{
+  toplam: 191,
+  atamaBekleyen: 49,
+  hizmetIci: 183,
+  koordinatBekleyen: 29,
+  kritik: 33
+}
+Çalışıyor: scripts/aron-import.mjs
+Okunan kayıt: 292
+Aktarılacak kayıt: 292
+Aktarıldı: 100/292
+Aktarıldı: 200/292
+Aktarıldı: 292/292
+ARON açık fiş verileri başarıyla aktarıldı.
+
+Çalışıyor: scripts/aron-operasyon-havuzu.mjs
+Çalışıyor: scripts/aron-import.mjs
+Okunan kayıt: 292
+Aktarılacak kayıt: 292
+Aktarıldı: 100/292
+Aktarıldı: 200/292
+Aktarıldı: 292/292
+ARON açık fiş verileri başarıyla aktarıldı.
+
+Çalışıyor: scripts/aron-operasyon-havuzu.mjs
+Toplam ham kayıt: 292
+Operasyon kapsamına giren: 191
+Atama bekleyen: 49
+Atanmış izleme: 142
+aktif_operasyon_havuzu_v2 aktarımı tamamlandı.
+
+19:00 ARON operasyon zinciri tamamlandı.
+{
+  toplam: 191,
+  atamaBekleyen: 49,
+  hizmetIci: 183,
+  koordinatBekleyen: 29,
+  kritik: 33
+}

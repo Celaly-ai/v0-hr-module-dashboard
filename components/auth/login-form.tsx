@@ -4,6 +4,8 @@ import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Loader2 } from "lucide-react"
 
+type GirisTipi = "telefon" | "email"
+
 function normalizePhone(value: string) {
   let digits = String(value || "").replace(/\D/g, "")
 
@@ -15,6 +17,10 @@ function normalizePhone(value: string) {
 
 function phoneToEmail(phone: string) {
   return `${normalizePhone(phone)}@feyroute.com`
+}
+
+function normalizeEmail(value: string) {
+  return String(value || "").trim().toLocaleLowerCase("tr-TR")
 }
 
 function aktifDurumMu(value?: string | null) {
@@ -29,7 +35,9 @@ function aktifDurumMu(value?: string | null) {
 }
 
 export default function LoginForm() {
+  const [girisTipi, setGirisTipi] = useState<GirisTipi>("telefon")
   const [telefon, setTelefon] = useState("")
+  const [email, setEmail] = useState("")
   const [sifre, setSifre] = useState("")
   const [hata, setHata] = useState("")
   const [bilgi, setBilgi] = useState("")
@@ -37,12 +45,19 @@ export default function LoginForm() {
 
   async function handleGiris() {
     const cleanPhone = normalizePhone(telefon)
+    const cleanEmail =
+      girisTipi === "telefon" ? phoneToEmail(cleanPhone) : normalizeEmail(email)
 
     setHata("")
     setBilgi("")
 
-    if (cleanPhone.length !== 10) {
+    if (girisTipi === "telefon" && cleanPhone.length !== 10) {
       setHata("Telefon numarası 10 haneli olmalıdır. Örnek: 05XXXXXXXXX")
+      return
+    }
+
+    if (girisTipi === "email" && !cleanEmail.includes("@")) {
+      setHata("Lütfen geçerli bir e-posta adresi giriniz.")
       return
     }
 
@@ -54,31 +69,35 @@ export default function LoginForm() {
     setYukleniyor(true)
 
     const supabase = createClient()
-    const email = phoneToEmail(cleanPhone)
 
     const { data: authData, error: authError } =
       await supabase.auth.signInWithPassword({
-        email,
+        email: cleanEmail,
         password: sifre,
       })
 
     if (authError || !authData.user) {
       setHata(
-        `Giriş yapılamadı. Supabase Auth içinde ${email} kullanıcısı yok veya şifre hatalı.`,
+        girisTipi === "telefon"
+          ? `Giriş yapılamadı. Supabase Auth içinde ${cleanEmail} kullanıcısı yok veya şifre hatalı.`
+          : "E-posta veya şifre hatalı.",
       )
       setYukleniyor(false)
       return
     }
 
-    const { data: personel, error: personelError } = await supabase
+    const personelSorgu =
+      girisTipi === "telefon"
+        ? `auth_id.eq.${authData.user.id},email.eq.${cleanEmail},telefon_normalized.eq.${cleanPhone}`
+        : `auth_id.eq.${authData.user.id},email.eq.${cleanEmail}`
+
+    const { data: personeller, error: personelError } = await supabase
       .from("personeller")
       .select(
         "id, ad, soyad, tel, email, telefon_normalized, kullanici_id, auth_id, rol, durum",
       )
-      .or(
-        `auth_id.eq.${authData.user.id},email.eq.${email},telefon_normalized.eq.${cleanPhone}`,
-      )
-      .maybeSingle()
+      .or(personelSorgu)
+      .limit(10)
 
     if (personelError) {
       await supabase.auth.signOut()
@@ -87,10 +106,25 @@ export default function LoginForm() {
       return
     }
 
+    const personelListesi = personeller || []
+
+    const personel =
+      personelListesi.find((p) => p.auth_id === authData.user.id) ||
+      personelListesi.find((p) => normalizeEmail(p.email || "") === cleanEmail) ||
+      (girisTipi === "telefon"
+        ? personelListesi.find(
+            (p) => String(p.telefon_normalized || "") === cleanPhone,
+          )
+        : null) ||
+      personelListesi[0] ||
+      null
+
     if (!personel) {
       await supabase.auth.signOut()
       setHata(
-        `Giriş başarılı fakat personeller tablosunda eşleşme bulunamadı. Kontrol: email=${email}, telefon_normalized=${cleanPhone}`,
+        girisTipi === "telefon"
+          ? `Giriş başarılı fakat personeller tablosunda eşleşme bulunamadı. Kontrol: email=${cleanEmail}, telefon_normalized=${cleanPhone}`
+          : `Giriş başarılı fakat personeller tablosunda ${cleanEmail} için eşleşme bulunamadı.`,
       )
       setYukleniyor(false)
       return
@@ -103,17 +137,17 @@ export default function LoginForm() {
       return
     }
 
-    const guncellenecekAlanlar: any = {}
+    const guncellenecekAlanlar: Record<string, string> = {}
 
     if (!personel.auth_id) {
       guncellenecekAlanlar.auth_id = authData.user.id
     }
 
     if (!personel.email) {
-      guncellenecekAlanlar.email = email
+      guncellenecekAlanlar.email = cleanEmail
     }
 
-    if (!personel.telefon_normalized) {
+    if (girisTipi === "telefon" && !personel.telefon_normalized) {
       guncellenecekAlanlar.telefon_normalized = cleanPhone
     }
 
@@ -132,6 +166,7 @@ export default function LoginForm() {
     }
 
     setBilgi("Giriş başarılı. Portale yönlendiriliyorsunuz...")
+
     const ilkGiris = authData.user.user_metadata?.ilk_giris
 
     if (ilkGiris) {
@@ -147,28 +182,77 @@ export default function LoginForm() {
       <div>
         <h2 className="text-xl font-bold text-foreground">Giriş Yap</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Telefon numaranız ve şifreniz ile devam edin.
+          Telefon veya e-posta adresiniz ile devam edin.
         </p>
       </div>
 
+      <div className="grid grid-cols-2 gap-2 rounded-xl bg-secondary p-1">
+        <button
+          type="button"
+          onClick={() => {
+            setGirisTipi("telefon")
+            setHata("")
+            setBilgi("")
+          }}
+          className={`rounded-lg px-3 py-2 text-sm font-bold ${
+            girisTipi === "telefon"
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground"
+          }`}
+        >
+          Telefon
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setGirisTipi("email")
+            setHata("")
+            setBilgi("")
+          }}
+          className={`rounded-lg px-3 py-2 text-sm font-bold ${
+            girisTipi === "email"
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground"
+          }`}
+        >
+          E-posta
+        </button>
+      </div>
+
       <div className="space-y-4">
-        <div>
-          <label className="text-sm font-medium text-foreground block mb-1">
-            Telefon Numarası
-          </label>
-          <input
-            type="tel"
-            value={telefon}
-            onChange={(e) => setTelefon(e.target.value)}
-            placeholder="05XXXXXXXXX"
-            className="w-full rounded-lg border border-border bg-secondary px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-          {normalizePhone(telefon).length === 10 && (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Giriş e-postası: {phoneToEmail(telefon)}
-            </p>
-          )}
-        </div>
+        {girisTipi === "telefon" ? (
+          <div>
+            <label className="text-sm font-medium text-foreground block mb-1">
+              Telefon Numarası
+            </label>
+            <input
+              type="tel"
+              value={telefon}
+              onChange={(e) => setTelefon(e.target.value)}
+              placeholder="05XXXXXXXXX"
+              className="w-full rounded-lg border border-border bg-secondary px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            {normalizePhone(telefon).length === 10 && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Giriş e-postası: {phoneToEmail(telefon)}
+              </p>
+            )}
+          </div>
+        ) : (
+          <div>
+            <label className="text-sm font-medium text-foreground block mb-1">
+              E-posta Adresi
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="ornek@firma.com"
+              className="w-full rounded-lg border border-border bg-secondary px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+        )}
 
         <div>
           <label className="text-sm font-medium text-foreground block mb-1">

@@ -1,0 +1,38 @@
+---
+description: FeyRoute master architecture — protect production, data, and core hierarchy
+alwaysApply: true
+---
+
+# FeyRoute Master Architecture
+
+Full reference: `docs/FEYROUTE_MASTER_ARCHITECTURE.md`
+
+## Role
+
+Protect and evolve architecture first. Do not rewrite working code or break production.
+
+## Fixed core hierarchy (never change)
+
+Phone → Customer → Product → Service Order → Operation Events
+
+- `customer_id` is permanent; phone is the match key only.
+- Product identity = Brand + Product Code + Model Code + Serial Number (not service orders).
+- Events are append-only; corporate memory is never destroyed.
+
+## Non-negotiables
+
+- AI analyzes/suggests only; humans make operational decisions.
+- No DROP tables, no destructive schema changes; prefer additive migrations.
+- New work runs in parallel; backward compatibility required.
+- Separate Repositories, Services, business logic, and UI.
+
+## Before implementing
+
+1. Understand current architecture and impact.
+2. Explain the plan.
+3. Implement minimally.
+4. Report: summary, files, DB/API changes, risks, tests, next step.
+
+## Priority
+
+Production → Data → Architecture → Compatibility → Quality → Performance

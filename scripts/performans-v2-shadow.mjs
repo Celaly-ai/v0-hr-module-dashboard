@@ -55,10 +55,26 @@ const VERI_TURLERI = ["nps", "randevu", "sikayet", "tamamlayici", "ek_garanti"]
 const SUM_TURLERI = new Set(["sikayet", "tamamlayici", "ek_garanti"])
 const AVG_TURLERI = new Set(["nps", "randevu"])
 
-const AGIRLIKLAR = {
-  nps: 0.2,
-  randevu: 0.2,
+const AGIRLIKLAR_ARIZA = {
   sikayet: 0.2,
+  nps: 0.1,
+  randevu: 0.3,
+  tamamlayici: 0.3,
+  ek_garanti: 0.1,
+}
+
+const AGIRLIKLAR_NAKLIYE_MONTAJ = {
+  sikayet: 0.4,
+  nps: 0.2,
+  randevu: 0.15,
+  tamamlayici: 0.15,
+  ek_garanti: 0.1,
+}
+
+const AGIRLIKLAR_GENEL = {
+  sikayet: 0.3,
+  nps: 0.15,
+  randevu: 0.15,
   tamamlayici: 0.2,
   ek_garanti: 0.2,
 }
@@ -86,24 +102,69 @@ function referansOrtalamaSec(turkiye, bolge) {
   return null
 }
 
+function puan100(value) {
+  return clamp(value, 0, 100)
+}
+
+function normalizeRol(value) {
+  return String(value ?? "")
+    .trim()
+    .toLocaleLowerCase("tr-TR")
+    .replaceAll("ı", "i")
+    .replaceAll("ğ", "g")
+    .replaceAll("ü", "u")
+    .replaceAll("ş", "s")
+    .replaceAll("ö", "o")
+    .replaceAll("ç", "c")
+}
+
+function rolAgirliklariSec(rol) {
+  const r = normalizeRol(rol)
+  if (r === "ariza_teknisyeni" || r === "teknisyen") {
+    return AGIRLIKLAR_ARIZA
+  }
+  if (r === "montaj_teknisyeni" || r === "nakliye" || r === "montaj") {
+    return AGIRLIKLAR_NAKLIYE_MONTAJ
+  }
+  return AGIRLIKLAR_GENEL
+}
+
+function harfNotuHesapla(toplamPuan) {
+  const puan = num(toplamPuan)
+  if (puan === null) return "E"
+  if (puan >= 90) return "A"
+  if (puan >= 80) return "B"
+  if (puan >= 70) return "C"
+  if (puan >= 60) return "D"
+  return "E"
+}
+
+function primHakkiHesapla(harfNotu) {
+  return harfNotu === "A" || harfNotu === "B" || harfNotu === "C"
+}
+
+function primDurumuMetni(harfNotu) {
+  return primHakkiHesapla(harfNotu) ? "Prim Hakki Var" : "Prim Hakki Yok"
+}
+
 function referansliPuan(deger, referans) {
   const d = Number(deger ?? 0)
   const ref = Number(referans ?? 0)
-  if (ref <= 0) return d > 0 ? clamp(d, 0, 150) : null
-  return clamp(100 + ((d - ref) / ref) * 100, 0, 150)
+  if (ref <= 0) return d > 0 ? puan100(d) : null
+  return puan100(100 + ((d - ref) / ref) * 100)
 }
 
-function sikayetPuanHesapla(teknisyenSikayet, servisToplam) {
-  const toplam = Number(servisToplam || 0)
+function sikayetPuanHesapla(teknisyenSikayet, toplamSikayet) {
+  const toplam = Number(toplamSikayet || 0)
   const deger = Number(teknisyenSikayet || 0)
   if (toplam <= 0) return 100
-  return clamp(100 - (deger / toplam) * 100, 0, 100)
+  return puan100(100 - (deger / toplam) * 100)
 }
 
-function agirlikliToplam(puanlar) {
+function agirlikliToplam(puanlar, agirliklar) {
   let toplamAgirlik = 0
   let toplam = 0
-  for (const [key, agirlik] of Object.entries(AGIRLIKLAR)) {
+  for (const [key, agirlik] of Object.entries(agirliklar)) {
     const value = puanlar[key]
     if (value !== null && value !== undefined && Number.isFinite(value)) {
       toplamAgirlik += agirlik
@@ -111,7 +172,7 @@ function agirlikliToplam(puanlar) {
     }
   }
   if (toplamAgirlik <= 0) return null
-  return toplam / toplamAgirlik
+  return puan100(toplam / toplamAgirlik)
 }
 
 function ayAnahtari(yil, ay) {
@@ -456,6 +517,38 @@ async function tumKayitlariCek(tablo, select = "*") {
   return sonuc
 }
 
+async function teknisyenRolHaritasiOlustur() {
+  const [personeller, eslestirmeler] = await Promise.all([
+    tumKayitlariCek("personeller", "id, rol"),
+    tumKayitlariCek(
+      "performans_personel_eslestirmeleri",
+      "teknisyen_anahtar, teknisyen_gorunen_ad, personel_id, durum",
+    ),
+  ])
+
+  const personelRolMap = new Map()
+  for (const personel of personeller) {
+    if (personel?.id) {
+      personelRolMap.set(personel.id, normalizeRol(personel.rol))
+    }
+  }
+
+  const rolHaritasi = new Map()
+  for (const eslestirme of eslestirmeler) {
+    if (eslestirme?.durum !== "aktif") continue
+    const anahtar = teknisyenAnahtarNormalize({
+      teknisyen_anahtar: eslestirme.teknisyen_anahtar,
+      teknisyen_gorunen_ad: eslestirme.teknisyen_gorunen_ad,
+    })
+    if (!anahtar) continue
+    const rol = personelRolMap.get(eslestirme.personel_id)
+    if (!rol) continue
+    rolHaritasi.set(anahtar, rol)
+  }
+
+  return rolHaritasi
+}
+
 // ---------------------------------------------------------------------------
 // Birleştirme (Kural 2)
 // ---------------------------------------------------------------------------
@@ -555,7 +648,7 @@ function satisPuanHesapla(gercekDeger, referans) {
   const hesapDegeri = Math.max(gercek, 1)
   const ref = num(referans)
   if (ref === null || ref <= 0) return null
-  return clamp(100 + ((hesapDegeri - ref) / ref) * 100, 0, 150)
+  return puan100(100 + ((hesapDegeri - ref) / ref) * 100)
 }
 
 function npsRandevuPuanHesapla(birlesikKayit) {
@@ -570,13 +663,13 @@ function npsRandevuPuanHesapla(birlesikKayit) {
   if (referans !== null && referans > 0 && deger !== null) {
     puan = referansliPuan(deger, referans)
   } else if (deger !== null) {
-    puan = clamp(deger, 0, 150)
+    puan = puan100(deger)
   }
 
   return { deger, referans, puan }
 }
 
-function hesaplaV2Aylik(birlesikKayitlar) {
+function hesaplaV2Aylik(birlesikKayitlar, teknisyenRolMap = new Map()) {
   /** @type {Map<string, Map<string, object>>} yil-ay -> teknisyen -> veri_turu kayit */
   const ayHaritasi = new Map()
 
@@ -625,26 +718,18 @@ function hesaplaV2Aylik(birlesikKayitlar) {
 
     if (calisanTeknisyenler.length === 0) continue
 
-    const aySikayetServisToplamlari = []
+    let toplamSikayet = 0
     for (const anahtar of calisanTeknisyenler) {
       const sikayetKayit = teknisyenMap.get(anahtar).veriler.get("sikayet")
-      if (sikayetKayit?.servis_toplam != null && sikayetKayit.servis_toplam > 0) {
-        aySikayetServisToplamlari.push(sikayetKayit.servis_toplam)
+      if (sikayetKayit) {
+        toplamSikayet += num(sikayetKayit.teknisyen_deger) ?? 0
       }
     }
-    const aySikayetServisToplam =
-      aySikayetServisToplamlari.length > 0
-        ? Math.max(...aySikayetServisToplamlari)
-        : null
 
     for (const anahtar of calisanTeknisyenler) {
       const teknisyen = teknisyenMap.get(anahtar)
       const veriler = teknisyen.veriler
-
-      const birlesikMap = new Map()
-      for (const [tur, kayit] of veriler) {
-        birlesikMap.set(`${anahtar}-${tur}`, kayit)
-      }
+      const agirliklar = rolAgirliklariSec(teknisyenRolMap.get(anahtar))
 
       const tamamlayiciReferans = satisReferansHesapla(
         calisanTeknisyenler,
@@ -672,32 +757,42 @@ function hesaplaV2Aylik(birlesikKayitlar) {
       const randevu = npsRandevuPuanHesapla(veriler.get("randevu"))
 
       const sikayetKayit = veriler.get("sikayet")
-      const sikayetDeger = sikayetKayit ? num(sikayetKayit.teknisyen_deger) ?? 0 : 0
-      const sikayetPuan = clamp(
-        sikayetPuanHesapla(sikayetDeger, aySikayetServisToplam),
-        0,
-        100,
-      )
+      let sikayetDeger = null
+      let sikayetPuan = null
+      if (sikayetKayit) {
+        sikayetDeger = num(sikayetKayit.teknisyen_deger) ?? 0
+        sikayetPuan = sikayetPuanHesapla(sikayetDeger, toplamSikayet)
+      }
 
       const tamamlayiciKayit = veriler.get("tamamlayici")
-      const tamamlayiciGercek = tamamlayiciKayit
-        ? num(tamamlayiciKayit.teknisyen_deger) ?? 0
-        : 0
-      const tamamlayiciPuan = satisPuanHesapla(tamamlayiciGercek, tamamlayiciReferans)
+      let tamamlayiciGercek = null
+      let tamamlayiciPuan = null
+      if (tamamlayiciKayit) {
+        tamamlayiciGercek = num(tamamlayiciKayit.teknisyen_deger)
+        tamamlayiciPuan = satisPuanHesapla(tamamlayiciGercek ?? 0, tamamlayiciReferans)
+      }
 
       const ekGarantiKayit = veriler.get("ek_garanti")
-      const ekGarantiGercek = ekGarantiKayit
-        ? num(ekGarantiKayit.teknisyen_deger) ?? 0
-        : 0
-      const ekGarantiPuan = satisPuanHesapla(ekGarantiGercek, ekGarantiReferans)
+      let ekGarantiGercek = null
+      let ekGarantiPuan = null
+      if (ekGarantiKayit) {
+        ekGarantiGercek = num(ekGarantiKayit.teknisyen_deger)
+        ekGarantiPuan = satisPuanHesapla(ekGarantiGercek ?? 0, ekGarantiReferans)
+      }
 
-      const toplamPuan = agirlikliToplam({
-        nps: nps.puan,
-        randevu: randevu.puan,
-        sikayet: sikayetPuan,
-        tamamlayici: tamamlayiciPuan,
-        ek_garanti: ekGarantiPuan,
-      })
+      const toplamPuan = agirlikliToplam(
+        {
+          nps: nps.puan,
+          randevu: randevu.puan,
+          sikayet: sikayetPuan,
+          tamamlayici: tamamlayiciPuan,
+          ek_garanti: ekGarantiPuan,
+        },
+        agirliklar,
+      )
+
+      const harfNotu = harfNotuHesapla(toplamPuan)
+      const primHakki = primHakkiHesapla(harfNotu)
 
       const sonucKey = teknisyenAyAnahtari(yil, ay, anahtar)
       aylikSonuclar.set(sonucKey, {
@@ -713,7 +808,7 @@ function hesaplaV2Aylik(birlesikKayitlar) {
         randevu_referans: randevu.referans,
         randevu_puan: randevu.puan,
         sikayet_deger: sikayetDeger,
-        sikayet_servis_toplam: aySikayetServisToplam,
+        sikayet_servis_toplam: toplamSikayet,
         sikayet_puan: sikayetPuan,
         tamamlayici_deger: tamamlayiciGercek,
         tamamlayici_referans: tamamlayiciReferans,
@@ -722,6 +817,10 @@ function hesaplaV2Aylik(birlesikKayitlar) {
         ek_garanti_referans: ekGarantiReferans,
         ek_garanti_puan: ekGarantiPuan,
         toplam_puan: toplamPuan,
+        harf_notu: harfNotu,
+        prim_hakki: primHakki,
+        prim_durumu: primDurumuMetni(harfNotu),
+        agirliklar,
         motor: "v2-shadow",
       })
     }
@@ -762,8 +861,13 @@ function hesaplaV2Yillik(aylikSonuclar) {
 
     const toplamPuan =
       aylikToplamPuanlar.length > 0
-        ? aylikToplamPuanlar.reduce((s, v) => s + v, 0) / aylikToplamPuanlar.length
+        ? puan100(
+            aylikToplamPuanlar.reduce((s, v) => s + v, 0) / aylikToplamPuanlar.length,
+          )
         : null
+
+    const harfNotu = harfNotuHesapla(toplamPuan)
+    const primHakki = primHakkiHesapla(harfNotu)
 
     yillikSonuclar.set(`${yil}-${teknisyenAnahtar}`, {
       yil: Number(yil),
@@ -773,6 +877,9 @@ function hesaplaV2Yillik(aylikSonuclar) {
       teknisyen_gorunen_ad: gorunenAd,
       calisilan_ay_sayisi: aylar.length,
       toplam_puan: toplamPuan,
+      harf_notu: harfNotu,
+      prim_hakki: primHakki,
+      prim_durumu: primDurumuMetni(harfNotu),
       motor: "v2-shadow",
     })
   }
@@ -1115,7 +1222,10 @@ const {
 console.log(`Birleştirilmiş kayıt: ${birlesik.length}`)
 console.log(`NPS otomatik fuzzy eşleşme: ${otomatikBaglananlar.length}`)
 
-const v2Aylik = hesaplaV2Aylik(birlesik)
+const teknisyenRolMap = await teknisyenRolHaritasiOlustur()
+console.log(`Teknisyen rol eşleşmesi: ${teknisyenRolMap.size}`)
+
+const v2Aylik = hesaplaV2Aylik(birlesik, teknisyenRolMap)
 console.log(`V2 aylık sonuç: ${v2Aylik.size}`)
 
 const v2Yillik = hesaplaV2Yillik(v2Aylik)

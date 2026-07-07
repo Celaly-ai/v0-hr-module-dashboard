@@ -3,6 +3,70 @@
 
 create extension if not exists "pgcrypto";
 
+-- ---------------------------------------------------------------------------
+-- Merkezi hizmet tipi sözlüğü
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.hizmet_tipleri (
+  id                  uuid primary key default gen_random_uuid(),
+  kod                 text not null,
+  ad                  text not null,
+  kategori            text,
+  varsayilan_sure_dk  integer,
+  varsayilan_yetenek  text,
+  sira                integer not null default 100,
+  aktif               boolean not null default true,
+  created_at          timestamptz not null default now(),
+  updated_at          timestamptz,
+  constraint hizmet_tipleri_kod_unique unique (kod)
+);
+
+create index if not exists hizmet_tipleri_aktif_sira_idx
+  on public.hizmet_tipleri (aktif, sira, ad);
+
+insert into public.hizmet_tipleri (kod, ad, sira)
+values
+  ('A',  'Arıza',                         10),
+  ('K',  'Keşif',                         20),
+  ('B',  'Bakım',                         30),
+  ('P',  'Periyodik Bakım',               40),
+  ('D',  'Demontaj',                      50),
+  ('M',  'Montaj',                        60),
+  ('N',  'Nakliye',                       70),
+  ('NM', 'Nakliye + Montaj',              80),
+  ('KM', 'Kurulum + Montaj',              90),
+  ('NK', 'Nakliye + Kurulum',            100),
+  ('EG', 'Ek Garanti',                   110),
+  ('TS', 'Tamamlayıcı Satış',            120),
+  ('IA', 'İade Alma',                    130),
+  ('HT', 'Hurda Toplama',                140),
+  ('YP', 'Yerinde Parça',                150),
+  ('TP', 'Teknik Planlama',              160),
+  ('EK', 'Eğitim / Kullanıcı Bilgilendirme', 170),
+  ('DK', 'Değişim Kurulumu',             180),
+  ('SK', 'Söküm',                        190),
+  ('TK', 'Tekrar Kontrol',               200)
+on conflict (kod) do update set
+  ad = excluded.ad,
+  sira = excluded.sira,
+  aktif = true,
+  updated_at = now();
+
+alter table public.hizmet_tipleri enable row level security;
+
+drop policy if exists "hizmet_tipleri_select_authenticated"
+  on public.hizmet_tipleri;
+
+create policy "hizmet_tipleri_select_authenticated"
+  on public.hizmet_tipleri
+  for select
+  to authenticated
+  using (true);
+
+-- ---------------------------------------------------------------------------
+-- Hizmet süre kataloğu
+-- ---------------------------------------------------------------------------
+
 create table if not exists public.hizmet_sure_katalogu (
   id                  uuid primary key default gen_random_uuid(),
   hizmet_kodu         text not null,

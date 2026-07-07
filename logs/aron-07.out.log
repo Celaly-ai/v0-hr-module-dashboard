@@ -1,0 +1,112 @@
+Çalışıyor: scripts/aron-import.mjs
+Okunan kayıt: 185
+Aktarılacak kayıt: 185
+Aktarıldı: 100/185
+Aktarıldı: 185/185
+ARON açık fiş verileri başarıyla aktarıldı.
+
+Çalışıyor: scripts/aron-operasyon-havuzu.mjs
+Toplam ham kayıt: 465
+Operasyon kapsamına giren: 254
+Atama bekleyen: 52
+Atanmış izleme: 202
+aktif_operasyon_havuzu_v2 aktarımı tamamlandı.
+
+Çalışıyor: scripts/ai-ekip-oneri-v1.mjs
+Atama bekleyen iş: 52
+Öneri üretilen iş: 52
+
+Çalışıyor: scripts/aron-07-planlama.mjs
+07:00 planlama havuzu oluşturuldu.
+Plan tarihi: 2026-07-03
+Planlanan iş: 16
+
+07:00 ARON planlama zinciri tamamlandı.
+{
+  toplam: 254,
+  atamaBekleyen: 52,
+  hizmetIci: 246,
+  koordinatBekleyen: 92,
+  kritik: 42,
+  aiOnerilen: 193
+}
+Çalışıyor: scripts/aron-import.mjs
+Okunan kayıt: 185
+Aktarılacak kayıt: 185
+Aktarıldı: 100/185
+Aktarıldı: 185/185
+ARON açık fiş verileri başarıyla aktarıldı.
+
+Çalışıyor: scripts/aron-operasyon-havuzu.mjs
+Toplam ham kayıt: 465
+Operasyon kapsamına giren: 254
+Atama bekleyen: 52
+Atanmış izleme: 202
+aktif_operasyon_havuzu_v2 aktarımı tamamlandı.
+
+Çalışıyor: scripts/ai-ekip-oneri-v1.mjs
+Atama bekleyen iş: 52
+Öneri üretilen iş: 52
+
+Çalışıyor: scripts/aron-07-planlama.mjs
+07:00 planlama havuzu oluşturuldu.
+Plan tarihi: 2026-07-04
+Planlanan iş: 16
+
+07:00 ARON planlama zinciri tamamlandı.
+{
+  toplam: 254,
+  atamaBekleyen: 52,
+  hizmetIci: 246,
+  koordinatBekleyen: 92,
+  kritik: 42,
+  aiOnerilen: 193
+}
+Çalışıyor: scripts/aron-import.mjs
+Okunan kayıt: 185
+Aktarılacak kayıt: 185
+Aktarıldı: 100/185
+Aktarıldı: 185/185
+ARON açık fiş verileri başarıyla aktarıldı.
+
+Çalışıyor: scripts/aron-operasyon-havuzu.mjs
+Toplam ham kayıt: 465
+Operasyon kapsamına giren: 254
+Atama bekleyen: 52
+Atanmış izleme: 202
+aktif_operasyon_havuzu_v2 aktarımı tamamlandı.
+
+Çalışıyor: scripts/ai-ekip-oneri-v1.mjs
+Atama bekleyen iş: 52
+Öneri üretilen iş: 52
+
+Çalışıyor: scripts/aron-07-planlama.mjs
+07:00 planlama havuzu oluşturuldu.
+Plan tarihi: 2026-07-05
+Planlanan iş: 16
+
+07:00 ARON planlama zinciri tamamlandı.
+{
+  toplam: 254,
+  atamaBekleyen: 52,
+  hizmetIci: 246,
+  koordinatBekleyen: 92,
+  kritik: 42,
+  aiOnerilen: 193
+}
+Çalışıyor: scripts/aron-import.mjs
+Okunan kayıt: 142
+Aktarılacak kayıt: 142
+Aktarıldı: 100/142
+Aktarıldı: 142/142
+ARON açık fiş verileri başarıyla aktarıldı.
+
+Çalışıyor: scripts/aron-operasyon-havuzu.mjs
+Çalışıyor: scripts/aron-import.mjs
+Okunan kayıt: 142
+Aktarılacak kayıt: 142
+Aktarıldı: 100/142
+Aktarıldı: 142/142
+ARON açık fiş verileri başarıyla aktarıldı.
+
+Çalışıyor: scripts/aron-operasyon-havuzu.mjs

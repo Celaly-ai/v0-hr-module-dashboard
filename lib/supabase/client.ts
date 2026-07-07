@@ -1,9 +1,14 @@
-import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { createBrowserClient } from "@supabase/ssr"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env"
 
 let browserClient: SupabaseClient | null = null
 
+/**
+ * Browser Supabase client — cookie tabanlı oturum (@supabase/ssr).
+ * Server route handler'ların (createServerClient) aynı cookie oturumunu
+ * okuyabilmesi için plain supabase-js yerine createBrowserClient kullanılır.
+ */
 export function createClient(): SupabaseClient {
   if (browserClient) return browserClient
 
@@ -14,7 +19,7 @@ export function createClient(): SupabaseClient {
     throw new Error("Supabase ortam değişkenleri eksik.")
   }
 
-  browserClient = createSupabaseClient(url, key)
+  browserClient = createBrowserClient(url, key)
 
   return browserClient
 }

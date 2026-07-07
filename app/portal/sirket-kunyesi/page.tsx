@@ -1,6 +1,10 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import {
+  kunyeZorunluEksikleriniBul,
+  sirketKaydindanKunyeOlustur,
+} from "@/lib/services/sirket-kunye-service"
 
 type Sirket = Record<string, any>
 
@@ -27,7 +31,10 @@ const BOS_FORM = {
 
   giris_cikis_lat: "",
   giris_cikis_lng: "",
-  giris_cikis_mesafe_limiti: "50",
+  giris_cikis_mesafe_limiti: "",
+
+  standart_mesai_baslangic: "",
+  standart_mesai_bitis: "",
 
   yetkili_ad_soyad: "",
   yetkili_telefon: "",
@@ -43,21 +50,32 @@ export default function SirketKunyesiPage() {
   const [kunyeTamamlandi, setKunyeTamamlandi] = useState(false)
 
   const zorunluEksikler = useMemo(() => {
-    const eksikler: string[] = []
+    const kunye = sirketKaydindanKunyeOlustur(
+      {
+        id: form.id || "gecici",
+        ad: form.ad,
+        unvan: form.unvan,
+        il: form.il,
+        ilce: form.ilce,
+        acik_adres: form.acik_adres,
+        giris_cikis_lat: form.giris_cikis_lat,
+        giris_cikis_lng: form.giris_cikis_lng,
+        giris_cikis_mesafe_limiti: form.giris_cikis_mesafe_limiti,
+        standart_mesai_baslangic: form.standart_mesai_baslangic,
+        standart_mesai_bitis: form.standart_mesai_bitis,
+      },
+      form.id || "gecici",
+    )
 
-    if (!form.ad.trim()) eksikler.push("Şirket adı")
-    if (!form.unvan.trim()) eksikler.push("Şirket ünvanı")
-    if (!form.vergi_no.trim()) eksikler.push("Vergi no")
-    if (!form.tel.trim()) eksikler.push("Telefon")
-    if (!form.email.trim()) eksikler.push("E-posta")
-    if (!form.il.trim()) eksikler.push("İl")
-    if (!form.ilce.trim()) eksikler.push("İlçe")
-    if (!form.mahalle.trim()) eksikler.push("Mahalle")
-    if (!form.acik_adres.trim()) eksikler.push("Açık adres")
-    if (!form.giris_cikis_lat.trim()) eksikler.push("Giriş/çıkış enlem")
-    if (!form.giris_cikis_lng.trim()) eksikler.push("Giriş/çıkış boylam")
+    const eksikler = kunyeZorunluEksikleriniBul(kunye, form.id || "gecici")
 
-    return eksikler
+    const formEksikleri: string[] = []
+    if (!form.vergi_no.trim()) formEksikleri.push("Vergi no")
+    if (!form.tel.trim()) formEksikleri.push("Telefon")
+    if (!form.email.trim()) formEksikleri.push("E-posta")
+    if (!form.mahalle.trim()) formEksikleri.push("Mahalle")
+
+    return [...eksikler, ...formEksikleri]
   }, [form])
 
   function guncelle(field: string, value: string) {
@@ -119,8 +137,11 @@ export default function SirketKunyesiPage() {
         giris_cikis_mesafe_limiti:
           sirket.giris_cikis_mesafe_limiti === null ||
           sirket.giris_cikis_mesafe_limiti === undefined
-            ? "50"
+            ? ""
             : String(sirket.giris_cikis_mesafe_limiti),
+
+        standart_mesai_baslangic: sirket.standart_mesai_baslangic || "",
+        standart_mesai_bitis: sirket.standart_mesai_bitis || "",
 
         yetkili_ad_soyad: sirket.yetkili_ad_soyad || "",
         yetkili_telefon: sirket.yetkili_telefon || "",
@@ -358,6 +379,28 @@ export default function SirketKunyesiPage() {
               >
                 Mevcut Konumu Giriş/Çıkış Lokasyonu Yap
               </button>
+            </Bolum>
+
+            <Bolum title="Standart Mesai Saatleri">
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Standart Mesai Başlangıç *">
+                  <input
+                    type="time"
+                    value={form.standart_mesai_baslangic}
+                    onChange={(e) => guncelle("standart_mesai_baslangic", e.target.value)}
+                    className="field"
+                  />
+                </Field>
+
+                <Field label="Standart Mesai Bitiş *">
+                  <input
+                    type="time"
+                    value={form.standart_mesai_bitis}
+                    onChange={(e) => guncelle("standart_mesai_bitis", e.target.value)}
+                    className="field"
+                  />
+                </Field>
+              </div>
             </Bolum>
 
             <Bolum title="Yetkili Bilgileri">

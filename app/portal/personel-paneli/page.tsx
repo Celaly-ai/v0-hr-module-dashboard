@@ -15,14 +15,6 @@ type Personel = {
   sirket_id?: string | null
 }
 
-type Vardiya = {
-  tarih: string
-  baslangic_saati: string | null
-  bitis_saati: string | null
-  durum: string | null
-  calisma_gunu: boolean | null
-}
-
 type MesaiKaydi = {
   id: string
   tip: string
@@ -32,47 +24,6 @@ type MesaiKaydi = {
 type Talep = {
   id: string
   durum: string | null
-}
-
-function bugunISO() {
-  const d = new Date()
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, "0")
-  const g = String(d.getDate()).padStart(2, "0")
-  return `${y}-${m}-${g}`
-}
-
-function tarihEkle(gun: number) {
-  const d = new Date()
-  d.setDate(d.getDate() + gun)
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, "0")
-  const g = String(d.getDate()).padStart(2, "0")
-  return `${y}-${m}-${g}`
-}
-
-function tarihYaz(value?: string | null) {
-  if (!value) return "-"
-  return new Date(`${value}T00:00:00`).toLocaleDateString("tr-TR", {
-    weekday: "short",
-    day: "2-digit",
-    month: "2-digit",
-  })
-}
-
-function saatYaz(value?: string | null) {
-  if (!value) return "-"
-  return String(value).slice(0, 5)
-}
-
-function durumYaz(value?: string | null) {
-  if (value === "calisma") return "Çalışma"
-  if (value === "izinli") return "İzinli"
-  if (value === "raporlu") return "Raporlu"
-  if (value === "egitim") return "Eğitim"
-  if (value === "hafta_tatili") return "Hafta Tatili"
-  if (value === "resmi_tatil") return "Resmi Tatil"
-  return value || "Plan Yok"
 }
 
 function saatFormat(value?: string | null) {
@@ -88,7 +39,6 @@ export default function PersonelPaneliPage() {
 
   const [loading, setLoading] = useState(true)
   const [personel, setPersonel] = useState<Personel | null>(null)
-  const [vardiyalar, setVardiyalar] = useState<Vardiya[]>([])
   const [mesaiKayitlari, setMesaiKayitlari] = useState<MesaiKaydi[]>([])
   const [talepler, setTalepler] = useState<Talep[]>([])
   const [hata, setHata] = useState<string | null>(null)
@@ -125,18 +75,7 @@ export default function PersonelPaneliPage() {
 
       setPersonel(p)
 
-      const bugun = bugunISO()
-      const onGunSonra = tarihEkle(9)
-
-      const [{ data: v }, { data: m }, { data: t }] = await Promise.all([
-        supabase
-          .from("vardiya_planlari")
-          .select("tarih, baslangic_saati, bitis_saati, durum, calisma_gunu")
-          .eq("personel_id", p.id)
-          .gte("tarih", bugun)
-          .lte("tarih", onGunSonra)
-          .order("tarih", { ascending: true }),
-
+      const [{ data: m }, { data: t }] = await Promise.all([
         supabase
           .from("giris_cikis_kayitlari")
           .select("id, tip, created_at")
@@ -151,7 +90,6 @@ export default function PersonelPaneliPage() {
           .order("created_at", { ascending: false }),
       ])
 
-      setVardiyalar(v || [])
       setMesaiKayitlari(m || [])
       setTalepler(t || [])
       setLoading(false)
@@ -167,8 +105,6 @@ export default function PersonelPaneliPage() {
 
   const sonMesai = mesaiKayitlari[0] || null
   const mesaiAktif = sonMesai?.tip === "giris"
-
-  const bugunkuVardiya = vardiyalar.find((v) => v.tarih === bugunISO()) || null
 
   const bekleyenTalepSayisi = talepler.filter((t) => {
     return !t.durum || ["Beklemede", "Bekliyor"].includes(t.durum)
@@ -231,88 +167,25 @@ export default function PersonelPaneliPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-3xl border bg-white p-5 shadow-sm">
+          <h2 className="text-lg font-black">Personel Özeti</h2>
+          <p className="mt-2 text-sm font-semibold text-slate-600">
+            Giriş/çıkış, vardiya planı ve ekip bilgileriniz Giriş/Çıkış ekranında görüntülenir.
+          </p>
           <button
-            onClick={() => router.push("/login-cikis")}
-            className="rounded-3xl border bg-white p-5 text-left shadow-sm active:scale-95"
+            type="button"
+            onClick={() => router.push("/portal/giris-cikis")}
+            className="mt-4 w-full rounded-xl bg-blue-700 py-3 text-sm font-black text-white"
           >
-            <p className="text-3xl">📍</p>
-            <p className="mt-3 text-lg font-black">Giriş / Çıkış</p>
-            <p className="mt-1 text-xs font-semibold text-slate-500">Mesai kaydı</p>
-          </button>
-
-          <button
-            onClick={() => router.push("/portal/izin")}
-            className="rounded-3xl border bg-white p-5 text-left shadow-sm active:scale-95"
-          >
-            <p className="text-3xl">🏖️</p>
-            <p className="mt-3 text-lg font-black">İzin Talebi</p>
-            <p className="mt-1 text-xs font-semibold text-slate-500">Yeni talep oluştur</p>
-          </button>
-
-          <button
-            onClick={() => router.push("/portal/talepler")}
-            className="rounded-3xl border bg-white p-5 text-left shadow-sm active:scale-95"
-          >
-            <p className="text-3xl">📋</p>
-            <p className="mt-3 text-lg font-black">Taleplerim</p>
-            <p className="mt-1 text-xs font-semibold text-slate-500">
-              Bekleyen: {bekleyenTalepSayisi}
-            </p>
-          </button>
-
-          <button
-            onClick={() => router.push("/portal/canli-konum")}
-            className="rounded-3xl border bg-white p-5 text-left shadow-sm active:scale-95"
-          >
-            <p className="text-3xl">🗺️</p>
-            <p className="mt-3 text-lg font-black">Konum</p>
-            <p className="mt-1 text-xs font-semibold text-slate-500">Takip durumu</p>
+            Giriş / Çıkış Ekranına Git
           </button>
         </div>
 
-        <div className="rounded-3xl border bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-black">Bugünkü Vardiya</h2>
-
-          {bugunkuVardiya ? (
-            <div className="mt-3 rounded-2xl bg-slate-50 p-4">
-              <p className="text-2xl font-black">
-                {saatYaz(bugunkuVardiya.baslangic_saati)} - {saatYaz(bugunkuVardiya.bitis_saati)}
-              </p>
-              <p className="mt-1 text-sm font-bold text-slate-600">
-                {durumYaz(bugunkuVardiya.durum)}
-              </p>
-            </div>
-          ) : (
-            <p className="mt-3 rounded-2xl bg-amber-50 p-4 text-sm font-bold text-amber-900">
-              Bugün için vardiya planı bulunamadı.
-            </p>
-          )}
-        </div>
-
-        <div className="rounded-3xl border bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-black">Gelecek 10 Gün</h2>
-
-          <div className="mt-3 space-y-2">
-            {vardiyalar.length === 0 ? (
-              <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
-                Vardiya kaydı bulunamadı.
-              </p>
-            ) : (
-              vardiyalar.map((v) => (
-                <div key={v.tarih} className="flex items-center justify-between rounded-2xl border bg-slate-50 p-3">
-                  <div>
-                    <p className="text-sm font-black">{tarihYaz(v.tarih)}</p>
-                    <p className="text-xs font-semibold text-slate-500">{durumYaz(v.durum)}</p>
-                  </div>
-                  <p className="text-sm font-black">
-                    {saatYaz(v.baslangic_saati)} - {saatYaz(v.bitis_saati)}
-                  </p>
-                </div>
-              ))
-            )}
+        {bekleyenTalepSayisi > 0 && (
+          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-950">
+            Bekleyen talep sayınız: {bekleyenTalepSayisi}
           </div>
-        </div>
+        )}
       </main>
       <MobileTabBar />
     </div>

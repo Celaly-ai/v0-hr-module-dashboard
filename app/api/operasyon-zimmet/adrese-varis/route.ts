@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { kullaniciZimmeteYetkiliMi } from "@/lib/services/gorev-yetki-service"
 
 function temiz(value: unknown) {
   return String(value ?? "").trim()
@@ -23,6 +24,12 @@ export async function POST(request: Request) {
       { error: "Zimmet ID, lat ve lng zorunludur." },
       { status: 400 },
     )
+  }
+
+  const yetki = await kullaniciZimmeteYetkiliMi(supabase, zimmetId)
+
+  if (!yetki.ok) {
+    return Response.json({ error: yetki.error }, { status: yetki.status ?? 403 })
   }
 
   const now = new Date().toISOString()

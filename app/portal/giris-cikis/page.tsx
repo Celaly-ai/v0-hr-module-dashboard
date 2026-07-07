@@ -2,11 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import {
+  sirketKunyesiGirisCikisKonumu,
+  sirketKunyesiKontrolEt,
+} from "@/lib/services/sirket-kunye-service"
+import type { SirketKunyeGirisCikisKonum, SirketKunyeKontrolSonuc } from "@/lib/types/sirket-kunye"
 import { MobileTabBar } from "@/components/mobile/mobile-tab-bar"
 import { useRouter } from "next/navigation"
 
 const ONAY_SINIRI_DAKIKA = 60
-const VARSAYILAN_MESAFE_SINIRI_METRE = 50
 const KONUM_LOG_ARALIGI_MS = 120000
 
 type Mesaj = {
@@ -16,12 +20,7 @@ type Mesaj = {
 
 type Kayit = Record<string, any>
 
-type ServisKonumu = {
-  lat: number
-  lng: number
-  mesafeSiniri: number
-  kaynak: string
-}
+type ServisKonumu = SirketKunyeGirisCikisKonum
 
 function startOfToday() {
   const d = new Date()
@@ -150,6 +149,101 @@ function konumAl(): Promise<GeolocationPosition> {
   })
 }
 
+type EkipBilgisi = {
+  ekipAdi: string
+  liderAdi: string
+  sorumluAdi: string
+  aracBilgisi: string
+  rol: string
+}
+
+type GelecekVardiya = {
+  tarih: string
+  baslangic_saati: string | null
+  bitis_saati: string | null
+  durum: string | null
+  aciklama: string | null
+}
+
+function tarihEkle(gun: number) {
+  const d = new Date()
+  d.setDate(d.getDate() + gun)
+  return localISO(d)
+}
+
+function tarihYaz(value?: string | null) {
+  if (!value) return "-"
+  return new Date(`${value}T00:00:00`).toLocaleDateString("tr-TR", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+  })
+}
+
+async function ekipBilgisiGetir(supabase: ReturnType<typeof createClient>, personelId: string) {
+  const { data: uyelikListesi } = await supabase
+    .from("ekip_uyeleri")
+    .select("id, ekip_id, personel_id, rol")
+    .eq("personel_id", personelId)
+    .limit(1)
+
+  const uyelik = (uyelikListesi || [])[0]
+  if (!uyelik?.ekip_id) return null
+
+  const { data: ekipListesi } = await supabase
+    .from("ekipler")
+    .select("id, ekip_adi, lider_personel_id, sorumlu_personel_id, arac_varlik_id")
+    .eq("id", uyelik.ekip_id)
+    .limit(1)
+
+  const ekip = (ekipListesi || [])[0]
+  if (!ekip) return null
+
+  const personelIds = [ekip.lider_personel_id, ekip.sorumlu_personel_id].filter(Boolean) as string[]
+
+  let liderAdi = "-"
+  let sorumluAdi = "-"
+
+  if (personelIds.length > 0) {
+    const { data: personelListesi } = await supabase
+      .from("personeller")
+      .select("id, ad, soyad")
+      .in("id", personelIds)
+
+    const adBul = (id?: string | null) => {
+      const p = (personelListesi || []).find((kayit) => kayit.id === id)
+      return p ? `${p.ad || ""} ${p.soyad || ""}`.trim() || "-" : "-"
+    }
+
+    liderAdi = adBul(ekip.lider_personel_id)
+    sorumluAdi = adBul(ekip.sorumlu_personel_id)
+  }
+
+  let aracBilgisi = "-"
+
+  if (ekip.arac_varlik_id) {
+    const { data: aracListesi } = await supabase
+      .from("varliklar")
+      .select("plaka, marka, model, ad")
+      .eq("id", ekip.arac_varlik_id)
+      .limit(1)
+
+    const arac = (aracListesi || [])[0]
+    if (arac) {
+      aracBilgisi =
+        [arac.plaka, arac.marka, arac.model].filter(Boolean).join(" ").trim() || arac.ad || "-"
+    }
+  }
+
+  return {
+    ekipAdi: ekip.ekip_adi || "-",
+    liderAdi,
+    sorumluAdi,
+    aracBilgisi,
+    rol: uyelik.rol || "-",
+  } satisfies EkipBilgisi
+}
+
 function mesafeHesapla(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 6371000
   const dLat = ((lat2 - lat1) * Math.PI) / 180
@@ -165,46 +259,6 @@ function mesafeHesapla(lat1: number, lng1: number, lat2: number, lng2: number) {
   return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)))
 }
 
-function sayi(value: any) {
-  const n = Number(value)
-  return Number.isFinite(n) ? n : null
-}
-
-function konumCikar(kayit: Kayit | null, kaynak: string): ServisKonumu | null {
-  if (!kayit) return null
-
-  const lat =
-    sayi(kayit.giris_cikis_lat) ??
-    sayi(kayit.lat) ??
-    sayi(kayit.latitude) ??
-    sayi(kayit.merkez_lat) ??
-    sayi(kayit.konum_lat) ??
-    sayi(kayit.servis_lat)
-
-  const lng =
-    sayi(kayit.giris_cikis_lng) ??
-    sayi(kayit.lng) ??
-    sayi(kayit.longitude) ??
-    sayi(kayit.merkez_lng) ??
-    sayi(kayit.konum_lng) ??
-    sayi(kayit.servis_lng)
-
-  if (lat === null || lng === null) return null
-
-  const mesafeSiniri =
-    sayi(kayit.giris_cikis_mesafe_limiti) ??
-    sayi(kayit.mesafe_limiti) ??
-    sayi(kayit.gps_mesafe_limiti) ??
-    VARSAYILAN_MESAFE_SINIRI_METRE
-
-  return {
-    lat,
-    lng,
-    mesafeSiniri,
-    kaynak,
-  }
-}
-
 export default function GirisCikisPage() {
   const router = useRouter()
 
@@ -215,46 +269,15 @@ export default function GirisCikisPage() {
   const [kayitlar, setKayitlar] = useState<Kayit[]>([])
   const [sonKayit, setSonKayit] = useState<Kayit | null>(null)
   const [servisKonumu, setServisKonumu] = useState<ServisKonumu | null>(null)
+  const [kunyeKontrol, setKunyeKontrol] = useState<SirketKunyeKontrolSonuc | null>(null)
+  const [ekipBilgisi, setEkipBilgisi] = useState<EkipBilgisi | null>(null)
+  const [gelecekVardiyalar, setGelecekVardiyalar] = useState<GelecekVardiya[]>([])
   const [mesaj, setMesaj] = useState<Mesaj | null>(null)
   const [konumTakipMesaji, setKonumTakipMesaji] = useState("Konum takibi beklemede.")
   const [yuklemeAdimi, setYuklemeAdimi] = useState("Başlatılıyor...")
   const [sonKonumGonderimSaati, setSonKonumGonderimSaati] = useState<string | null>(null)
   const [konumGonderimSayisi, setKonumGonderimSayisi] = useState(0)
   const konumLogIsleniyorRef = useRef(false)
-
-  async function servisKonumuGetir(p: Kayit) {
-    const supabase = createClient()
-
-    if (p.sirket_id) {
-      const { data } = await supabase
-        .from("sirketler")
-        .select(
-          "id, ad, unvan, il, ilce, mahalle, acik_adres, giris_cikis_lat, giris_cikis_lng, giris_cikis_mesafe_limiti, kunye_tamamlandi",
-        )
-        .eq("id", p.sirket_id)
-        .maybeSingle()
-
-      const sirketKonumu = konumCikar(data, "şirket künyesi")
-      if (sirketKonumu) return sirketKonumu
-
-      if (data) {
-        throw new Error(
-          "Şirket künyesinde giriş/çıkış lokasyonu eksik. Lütfen Şirket Künyesi ekranında giriş/çıkış enlem, boylam ve mesafe limitini tanımlayın.",
-        )
-      }
-    }
-
-    if (p.sube_id) {
-      const { data } = await supabase.from("subeler").select("*").eq("id", p.sube_id).maybeSingle()
-      const subeKonumu = konumCikar(data, "şube")
-      if (subeKonumu) return subeKonumu
-    }
-
-    const personelKonumu = konumCikar(p, "personel")
-    if (personelKonumu) return personelKonumu
-
-    return null
-  }
 
   async function verileriYukle() {
     setLoading(true)
@@ -295,10 +318,22 @@ export default function GirisCikisPage() {
 
       setPersonel(personelData)
 
-      setYuklemeAdimi("Şirket künyesi giriş/çıkış lokasyonu alınıyor...")
+      setYuklemeAdimi("Şirket künyesi kontrol ediliyor...")
 
-      const konum = await servisKonumuGetir(personelData)
-      setServisKonumu(konum)
+      const kunyeSonuc = await sirketKunyesiKontrolEt(supabase, user.id, user.email)
+      setKunyeKontrol(kunyeSonuc)
+
+      if (!kunyeSonuc.tamam) {
+        setServisKonumu(null)
+        setMesaj({
+          tip: "hata",
+          metin:
+            kunyeSonuc.hata ||
+            "Şirket künyesi tamamlanmadan giriş/çıkış yapılamaz. Eksik alanları yöneticiniz tamamlamalıdır.",
+        })
+      } else {
+        setServisKonumu(sirketKunyesiGirisCikisKonumu(kunyeSonuc.kunye))
+      }
 
       const bugun = localISO(new Date())
 
@@ -312,6 +347,23 @@ export default function GirisCikisPage() {
         .maybeSingle()
 
       setVardiya(vardiyaData)
+
+      setYuklemeAdimi("Ekip bilgileri okunuyor...")
+      const ekip = await ekipBilgisiGetir(supabase, personelData.id)
+      setEkipBilgisi(ekip)
+
+      setYuklemeAdimi("Gelecek vardiyalar okunuyor...")
+      const onGunSonra = tarihEkle(9)
+
+      const { data: vardiyaListesi } = await supabase
+        .from("vardiya_planlari")
+        .select("tarih, baslangic_saati, bitis_saati, durum, aciklama")
+        .eq("personel_id", personelData.id)
+        .gte("tarih", bugun)
+        .lte("tarih", onGunSonra)
+        .order("tarih", { ascending: true })
+
+      setGelecekVardiyalar((vardiyaListesi || []) as GelecekVardiya[])
 
       setYuklemeAdimi("Giriş çıkış kayıtları okunuyor...")
 
@@ -346,6 +398,7 @@ export default function GirisCikisPage() {
     void verileriYukle()
   }, [])
 
+  const kunyeTamam = Boolean(kunyeKontrol?.tamam)
   const vardiyaCalismaGunu = useMemo(() => {
     return Boolean(vardiya && vardiya.durum === "calisma" && vardiya.calisma_gunu !== false)
   }, [vardiya])
@@ -529,11 +582,11 @@ export default function GirisCikisPage() {
         return
       }
 
-      if (!servisKonumu) {
+      if (!kunyeTamam || !servisKonumu) {
         setMesaj({
           tip: "hata",
           metin:
-            "Giriş/çıkış lokasyonu bulunamadı. Lütfen Şirket Künyesi ekranında giriş/çıkış enlem, boylam ve mesafe limitini tanımlayın.",
+            "Şirket künyesi tamamlanmadan giriş/çıkış yapılamaz. Lütfen Şirket Künyesi ekranında giriş/çıkış enlem, boylam ve mesafe limitini tanımlayın.",
         })
         setIslem(false)
         return
@@ -682,100 +735,78 @@ export default function GirisCikisPage() {
         </div>
       </div>
 
-      <div className="max-w-md mx-auto p-4 space-y-4 pb-28">
-        <div
-          className={`rounded-2xl p-4 text-white text-center ${ustKartClass(vardiya, aktifDurum)}`}
-        >
-          <p className="text-3xl">{ustKartIkon(vardiya, aktifDurum)}</p>
-
-          <p className="mt-2 text-lg font-black">
-            {ustKartBaslik(vardiya, aktifDurum)}
-          </p>
-
-          <p className="text-xs font-semibold mt-2">
-            {personel?.ad_soyad || `${personel?.ad || ""} ${personel?.soyad || ""}`}
-          </p>
-
-          <p className="text-xs font-semibold mt-1">
-            Bugünkü Durum: {vardiya ? durumEtiketi(vardiya.durum) : "Plan Yok"}
-          </p>
-
-          {vardiyaCalismaGunu && (
-            <p className="text-xs font-semibold mt-1">
-              {temizSaat(vardiya?.baslangic_saati)} - {temizSaat(vardiya?.bitis_saati)}
-            </p>
+      <div className="max-w-3xl mx-auto p-3 sm:p-4 space-y-3 pb-28">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+          <h2 className="text-xs font-black uppercase tracking-wide text-slate-500">Ekip Bilgisi</h2>
+          {ekipBilgisi ? (
+            <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs font-bold text-slate-800">
+              <p className="col-span-2 text-sm font-black text-slate-950">{ekipBilgisi.ekipAdi}</p>
+              <p><span className="text-slate-500">Lider:</span> {ekipBilgisi.liderAdi}</p>
+              <p><span className="text-slate-500">Sorumlu:</span> {ekipBilgisi.sorumluAdi}</p>
+              <p><span className="text-slate-500">Araç:</span> {ekipBilgisi.aracBilgisi}</p>
+              <p><span className="text-slate-500">Rolünüz:</span> {ekipBilgisi.rol}</p>
+            </div>
+          ) : (
+            <p className="mt-2 text-xs font-bold text-slate-600">Henüz ekibe bağlı değilsiniz.</p>
           )}
+        </div>
+
+        <div
+          className={`rounded-xl px-3 py-2.5 text-white text-center ${ustKartClass(vardiya, aktifDurum)}`}
+        >
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-xl">{ustKartIkon(vardiya, aktifDurum)}</span>
+            <p className="text-base font-black">{ustKartBaslik(vardiya, aktifDurum)}</p>
+          </div>
+
+          <p className="mt-1 text-[11px] font-semibold">
+            {personel?.ad_soyad || `${personel?.ad || ""} ${personel?.soyad || ""}`}
+            {" · "}
+            {vardiya ? durumEtiketi(vardiya.durum) : "Plan Yok"}
+            {vardiyaCalismaGunu
+              ? ` · ${temizSaat(vardiya?.baslangic_saati)}-${temizSaat(vardiya?.bitis_saati)}`
+              : ""}
+          </p>
 
           {vardiya && vardiya.durum !== "calisma" && vardiya.aciklama && (
-            <p className="text-xs font-semibold mt-2 opacity-95">
-              {vardiya.aciklama}
-            </p>
+            <p className="mt-1 text-[11px] font-semibold opacity-95">{vardiya.aciklama}</p>
           )}
 
           {servisKonumu && vardiyaCalismaGunu && (
-            <p className="text-xs font-semibold mt-2 opacity-90">
-              Konum kaynağı: {servisKonumu.kaynak} · Limit: {servisKonumu.mesafeSiniri} m
+            <p className="mt-1 text-[10px] font-semibold opacity-90">
+              Konum: {servisKonumu.kaynak} · Limit {servisKonumu.mesafeSiniri} m
             </p>
           )}
         </div>
 
-        <div className="rounded-2xl border border-gray-300 bg-white p-4 shadow-sm">
-          <div className="mb-3">
-            <h2 className="text-sm font-black">Bugünkü Vardiya Analizi</h2>
-            <p className="text-xs text-gray-600 font-semibold">
-              Plan, giriş/çıkış ve puantaj özeti
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 text-xs font-bold">
-            <div className="rounded-xl bg-gray-50 border p-3">
-              <p className="text-gray-500">Vardiya</p>
-              <p className="text-gray-900">
-                {vardiyaCalismaGunu
-                  ? `${temizSaat(vardiya?.baslangic_saati)} - ${temizSaat(vardiya?.bitis_saati)}`
-                  : vardiya
-                    ? durumEtiketi(vardiya.durum)
-                    : "Plan yok"}
-              </p>
-            </div>
-
-            <div className="rounded-xl bg-gray-50 border p-3">
-              <p className="text-gray-500">Durum</p>
-              <p className="text-gray-900">
-                {vardiya ? durumEtiketi(vardiya.durum) : "Plan Yok"}
-              </p>
-            </div>
-
-            <div className="rounded-xl bg-gray-50 border p-3">
+        <div className="rounded-xl border border-gray-300 bg-white p-3 shadow-sm">
+          <h2 className="text-xs font-black text-gray-900">Bugünkü Vardiya Analizi</h2>
+          <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-bold">
+            <div className="rounded-lg bg-gray-50 border px-2 py-1.5">
               <p className="text-gray-500">İlk Giriş</p>
               <p className="text-gray-900">{formatSaat(gunAnalizi.ilkGiris?.created_at)}</p>
             </div>
-
-            <div className="rounded-xl bg-gray-50 border p-3">
+            <div className="rounded-lg bg-gray-50 border px-2 py-1.5">
               <p className="text-gray-500">Son Çıkış</p>
               <p className="text-gray-900">{formatSaat(gunAnalizi.sonCikis?.created_at)}</p>
             </div>
-
-            <div className="rounded-xl bg-gray-50 border p-3">
-              <p className="text-gray-500">Çalışılan Süre</p>
+            <div className="rounded-lg bg-gray-50 border px-2 py-1.5">
+              <p className="text-gray-500">Çalışılan</p>
               <p className="text-gray-900">{dakikaYaz(gunAnalizi.calismaDakika)}</p>
             </div>
-
-            <div className="rounded-xl bg-gray-50 border p-3">
+            <div className="rounded-lg bg-gray-50 border px-2 py-1.5">
               <p className="text-gray-500">Geç Giriş</p>
               <p className={analizRenk(gunAnalizi.gecGirisDakika)}>
                 {dakikaYaz(gunAnalizi.gecGirisDakika)}
               </p>
             </div>
-
-            <div className="rounded-xl bg-gray-50 border p-3">
+            <div className="rounded-lg bg-gray-50 border px-2 py-1.5">
               <p className="text-gray-500">Erken Çıkış</p>
               <p className={analizRenk(gunAnalizi.erkenCikisDakika)}>
                 {dakikaYaz(gunAnalizi.erkenCikisDakika)}
               </p>
             </div>
-
-            <div className="rounded-xl bg-gray-50 border p-3">
+            <div className="rounded-lg bg-gray-50 border px-2 py-1.5">
               <p className="text-gray-500">Fazla Mesai</p>
               <p className={gunAnalizi.fazlaMesaiDakika > 0 ? "text-blue-700" : "text-green-700"}>
                 {dakikaYaz(gunAnalizi.fazlaMesaiDakika)}
@@ -802,94 +833,108 @@ export default function GirisCikisPage() {
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={() => handleKayit("giris")}
-          disabled={islem || aktifDurum === "giris" || !vardiyaCalismaGunu}
-          className="w-full rounded-xl bg-green-600 py-4 text-white font-black disabled:opacity-40"
-        >
-          {islem ? "İşleniyor..." : "📍 Giriş Yap"}
-        </button>
+        {!kunyeTamam && kunyeKontrol && !kunyeKontrol.tamam && (
+          <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-950">
+            Şirket künyesi tamamlanmadan giriş/çıkış yapılamaz.
+            {kunyeKontrol.eksikler.length > 0 && (
+              <span className="mt-2 block text-xs font-semibold">
+                Eksik: {kunyeKontrol.eksikler.join(", ")}
+              </span>
+            )}
+          </div>
+        )}
 
-        <button
-          type="button"
-          onClick={() => handleKayit("cikis")}
-          disabled={islem || aktifDurum === "cikis" || !vardiyaCalismaGunu}
-          className="w-full rounded-xl bg-red-600 py-4 text-white font-black disabled:opacity-40"
-        >
-          {islem ? "İşleniyor..." : "🚪 Çıkış Yap"}
-        </button>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => handleKayit("giris")}
+            disabled={islem || aktifDurum === "giris" || !vardiyaCalismaGunu || !kunyeTamam}
+            className="rounded-xl bg-green-600 py-3 text-sm text-white font-black disabled:opacity-40"
+          >
+            {islem ? "..." : "📍 Giriş"}
+          </button>
 
-        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => handleKayit("cikis")}
+            disabled={islem || aktifDurum === "cikis" || !vardiyaCalismaGunu || !kunyeTamam}
+            className="rounded-xl bg-red-600 py-3 text-sm text-white font-black disabled:opacity-40"
+          >
+            {islem ? "..." : "🚪 Çıkış"}
+          </button>
+        </div>
+
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 shadow-sm">
+          <div className="flex items-start justify-between gap-2">
             <div>
-              <h2 className="text-sm font-black text-blue-950">Konum Takibi</h2>
-              <p className="mt-1 text-xs font-semibold text-blue-900">
-                {vardiyaCalismaGunu && aktifDurum === "giris"
-                  ? "Aktif mesai sırasında konum takibi çalışır."
-                  : "Mesai kapalı veya bugün çalışma günü değil. Konum takibi pasiftir."}
-              </p>
-              <p className="mt-2 text-xs font-bold text-blue-950">
-                {konumTakipMesaji}
-              </p>
+              <h2 className="text-xs font-black text-blue-950">Konum Takibi</h2>
+              <p className="mt-1 text-[11px] font-semibold text-blue-900">{konumTakipMesaji}</p>
             </div>
-
-            <div className="rounded-xl bg-white px-3 py-2 text-right text-xs font-black text-blue-950">
-              <p>Gönderim: {konumGonderimSayisi}</p>
-              <p>Son: {sonKonumGonderimSaati || "-"}</p>
+            <div className="rounded-lg bg-white px-2 py-1 text-right text-[10px] font-black text-blue-950">
+              <p>{konumGonderimSayisi} gönderim</p>
+              <p>{sonKonumGonderimSaati || "-"}</p>
             </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-gray-300 bg-white p-4 shadow-sm">
-          <div className="mb-3">
-            <h2 className="text-sm font-black">Bugünkü Hareketler</h2>
-            <p className="text-xs text-gray-600 font-semibold">
-              Gün içi giriş / çıkış kayıtları
-            </p>
-          </div>
-
+        <div className="rounded-xl border border-gray-300 bg-white p-3 shadow-sm">
+          <h2 className="text-xs font-black">Bugünkü Hareketler</h2>
           {kayitlar.length === 0 ? (
-            <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 text-center text-sm font-bold text-gray-600">
-              Kayıt bulunmuyor.
-            </div>
+            <p className="mt-2 rounded-lg bg-gray-50 border p-2 text-center text-[11px] font-bold text-gray-600">
+              Kayıt yok
+            </p>
           ) : (
-            <div className="space-y-2">
+            <div className="mt-2 space-y-1.5">
               {kayitlar.map((kayit) => (
                 <div
                   key={kayit.id}
-                  className="rounded-xl border border-gray-200 p-3 flex items-center justify-between"
+                  className="rounded-lg border border-gray-200 px-2 py-1.5 flex items-center justify-between"
                 >
-                  <div>
-                    <p className="text-sm font-black">
-                      {kayit.tip === "giris" ? "📍 Giriş" : "🚪 Çıkış"}
-                    </p>
-
-                    <p className="text-xs text-gray-600 font-semibold">
-                      {formatSaat(kayit.created_at)}
-                    </p>
-                  </div>
-
-                  <div
-                    className={`rounded-lg border px-2 py-1 text-xs font-black ${
-                      kayit.tip === "giris"
-                        ? durumClass("Çalışıyor")
-                        : durumClass("Zamanında")
+                  <p className="text-[11px] font-black">
+                    {kayit.tip === "giris" ? "📍 Giriş" : "🚪 Çıkış"} · {formatSaat(kayit.created_at)}
+                  </p>
+                  <span
+                    className={`rounded border px-1.5 py-0.5 text-[10px] font-black ${
+                      kayit.tip === "giris" ? durumClass("Çalışıyor") : durumClass("Zamanında")
                     }`}
                   >
                     {kayit.tip === "giris" ? "Giriş" : "Çıkış"}
-                  </div>
+                  </span>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        <div className="rounded-xl bg-blue-50 border border-blue-200 p-3">
-          <p className="text-xs font-bold text-blue-900">
-            📍 Giriş/çıkış lokasyonu ana kaynak olarak Şirket Künyesi ekranındaki enlem, boylam ve mesafe limitinden okunur.
-          </p>
+        <div className="rounded-xl border border-gray-300 bg-white p-3 shadow-sm">
+          <h2 className="text-xs font-black">Gelecek 10 Günlük Vardiya</h2>
+          {gelecekVardiyalar.length === 0 ? (
+            <p className="mt-2 rounded-lg bg-gray-50 border p-2 text-center text-[11px] font-bold text-gray-600">
+              Vardiya kaydı bulunamadı.
+            </p>
+          ) : (
+            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {gelecekVardiyalar.map((plan) => (
+                <div key={plan.tarih} className="rounded-lg border bg-slate-50 px-2 py-1.5">
+                  <p className="text-[11px] font-black text-slate-900">{tarihYaz(plan.tarih)}</p>
+                  <p className="text-[10px] font-bold text-slate-600">{durumEtiketi(plan.durum)}</p>
+                  <p className="text-[10px] font-bold text-slate-800">
+                    {temizSaat(plan.baslangic_saati) || "-"} - {temizSaat(plan.bitis_saati) || "-"}
+                  </p>
+                  {plan.aciklama && (
+                    <p className="mt-0.5 text-[10px] font-semibold text-slate-600 line-clamp-2">
+                      {plan.aciklama}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+
+        <p className="text-[10px] font-bold text-blue-900 text-center">
+          Giriş/çıkış lokasyonu ve mesafe limiti yalnızca şirket künyesinden okunur.
+        </p>
       </div>
       <MobileTabBar />
     </div>

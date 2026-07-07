@@ -40,6 +40,7 @@ try {
 
   await runScript("scripts/aron-import.mjs", [jsonPath])
   await runScript("scripts/aron-operasyon-havuzu.mjs")
+  await runScript("scripts/ai-ekip-oneri-v1.mjs")
 
   const { data: ozet, error: ozetError } = await supabase
     .from("aktif_operasyon_havuzu_v2")

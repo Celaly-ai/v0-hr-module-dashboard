@@ -159,6 +159,7 @@ const modulYollari: Record<string, string> = {
   ai_canli_operasyon_merkezi: "/portal/ai-canli-operasyon-merkezi",
   akilli_atama_merkezi: "/portal/akilli-atama-merkezi",
   hizmet_sure_katalogu: "/portal/hizmet-sure-katalogu",
+  urun_takip_zinciri: "/portal/urun-takip-zinciri",
 
   bayi_operasyon_merkezi: "/portal/bayi-operasyon-merkezi",
 
@@ -217,6 +218,7 @@ const modulIkonlari: Record<string, any> = {
   ai_canli_operasyon_merkezi: BarChart3,
   akilli_atama_merkezi: ClipboardCheck,
   hizmet_sure_katalogu: Clock,
+  urun_takip_zinciri: Boxes,
 
   bayi_operasyon_merkezi: Store,
 

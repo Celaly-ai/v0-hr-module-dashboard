@@ -48,6 +48,7 @@ export const ALL_MODULES = [
   "Hizmet Sure Katalogu",
   "Operasyon Zimmet",
   "Gorevlerim",
+  "Urun Takip Zinciri",
   "Adres Konum Teyit",
   "Adres Konum Rapor",
   "Yonetici Bildirimleri",
@@ -142,6 +143,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, ModuleSlug[]> = {
     "Akilli Atama Merkezi",
     "Hizmet Sure Katalogu",
     "Operasyon Zimmet",
+    "Urun Takip Zinciri",
     "Adres Konum Teyit",
     "Adres Konum Rapor",
     "Yonetici Bildirimleri",
@@ -207,6 +209,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, ModuleSlug[]> = {
 
     "Operasyon Havuzu",
     "Operasyon Zimmet",
+    "Urun Takip Zinciri",
 
     "Urun Merkezi",
     "Urun Operasyon Dashboard",
@@ -254,6 +257,13 @@ export const PORTAL_MODULE_DEFINITIONS: Record<string, PortalModuleDefinition> =
     route: "/portal/gorevlerim",
     aciklama:
       "Atanmış saha görevlerinizi görüntüleyin ve operasyon işlemlerini yürütün.",
+  },
+  urun_takip_zinciri: {
+    kod: "urun_takip_zinciri",
+    ad: "Ürün Takip Zinciri",
+    route: "/portal/urun-takip-zinciri",
+    aciklama:
+      "Seri no ve model üzerinden ürün takip ve zimmet zinciri oluşturur.",
   },
   performans_yonetim_v2: {
     kod: "performans_yonetim_v2",

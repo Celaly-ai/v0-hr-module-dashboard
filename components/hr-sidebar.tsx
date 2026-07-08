@@ -246,6 +246,13 @@ const navigationItems: NavGroup[] = [
       },
 
       {
+        title: "AI Kurumsal Yazışma Asistanı",
+        icon: Bot,
+        href: "/portal/ai-kanitli-yazisma-asistani",
+        alwaysVisible: true,
+      },
+
+      {
         title: "Akıllı Atama Merkezi",
         icon: Warehouse,
         href: "/portal/akilli-atama-merkezi",

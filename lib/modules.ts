@@ -264,6 +264,12 @@ export const PORTAL_MODULE_DEFINITIONS: Record<string, PortalModuleDefinition> =
     route: "/portal/urun-takip-zinciri",
     aciklama: "Mobil barkod ile zimmet alma ve zimmet düşme.",
   },
+  aron_ham_veri_merkezi: {
+    kod: "aron_ham_veri_merkezi",
+    ad: "ARON Ham Veri Merkezi",
+    route: "/portal/aron-ham-veri-merkezi",
+    aciklama: "Eski ARON'dan çekilen tüm verileri ham arşiv olarak saklar.",
+  },
   performans_yonetim_v2: {
     kod: "performans_yonetim_v2",
     ad: "Performans Yönetim V2",

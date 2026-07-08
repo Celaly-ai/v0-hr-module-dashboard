@@ -160,6 +160,7 @@ const modulYollari: Record<string, string> = {
   akilli_atama_merkezi: "/portal/akilli-atama-merkezi",
   hizmet_sure_katalogu: "/portal/hizmet-sure-katalogu",
   urun_takip_zinciri: "/portal/urun-takip-zinciri",
+  aron_ham_veri_merkezi: "/portal/aron-ham-veri-merkezi",
 
   bayi_operasyon_merkezi: "/portal/bayi-operasyon-merkezi",
 
@@ -219,6 +220,7 @@ const modulIkonlari: Record<string, any> = {
   akilli_atama_merkezi: ClipboardCheck,
   hizmet_sure_katalogu: Clock,
   urun_takip_zinciri: Boxes,
+  aron_ham_veri_merkezi: FileSpreadsheet,
 
   bayi_operasyon_merkezi: Store,
 

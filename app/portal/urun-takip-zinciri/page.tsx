@@ -73,8 +73,36 @@ const HASAR_ACIKLAMA_MIN = 30
 const HASAR_FOTO_KAMERA_HATA =
   "Kamera açılamadı. Telefon tarayıcısından kamera iznini kontrol edip tekrar deneyin."
 
+const BARKOD_FOTO_MESAJ =
+  "Barkod fotoğrafı alındı, ürün kimliği daha sonra doğrulanacak."
+
 function hasarAciklamaGecerli(aciklama: string) {
   return aciklama.trim().length >= HASAR_ACIKLAMA_MIN
+}
+
+function logAciklamaOlustur(aciklama: string | null, barkodFotoUrl?: string | null) {
+  const parcalar: string[] = []
+  if (aciklama?.trim()) parcalar.push(aciklama.trim())
+  if (barkodFotoUrl) parcalar.push(`BARKOD_FOTO_URL=${barkodFotoUrl}`)
+  return parcalar.length > 0 ? parcalar.join(" | ") : null
+}
+
+function geciciFotoKimligiOlustur(fotoUrl: string) {
+  const timestamp = Date.now()
+  return {
+    seriNo: `FOTO_${timestamp}`,
+    model: "BARKOD_FOTO_OKUNACAK",
+    barkod: fotoUrl || `FOTO_${timestamp}`,
+  }
+}
+
+function BarkodFotoAlindiKarti() {
+  return (
+    <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-3">
+      <p className="text-sm font-black text-emerald-900">Barkod fotoğrafı alındı</p>
+      <p className="mt-1 text-xs font-semibold text-emerald-800">{BARKOD_FOTO_MESAJ}</p>
+    </div>
+  )
 }
 
 function BarkodDogrulamaKarti() {
@@ -146,6 +174,9 @@ export default function UrunTakipZinciriPage() {
   const [fisNo, setFisNo] = useState("")
   const [alBarkod, setAlBarkod] = useState("")
   const [alBarkodDogrulandi, setAlBarkodDogrulandi] = useState(false)
+  const [alBarkodFotoUrl, setAlBarkodFotoUrl] = useState<string | null>(null)
+  const [alBarkodFotoYukleniyor, setAlBarkodFotoYukleniyor] = useState(false)
+  const [alBarkodFotoModu, setAlBarkodFotoModu] = useState(false)
   const [seriNo, setSeriNo] = useState("")
   const [model, setModel] = useState("")
   const [hasarDurumu, setHasarDurumu] = useState<HasarDurumu>("hasarsiz")
@@ -162,10 +193,16 @@ export default function UrunTakipZinciriPage() {
   const [dusBarkod, setDusBarkod] = useState("")
   const [dusUrun, setDusUrun] = useState<UrunKayit | null>(null)
   const [dusBarkodDogrulandi, setDusBarkodDogrulandi] = useState(false)
+  const [dusBarkodMetinOkundu, setDusBarkodMetinOkundu] = useState(false)
+  const [dusBarkodFotoUrl, setDusBarkodFotoUrl] = useState<string | null>(null)
+  const [dusBarkodFotoYukleniyor, setDusBarkodFotoYukleniyor] = useState(false)
+  const [dusBarkodFotoAlindi, setDusBarkodFotoAlindi] = useState(false)
   const [dusIslem, setDusIslem] = useState<ZimmetDusIslem>("nakliye")
 
   const alBarkodRef = useRef<HTMLInputElement>(null)
+  const alBarkodFotoInputRef = useRef<HTMLInputElement>(null)
   const dusBarkodRef = useRef<HTMLInputElement>(null)
+  const dusBarkodFotoInputRef = useRef<HTMLInputElement>(null)
   const hasarFotoInputRef = useRef<HTMLInputElement>(null)
 
   const zimmetAkisiAcik = useMemo(() => {
@@ -263,6 +300,7 @@ export default function UrunTakipZinciriPage() {
     yeniDurum: string | null,
     aciklama: string | null,
     konum: { lat: number; lng: number } | null,
+    barkodFotoUrl?: string | null,
   ) {
     const supabase = createClient()
     const { error } = await supabase.from("urun_takip_loglari").insert({
@@ -274,7 +312,7 @@ export default function UrunTakipZinciriPage() {
       islem_tipi: islemTipi,
       onceki_durum: oncekiDurum,
       yeni_durum: yeniDurum,
-      aciklama,
+      aciklama: logAciklamaOlustur(aciklama, barkodFotoUrl),
       personel_id: personel?.id ?? null,
       personel_ad: personelAdi(personel),
       konum_lat: konum?.lat ?? null,
@@ -282,6 +320,92 @@ export default function UrunTakipZinciriPage() {
     })
 
     if (error) throw new Error("Log kaydı oluşturulamadı: " + error.message)
+  }
+
+  async function barkodFotoYukle(dosya: File, altKlasor: "barkod-al" | "barkod-dus") {
+    if (!personel?.id) throw new Error("Personel bilgisi bulunamadı.")
+
+    const supabase = createClient()
+    const uzanti = dosya.name.split(".").pop()?.toLowerCase() || "jpg"
+    const yol = `${altKlasor}/${personel.id}/${Date.now()}.${uzanti}`
+
+    const { error } = await supabase.storage.from("urun-takip").upload(yol, dosya, {
+      cacheControl: "3600",
+      upsert: false,
+    })
+
+    if (error) throw new Error("Fotoğraf yüklenemedi: " + error.message)
+
+    const { data } = supabase.storage.from("urun-takip").getPublicUrl(yol)
+    return data.publicUrl
+  }
+
+  async function alBarkodFotoSec(dosya: File | undefined) {
+    if (!dosya) return
+
+    setAlBarkodFotoYukleniyor(true)
+    setMesaj(null)
+
+    try {
+      const url = await barkodFotoYukle(dosya, "barkod-al")
+      const kimlik = geciciFotoKimligiOlustur(url)
+      setAlBarkodFotoUrl(url)
+      setAlBarkodFotoModu(true)
+      setAlBarkod(kimlik.barkod)
+      setSeriNo(kimlik.seriNo)
+      setModel(kimlik.model)
+      setAlBarkodDogrulandi(true)
+      setHasarDevam(false)
+      setMevcutUrun(null)
+      setKaynak("")
+      setBayiKodu("")
+      setMesaj({ tip: "basari", metin: BARKOD_FOTO_MESAJ })
+    } catch {
+      setAlBarkodFotoUrl(null)
+      setAlBarkodFotoModu(false)
+      setAlBarkodDogrulandi(false)
+      setMesaj({ tip: "hata", metin: HASAR_FOTO_KAMERA_HATA })
+    } finally {
+      setAlBarkodFotoYukleniyor(false)
+    }
+  }
+
+  async function dusBarkodFotoSec(dosya: File | undefined) {
+    if (!dosya) return
+
+    if (!dusUrun) {
+      setMesaj({ tip: "hata", metin: "Önce düşülecek ürünü listeden seçin." })
+      return
+    }
+
+    setDusBarkodFotoYukleniyor(true)
+    setMesaj(null)
+
+    try {
+      const url = await barkodFotoYukle(dosya, "barkod-dus")
+      setDusBarkodFotoUrl(url)
+      setDusBarkodFotoAlindi(true)
+      setDusBarkodMetinOkundu(false)
+      setDusBarkodDogrulandi(true)
+      setMesaj({ tip: "basari", metin: BARKOD_FOTO_MESAJ })
+    } catch {
+      setDusBarkodFotoUrl(null)
+      setDusBarkodFotoAlindi(false)
+      setDusBarkodDogrulandi(dusBarkodMetinOkundu)
+      setMesaj({ tip: "hata", metin: HASAR_FOTO_KAMERA_HATA })
+    } finally {
+      setDusBarkodFotoYukleniyor(false)
+    }
+  }
+
+  function dusUrunSec(urun: UrunKayit) {
+    setDusUrun(urun)
+    setDusBarkodFotoUrl(null)
+    setDusBarkodFotoAlindi(false)
+    if (!dusBarkodMetinOkundu) {
+      setDusBarkodDogrulandi(false)
+    }
+    setMesaj(null)
   }
 
   async function hasarFotoYukle(dosya: File) {
@@ -330,6 +454,8 @@ export default function UrunTakipZinciriPage() {
     setMesaj(null)
     setAlBarkod(deger)
     setAlBarkodDogrulandi(false)
+    setAlBarkodFotoUrl(null)
+    setAlBarkodFotoModu(false)
     setHasarDevam(false)
     setMevcutUrun(null)
     setKaynak("")
@@ -381,6 +507,7 @@ export default function UrunTakipZinciriPage() {
       }
 
       setAlBarkodDogrulandi(true)
+      setAlBarkodFotoModu(false)
     } catch {
       setAlBarkodDogrulandi(false)
       setMesaj({
@@ -400,6 +527,9 @@ export default function UrunTakipZinciriPage() {
     setMesaj(null)
     setDusBarkod(deger)
     setDusBarkodDogrulandi(false)
+    setDusBarkodMetinOkundu(false)
+    setDusBarkodFotoUrl(null)
+    setDusBarkodFotoAlindi(false)
     setDusUrun(null)
 
     if (!personel?.id) {
@@ -432,6 +562,7 @@ export default function UrunTakipZinciriPage() {
     }
 
     setDusUrun(eslesen)
+    setDusBarkodMetinOkundu(true)
     setDusBarkodDogrulandi(true)
   }
 
@@ -439,6 +570,8 @@ export default function UrunTakipZinciriPage() {
     setFisNo("")
     setAlBarkod("")
     setAlBarkodDogrulandi(false)
+    setAlBarkodFotoUrl(null)
+    setAlBarkodFotoModu(false)
     setSeriNo("")
     setModel("")
     setHasarDurumu("hasarsiz")
@@ -456,6 +589,9 @@ export default function UrunTakipZinciriPage() {
     setDusBarkod("")
     setDusUrun(null)
     setDusBarkodDogrulandi(false)
+    setDusBarkodMetinOkundu(false)
+    setDusBarkodFotoUrl(null)
+    setDusBarkodFotoAlindi(false)
     setDusIslem("nakliye")
   }
 
@@ -493,7 +629,7 @@ export default function UrunTakipZinciriPage() {
         fis_no: fisNo.trim(),
         seri_no: seriNo,
         model,
-        barkod: alBarkod.trim() || `${seriNo}|${model}`,
+        barkod: alBarkodFotoModu ? alBarkodFotoUrl || alBarkod.trim() : alBarkod.trim() || `${seriNo}|${model}`,
         hasar_durumu: "hasarli" as const,
         hasar_aciklama: hasarAciklama.trim(),
         hasar_foto_url: hasarFotoUrl,
@@ -523,6 +659,7 @@ export default function UrunTakipZinciriPage() {
           "iade_edildi",
           hasarAciklama.trim(),
           konum,
+          alBarkodFotoModu ? alBarkodFotoUrl : null,
         )
       } else {
         const { data, error } = await supabase
@@ -541,6 +678,7 @@ export default function UrunTakipZinciriPage() {
           "iade_edildi",
           hasarAciklama.trim(),
           konum,
+          alBarkodFotoModu ? alBarkodFotoUrl : null,
         )
       }
 
@@ -614,7 +752,9 @@ export default function UrunTakipZinciriPage() {
       const supabase = createClient()
       const simdi = new Date().toISOString()
       const pAd = personelAdi(personel)
-      const tamBarkod = alBarkod.trim() || `${seriNo}|${model}`
+      const tamBarkod = alBarkodFotoModu
+        ? alBarkodFotoUrl || alBarkod.trim()
+        : alBarkod.trim() || `${seriNo}|${model}`
 
       const ortak = {
         fis_no: fisNo.trim(),
@@ -652,6 +792,7 @@ export default function UrunTakipZinciriPage() {
           ortak.durum,
           mevcut.aktif_zimmet ? "Zimmet güncellendi" : "Zimmet alındı",
           konum,
+          alBarkodFotoModu ? alBarkodFotoUrl : null,
         )
       } else {
         const { data, error } = await supabase
@@ -670,6 +811,7 @@ export default function UrunTakipZinciriPage() {
           ortak.durum,
           `Kaynak: ${kaynak ? KAYNAK_ETIKET[kaynak as Kaynak] : "-"}`,
           konum,
+          alBarkodFotoModu ? alBarkodFotoUrl : null,
         )
       }
 
@@ -691,8 +833,15 @@ export default function UrunTakipZinciriPage() {
     setMesaj(null)
 
     try {
-      if (!dusBarkodDogrulandi || !dusUrun || !personel?.id) {
+      if (!dusUrun || !personel?.id) {
         setMesaj({ tip: "hata", metin: "Önce barkod okutarak doğrulama yapın." })
+        return
+      }
+      if (!dusBarkodMetinOkundu && !dusBarkodFotoUrl) {
+        setMesaj({
+          tip: "hata",
+          metin: "Canlı barkod okunamadıysa barkod fotoğrafı çekmelisiniz.",
+        })
         return
       }
 
@@ -746,6 +895,7 @@ export default function UrunTakipZinciriPage() {
         yeniDurum,
         ZIMMET_DUS_ETIKET[dusIslem],
         konum,
+        dusBarkodFotoAlindi ? dusBarkodFotoUrl : null,
       )
 
       setMesaj({ tip: "basari", metin: "Zimmet düşürüldü." })
@@ -842,6 +992,36 @@ export default function UrunTakipZinciriPage() {
 
             <BarcodeScanner onDetected={(value) => void alBarkodIsle(value)} />
 
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
+              <span className="mb-2 block text-xs font-black uppercase text-slate-500">
+                Barkod fotoğrafı çek (fallback)
+              </span>
+              <input
+                ref={alBarkodFotoInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                disabled={alBarkodFotoYukleniyor}
+                className="sr-only"
+                onChange={(e) => {
+                  const dosya = e.target.files?.[0]
+                  void alBarkodFotoSec(dosya)
+                  e.target.value = ""
+                }}
+              />
+              <button
+                type="button"
+                disabled={alBarkodFotoYukleniyor}
+                onClick={() => alBarkodFotoInputRef.current?.click()}
+                className={`${btnSinifi} bg-slate-800 text-white`}
+              >
+                {alBarkodFotoYukleniyor ? "Yükleniyor..." : "Barkod Fotoğrafı Çek"}
+              </button>
+              <p className="mt-2 text-xs font-semibold text-slate-600">
+                Kamera taraması çalışmazsa barkod fotoğrafı ile devam edin.
+              </p>
+            </div>
+
             <label className="block">
               <span className="mb-1 block text-xs font-black uppercase text-slate-500">
                 Barkod (fiziksel okuyucu)
@@ -874,7 +1054,8 @@ export default function UrunTakipZinciriPage() {
               Barkodu İşle
             </button>
 
-            {alBarkodDogrulandi && <BarkodDogrulamaKarti />}
+            {alBarkodDogrulandi && alBarkodFotoModu && <BarkodFotoAlindiKarti />}
+            {alBarkodDogrulandi && !alBarkodFotoModu && <BarkodDogrulamaKarti />}
 
             {alBarkodDogrulandi && (
               <>
@@ -1071,6 +1252,71 @@ export default function UrunTakipZinciriPage() {
 
             <BarcodeScanner onDetected={(value) => void dusBarkodIsle(value)} />
 
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
+              <span className="mb-2 block text-xs font-black uppercase text-slate-500">
+                Barkod fotoğrafı çek (fallback)
+              </span>
+              <input
+                ref={dusBarkodFotoInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                disabled={dusBarkodFotoYukleniyor || !dusUrun}
+                className="sr-only"
+                onChange={(e) => {
+                  const dosya = e.target.files?.[0]
+                  void dusBarkodFotoSec(dosya)
+                  e.target.value = ""
+                }}
+              />
+              <button
+                type="button"
+                disabled={dusBarkodFotoYukleniyor || !dusUrun}
+                onClick={() => dusBarkodFotoInputRef.current?.click()}
+                className={`${btnSinifi} bg-slate-800 text-white`}
+              >
+                {dusBarkodFotoYukleniyor
+                  ? "Yükleniyor..."
+                  : dusUrun
+                    ? "Barkod Fotoğrafı Çek"
+                    : "Önce ürün seçin"}
+              </button>
+              <p className="mt-2 text-xs font-semibold text-slate-600">
+                Canlı okuma başarısızsa ürün seçip barkod fotoğrafı çekin.
+              </p>
+            </div>
+
+            {!dusBarkodMetinOkundu && (
+              <div className="space-y-3">
+                <p className="text-sm font-bold text-slate-700">
+                  Fotoğraf fallback için düşülecek ürünü seçin:
+                </p>
+                {aktifZimmetler.length === 0 ? (
+                  <p className="text-sm font-bold text-slate-600">Aktif zimmetiniz yok.</p>
+                ) : (
+                  aktifZimmetler.map((z) => {
+                    const secili = dusUrun?.id === z.id
+                    return (
+                      <button
+                        key={z.id}
+                        type="button"
+                        onClick={() => dusUrunSec(z)}
+                        className={`w-full rounded-2xl border-2 p-4 text-left ${
+                          secili ? "border-red-500 bg-red-50" : "border-slate-200 bg-white"
+                        }`}
+                      >
+                        <p className="font-black">{z.model}</p>
+                        <p className="mt-1 text-sm text-slate-600">Fiş: {z.fis_no}</p>
+                        {secili && (
+                          <p className="mt-2 text-xs font-black text-red-700">Seçildi ✓</p>
+                        )}
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+            )}
+
             <label className="block">
               <span className="mb-1 block text-xs font-black uppercase text-slate-500">
                 Barkod (fiziksel okuyucu)
@@ -1103,7 +1349,8 @@ export default function UrunTakipZinciriPage() {
               Barkodu İşle
             </button>
 
-            {dusBarkodDogrulandi && <BarkodDogrulamaKarti />}
+            {dusBarkodDogrulandi && dusBarkodFotoAlindi && <BarkodFotoAlindiKarti />}
+            {dusBarkodDogrulandi && dusBarkodMetinOkundu && <BarkodDogrulamaKarti />}
 
             <label className="block">
               <span className="mb-1 block text-xs font-black uppercase text-slate-500">
@@ -1125,7 +1372,7 @@ export default function UrunTakipZinciriPage() {
 
             <button
               type="button"
-              disabled={islem || yukleniyor || !dusBarkodDogrulandi}
+              disabled={islem || yukleniyor || !dusUrun || (!dusBarkodMetinOkundu && !dusBarkodFotoUrl)}
               onClick={() => void zimmetDus()}
               className={`${btnSinifi} bg-red-700 text-white`}
             >

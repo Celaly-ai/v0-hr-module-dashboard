@@ -42,6 +42,7 @@ export const ALL_MODULES = [
   // Operasyon
   "AI Canli Operasyon Merkezi",
   "AI Gorev Merkezi",
+  "AI Kurumsal Yazisma Asistani",
   "Operasyon Havuzu",
   "Akilli Atama Merkezi",
   "Hizmet Sure Katalogu",
@@ -136,6 +137,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, ModuleSlug[]> = {
 
     "AI Canli Operasyon Merkezi",
     "AI Gorev Merkezi",
+    "AI Kurumsal Yazisma Asistani",
     "Operasyon Havuzu",
     "Akilli Atama Merkezi",
     "Hizmet Sure Katalogu",
@@ -180,6 +182,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, ModuleSlug[]> = {
     "Performans Yonetim V2",
     "Performansim",
 
+    "AI Kurumsal Yazisma Asistani",
+
     "Adres Konum Teyit",
     "Adres Konum Rapor",
     "Yonetici Bildirimleri",
@@ -221,6 +225,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, ModuleSlug[]> = {
 
     "Performansim",
 
+    "AI Kurumsal Yazisma Asistani",
+
     "Adres Konum Teyit",
 
     "Bildirimler",
@@ -235,6 +241,13 @@ export type PortalModuleDefinition = {
 }
 
 export const PORTAL_MODULE_DEFINITIONS: Record<string, PortalModuleDefinition> = {
+  ai_kanitli_yazisma_asistani: {
+    kod: "ai_kanitli_yazisma_asistani",
+    ad: "AI Kurumsal Yazışma Asistanı",
+    route: "/portal/ai-kanitli-yazisma-asistani",
+    aciklama:
+      "Kanıt ve talebe dayalı profesyonel kurumsal yazı hazırlar.",
+  },
   gorevlerim: {
     kod: "gorevlerim",
     ad: "Görevlerim",
@@ -263,4 +276,84 @@ export const PORTAL_MODULE_DEFINITIONS: Record<string, PortalModuleDefinition> =
     aciklama:
       "Performans matris verilerini yükleyin ve normalize kayıtları yönetin.",
   },
+}
+
+export type PortalModul = {
+  kod: string
+  ad: string
+  aciklama: string | null
+  kategori: string
+  standart: boolean
+  aktif: boolean
+  sira: number
+}
+
+/** Personel portalında zorunlu (standart) modül kodları — sıra önemlidir. */
+export const PERSONEL_STANDART_MODUL_KODLARI = [
+  "mesai",
+  "izin",
+  "talepler",
+  "iletisim",
+  "adres_konum_teyit",
+  "performansim",
+  "ai_kanitli_yazisma_asistani",
+] as const
+
+export type PersonelStandartModulKodu =
+  (typeof PERSONEL_STANDART_MODUL_KODLARI)[number]
+
+/** DB kaydı yoksa veya standart=false ise portal tarafında garanti edilen modüller. */
+export const PERSONEL_STANDART_MODUL_GARANTI: PortalModul[] = [
+  {
+    kod: "performansim",
+    ad: "Performansım",
+    aciklama:
+      "Kişisel performans puanınızı, sıralamanızı ve gelişim alanlarınızı görüntüleyin.",
+    kategori: "standart",
+    standart: true,
+    aktif: true,
+    sira: 6,
+  },
+  {
+    kod: "ai_kanitli_yazisma_asistani",
+    ad: "AI Kurumsal Yazışma Asistanı",
+    aciklama:
+      "Kanıt ve talebe dayalı profesyonel kurumsal yazı hazırlar.",
+    kategori: "standart",
+    standart: true,
+    aktif: true,
+    sira: 7,
+  },
+]
+
+function standartModulunuGarantiEt(moduller: PortalModul[], garanti: PortalModul) {
+  const modulVar = moduller.some((modul) => modul.kod === garanti.kod)
+
+  if (modulVar) {
+    return moduller.map((modul) => {
+      if (modul.kod !== garanti.kod) {
+        return modul
+      }
+
+      return {
+        ...modul,
+        ad: garanti.ad,
+        aciklama: garanti.aciklama,
+        kategori: "standart",
+        standart: true,
+        aktif: true,
+      }
+    })
+  }
+
+  return [...moduller, garanti]
+}
+
+export function personelStandartModulleriniGarantiEt(
+  moduller: PortalModul[],
+): PortalModul[] {
+  return PERSONEL_STANDART_MODUL_GARANTI.reduce(
+    (liste, garanti) => standartModulunuGarantiEt(liste, garanti),
+    moduller,
+  )
 }

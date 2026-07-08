@@ -45,6 +45,33 @@ create index if not exists urun_takip_kayitlari_created_idx
 create index if not exists urun_takip_kayitlari_aktif_idx
   on public.urun_takip_kayitlari (aktif_zimmet, durum);
 
+create index if not exists urun_takip_kayitlari_personel_aktif_idx
+  on public.urun_takip_kayitlari (zimmetli_personel_id)
+  where aktif_zimmet = true;
+
+-- ---------------------------------------------------------------------
+-- Hasar fotoğrafları storage
+-- ---------------------------------------------------------------------
+insert into storage.buckets (id, name, public)
+values ('urun-takip', 'urun-takip', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists urun_takip_storage_read on storage.objects;
+create policy urun_takip_storage_read on storage.objects
+  for select to authenticated
+  using (bucket_id = 'urun-takip');
+
+drop policy if exists urun_takip_storage_insert on storage.objects;
+create policy urun_takip_storage_insert on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'urun-takip');
+
+drop policy if exists urun_takip_storage_update on storage.objects;
+create policy urun_takip_storage_update on storage.objects
+  for update to authenticated
+  using (bucket_id = 'urun-takip')
+  with check (bucket_id = 'urun-takip');
+
 -- ---------------------------------------------------------------------
 -- urun_takip_loglari
 -- ---------------------------------------------------------------------
@@ -131,7 +158,7 @@ begin
     select
       'urun_takip_zinciri',
       'Ürün Takip Zinciri',
-      'Seri no ve model üzerinden ürün takip ve zimmet zinciri oluşturur.',
+      'Mobil barkod ile zimmet alma ve zimmet düşme.',
       'operasyon',
       false,
       true,
@@ -143,7 +170,7 @@ begin
     update public.moduller
     set
       ad = 'Ürün Takip Zinciri',
-      aciklama = 'Seri no ve model üzerinden ürün takip ve zimmet zinciri oluşturur.',
+      aciklama = 'Mobil barkod ile zimmet alma ve zimmet düşme.',
       kategori = 'operasyon',
       standart = false,
       aktif = true,

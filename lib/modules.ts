@@ -262,8 +262,7 @@ export const PORTAL_MODULE_DEFINITIONS: Record<string, PortalModuleDefinition> =
     kod: "urun_takip_zinciri",
     ad: "Ürün Takip Zinciri",
     route: "/portal/urun-takip-zinciri",
-    aciklama:
-      "Seri no ve model üzerinden ürün takip ve zimmet zinciri oluşturur.",
+    aciklama: "Mobil barkod ile zimmet alma ve zimmet düşme.",
   },
   performans_yonetim_v2: {
     kod: "performans_yonetim_v2",

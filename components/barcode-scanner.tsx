@@ -7,6 +7,9 @@ type Props = {
   onDetected: (value: string) => void
 }
 
+const KAMERA_HATA =
+  "Kamera açılamadı. Telefon tarayıcısından kamera iznini kontrol edip tekrar deneyin."
+
 export default function BarcodeScanner({ onDetected }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const controlsRef = useRef<IScannerControls | null>(null)
@@ -20,18 +23,10 @@ export default function BarcodeScanner({ onDetected }: Props) {
       setHata("")
 
       const reader = new BrowserMultiFormatReader()
-      const devices = await BrowserMultiFormatReader.listVideoInputDevices()
-
-      if (!devices.length) {
-        setHata("Kamera bulunamadı.")
-        return
-      }
-
-      const cihazId = devices[devices.length - 1].deviceId
       setAktif(true)
 
       controlsRef.current = await reader.decodeFromVideoDevice(
-        cihazId,
+        undefined,
         videoRef.current!,
         (result) => {
           if (!result) return
@@ -45,8 +40,8 @@ export default function BarcodeScanner({ onDetected }: Props) {
           setAktif(false)
         },
       )
-    } catch (err: any) {
-      setHata(err?.message || "Barkod okunamadı.")
+    } catch {
+      setHata(KAMERA_HATA)
       setAktif(false)
     }
   }
@@ -80,12 +75,13 @@ export default function BarcodeScanner({ onDetected }: Props) {
         </div>
       )}
 
-      {aktif && (
-        <video
-          ref={videoRef}
-          className="mt-3 w-full overflow-hidden rounded-2xl border"
-        />
-      )}
+      <video
+        ref={videoRef}
+        muted
+        playsInline
+        autoPlay
+        className={`mt-3 w-full overflow-hidden rounded-2xl border ${aktif ? "" : "hidden"}`}
+      />
 
       {sonKod && (
         <div className="mt-3 rounded-xl border border-emerald-300 bg-emerald-50 p-3">

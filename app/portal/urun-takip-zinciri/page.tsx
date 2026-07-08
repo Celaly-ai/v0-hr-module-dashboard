@@ -68,6 +68,26 @@ const inputSinifi =
 const btnSinifi =
   "w-full rounded-2xl px-4 py-4 text-base font-black disabled:cursor-not-allowed disabled:opacity-50"
 
+const HASAR_ACIKLAMA_MIN = 30
+
+const HASAR_FOTO_KAMERA_HATA =
+  "Kamera açılamadı. Telefon tarayıcısından kamera iznini kontrol edip tekrar deneyin."
+
+function hasarAciklamaGecerli(aciklama: string) {
+  return aciklama.trim().length >= HASAR_ACIKLAMA_MIN
+}
+
+function BarkodDogrulamaKarti() {
+  return (
+    <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-3">
+      <p className="text-sm font-black text-emerald-900">Barkod doğrulandı</p>
+      <p className="mt-1 text-xs font-semibold text-emerald-800">
+        Ürün kimliği sistem tarafından çözümlendi.
+      </p>
+    </div>
+  )
+}
+
 function personelAdi(p: PersonelOzet | null) {
   if (!p) return null
   return `${p.ad || ""} ${p.soyad || ""}`.trim() || null
@@ -125,12 +145,14 @@ export default function UrunTakipZinciriPage() {
 
   const [fisNo, setFisNo] = useState("")
   const [alBarkod, setAlBarkod] = useState("")
+  const [alBarkodDogrulandi, setAlBarkodDogrulandi] = useState(false)
   const [seriNo, setSeriNo] = useState("")
   const [model, setModel] = useState("")
   const [hasarDurumu, setHasarDurumu] = useState<HasarDurumu>("hasarsiz")
   const [hasarAciklama, setHasarAciklama] = useState("")
   const [hasarFotoUrl, setHasarFotoUrl] = useState<string | null>(null)
   const [hasarFotoYukleniyor, setHasarFotoYukleniyor] = useState(false)
+  const [hasarFotoKameraHata, setHasarFotoKameraHata] = useState("")
   const [hasarDevam, setHasarDevam] = useState(false)
   const [kaynak, setKaynak] = useState<Kaynak | "">("")
   const [bayiKodu, setBayiKodu] = useState("")
@@ -138,20 +160,19 @@ export default function UrunTakipZinciriPage() {
   const [mevcutUrun, setMevcutUrun] = useState<UrunKayit | null>(null)
 
   const [dusBarkod, setDusBarkod] = useState("")
-  const [dusSeriNo, setDusSeriNo] = useState("")
-  const [dusModel, setDusModel] = useState("")
   const [dusUrun, setDusUrun] = useState<UrunKayit | null>(null)
   const [dusBarkodDogrulandi, setDusBarkodDogrulandi] = useState(false)
   const [dusIslem, setDusIslem] = useState<ZimmetDusIslem>("nakliye")
 
   const alBarkodRef = useRef<HTMLInputElement>(null)
   const dusBarkodRef = useRef<HTMLInputElement>(null)
+  const hasarFotoInputRef = useRef<HTMLInputElement>(null)
 
   const zimmetAkisiAcik = useMemo(() => {
-    if (!seriNo || !model) return false
+    if (!alBarkodDogrulandi) return false
     if (hasarDurumu === "hasarsiz") return true
     return hasarDevam
-  }, [hasarDurumu, hasarDevam, seriNo, model])
+  }, [alBarkodDogrulandi, hasarDurumu, hasarDevam])
 
   const aktifZimmetleriYukle = useCallback(async (personelId: string) => {
     const supabase = createClient()
@@ -267,6 +288,7 @@ export default function UrunTakipZinciriPage() {
     if (!personel?.id) throw new Error("Personel bilgisi bulunamadı.")
 
     setHasarFotoYukleniyor(true)
+    setHasarFotoKameraHata("")
     try {
       const supabase = createClient()
       const uzanti = dosya.name.split(".").pop()?.toLowerCase() || "jpg"
@@ -287,21 +309,39 @@ export default function UrunTakipZinciriPage() {
     }
   }
 
+  async function hasarFotoSec(dosya: File | undefined) {
+    if (!dosya) return
+
+    try {
+      await hasarFotoYukle(dosya)
+    } catch {
+      setHasarFotoUrl(null)
+      setHasarFotoKameraHata(HASAR_FOTO_KAMERA_HATA)
+    }
+  }
+
   async function alBarkodIsle(ham: string) {
+    const deger = ham.trim()
+    if (!deger) {
+      setMesaj({ tip: "hata", metin: "Barkod değeri girin." })
+      return
+    }
+
     setMesaj(null)
-    setAlBarkod(ham)
+    setAlBarkod(deger)
+    setAlBarkodDogrulandi(false)
     setHasarDevam(false)
     setMevcutUrun(null)
     setKaynak("")
     setBayiKodu("")
 
-    const ayrilmis = barkodAyristir(ham)
+    const ayrilmis = barkodAyristir(deger)
     if (!ayrilmis) {
       setSeriNo("")
       setModel("")
       setMesaj({
         tip: "hata",
-        metin: "Barkod okunamadı. Format: SERINO|MODEL",
+        metin: "Ürün bilgisi okunamadı. Barkodu tekrar okutun.",
       })
       return
     }
@@ -323,6 +363,7 @@ export default function UrunTakipZinciriPage() {
           bulunan.zimmetli_personel_id &&
           bulunan.zimmetli_personel_id !== personel?.id
         ) {
+          setAlBarkodDogrulandi(false)
           setMesaj({
             tip: "hata",
             metin: `Bu ürün ${bulunan.zimmetli_personel_ad || "başka personel"} zimmetinde aktif.`,
@@ -338,38 +379,42 @@ export default function UrunTakipZinciriPage() {
           setZimmetDurumu(bulunan.durum)
         }
       }
-    } catch (err) {
+
+      setAlBarkodDogrulandi(true)
+    } catch {
+      setAlBarkodDogrulandi(false)
       setMesaj({
         tip: "hata",
-        metin: err instanceof Error ? err.message : "Ürün kontrolü başarısız.",
+        metin: "Ürün bilgisi okunamadı. Barkodu tekrar okutun.",
       })
     }
   }
 
   async function dusBarkodIsle(ham: string) {
+    const deger = ham.trim()
+    if (!deger) {
+      setMesaj({ tip: "hata", metin: "Barkod değeri girin." })
+      return
+    }
+
     setMesaj(null)
-    setDusBarkod(ham)
+    setDusBarkod(deger)
     setDusBarkodDogrulandi(false)
     setDusUrun(null)
-    setDusSeriNo("")
-    setDusModel("")
 
     if (!personel?.id) {
       setMesaj({ tip: "hata", metin: "Personel bilgisi bulunamadı." })
       return
     }
 
-    const ayrilmis = barkodAyristir(ham)
+    const ayrilmis = barkodAyristir(deger)
     if (!ayrilmis) {
       setMesaj({
         tip: "hata",
-        metin: "Barkod okunamadı. Format: SERINO|MODEL",
+        metin: "Ürün bilgisi okunamadı. Barkodu tekrar okutun.",
       })
       return
     }
-
-    setDusSeriNo(ayrilmis.seriNo)
-    setDusModel(ayrilmis.model)
 
     const eslesen = aktifZimmetler.find(
       (z) =>
@@ -388,17 +433,18 @@ export default function UrunTakipZinciriPage() {
 
     setDusUrun(eslesen)
     setDusBarkodDogrulandi(true)
-    setMesaj({ tip: "basari", metin: "Barkod doğrulandı. İşlem seçip zimmet düşebilirsiniz." })
   }
 
   function alFormuSifirla() {
     setFisNo("")
     setAlBarkod("")
+    setAlBarkodDogrulandi(false)
     setSeriNo("")
     setModel("")
     setHasarDurumu("hasarsiz")
     setHasarAciklama("")
     setHasarFotoUrl(null)
+    setHasarFotoKameraHata("")
     setHasarDevam(false)
     setKaynak("")
     setBayiKodu("")
@@ -408,8 +454,6 @@ export default function UrunTakipZinciriPage() {
 
   function dusFormuSifirla() {
     setDusBarkod("")
-    setDusSeriNo("")
-    setDusModel("")
     setDusUrun(null)
     setDusBarkodDogrulandi(false)
     setDusIslem("nakliye")
@@ -428,8 +472,11 @@ export default function UrunTakipZinciriPage() {
         setMesaj({ tip: "hata", metin: "Fiş no ve barkod zorunludur." })
         return
       }
-      if (!hasarAciklama.trim()) {
-        setMesaj({ tip: "hata", metin: "Hasar açıklaması zorunludur." })
+      if (!hasarAciklamaGecerli(hasarAciklama)) {
+        setMesaj({
+          tip: "hata",
+          metin: `Hasar açıklaması en az ${HASAR_ACIKLAMA_MIN} karakter olmalıdır.`,
+        })
         return
       }
       if (!hasarFotoUrl) {
@@ -525,8 +572,11 @@ export default function UrunTakipZinciriPage() {
           setMesaj({ tip: "hata", metin: "Hasarlı ürün için Devam Et veya İşlemi Sonlandır seçin." })
           return
         }
-        if (!hasarAciklama.trim()) {
-          setMesaj({ tip: "hata", metin: "Hasar açıklaması zorunludur." })
+        if (!hasarAciklamaGecerli(hasarAciklama)) {
+          setMesaj({
+            tip: "hata",
+            metin: `Hasar açıklaması en az ${HASAR_ACIKLAMA_MIN} karakter olmalıdır.`,
+          })
           return
         }
         if (!hasarFotoUrl) {
@@ -626,7 +676,6 @@ export default function UrunTakipZinciriPage() {
       setMesaj({ tip: "basari", metin: yeniKayit ? "Zimmet alındı." : "Zimmet güncellendi." })
       alFormuSifirla()
       await yenile()
-      alBarkodRef.current?.focus()
     } catch (err) {
       setMesaj({
         tip: "hata",
@@ -702,7 +751,6 @@ export default function UrunTakipZinciriPage() {
       setMesaj({ tip: "basari", metin: "Zimmet düşürüldü." })
       dusFormuSifirla()
       await yenile()
-      dusBarkodRef.current?.focus()
     } catch (err) {
       setMesaj({
         tip: "hata",
@@ -792,37 +840,43 @@ export default function UrunTakipZinciriPage() {
               />
             </label>
 
+            <BarcodeScanner onDetected={(value) => void alBarkodIsle(value)} />
+
             <label className="block">
               <span className="mb-1 block text-xs font-black uppercase text-slate-500">
-                Barkod Oku / Barkod Gir
+                Barkod (fiziksel okuyucu)
               </span>
               <input
                 ref={alBarkodRef}
                 className={inputSinifi}
                 value={alBarkod}
-                onChange={(e) => void alBarkodIsle(e.target.value)}
-                placeholder="SERINO|MODEL"
+                onChange={(e) => {
+                  setAlBarkod(e.target.value)
+                  if (alBarkodDogrulandi) setAlBarkodDogrulandi(false)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault()
+                    void alBarkodIsle(e.currentTarget.value)
+                  }
+                }}
+                placeholder="Barkod okutun"
                 autoComplete="off"
+                enterKeyHint="go"
               />
-              <p className="mt-1 text-xs font-semibold text-slate-500">
-                Format: SERINO|MODEL
-              </p>
             </label>
 
-            <BarcodeScanner onDetected={(kod) => void alBarkodIsle(kod)} />
+            <button
+              type="button"
+              onClick={() => void alBarkodIsle(alBarkod)}
+              className={`${btnSinifi} bg-blue-700 py-5 text-lg text-white`}
+            >
+              Barkodu İşle
+            </button>
 
-            {seriNo && model && (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold">
-                <p>
-                  <span className="font-black">Seri No:</span> {seriNo}
-                </p>
-                <p className="mt-1">
-                  <span className="font-black">Model:</span> {model}
-                </p>
-              </div>
-            )}
+            {alBarkodDogrulandi && <BarkodDogrulamaKarti />}
 
-            {seriNo && model && (
+            {alBarkodDogrulandi && (
               <>
                 <label className="block">
                   <span className="mb-1 block text-xs font-black uppercase text-slate-500">
@@ -852,43 +906,67 @@ export default function UrunTakipZinciriPage() {
                         className={`${inputSinifi} min-h-[88px]`}
                         value={hasarAciklama}
                         onChange={(e) => setHasarAciklama(e.target.value)}
+                        minLength={HASAR_ACIKLAMA_MIN}
                       />
+                      <p className="mt-1 text-xs font-semibold text-amber-800">
+                        En az {HASAR_ACIKLAMA_MIN} karakter ({hasarAciklama.trim().length}/
+                        {HASAR_ACIKLAMA_MIN})
+                      </p>
                     </label>
 
-                    <label className="block">
+                    <div className="block">
                       <span className="mb-1 block text-xs font-black uppercase text-amber-900">
                         Hasar Fotoğrafı Çek
                       </span>
                       <input
+                        ref={hasarFotoInputRef}
                         type="file"
                         accept="image/*"
                         capture="environment"
                         disabled={hasarFotoYukleniyor}
-                        className="w-full text-sm font-semibold"
+                        className="sr-only"
                         onChange={(e) => {
                           const dosya = e.target.files?.[0]
-                          if (dosya) void hasarFotoYukle(dosya)
+                          void hasarFotoSec(dosya)
+                          e.target.value = ""
                         }}
                       />
-                      {hasarFotoYukleniyor && (
-                        <p className="mt-1 text-xs font-bold text-amber-800">Yükleniyor...</p>
+                      <button
+                        type="button"
+                        disabled={hasarFotoYukleniyor}
+                        onClick={() => hasarFotoInputRef.current?.click()}
+                        className={`${btnSinifi} bg-amber-800 text-white`}
+                      >
+                        {hasarFotoYukleniyor ? "Yükleniyor..." : "Kamera ile Çek"}
+                      </button>
+                      {hasarFotoKameraHata && (
+                        <p className="mt-2 rounded-xl border border-red-300 bg-red-50 p-3 text-xs font-bold text-red-900">
+                          {hasarFotoKameraHata}
+                        </p>
                       )}
                       {hasarFotoUrl && (
-                        <p className="mt-1 text-xs font-bold text-emerald-800">
+                        <p className="mt-2 text-xs font-bold text-emerald-800">
                           Fotoğraf kaydedildi ✓
                         </p>
                       )}
-                    </label>
+                    </div>
 
                     <div className="grid gap-2">
                       <button
                         type="button"
                         disabled={islem || hasarFotoYukleniyor}
                         onClick={() => {
-                          if (!hasarAciklama.trim() || !hasarFotoUrl) {
+                          if (!hasarAciklamaGecerli(hasarAciklama)) {
                             setMesaj({
                               tip: "hata",
-                              metin: "Devam için açıklama ve fotoğraf zorunludur.",
+                              metin: `Hasar açıklaması en az ${HASAR_ACIKLAMA_MIN} karakter olmalıdır.`,
+                            })
+                            return
+                          }
+                          if (!hasarFotoUrl) {
+                            setMesaj({
+                              tip: "hata",
+                              metin: "Devam için hasar fotoğrafı zorunludur.",
                             })
                             return
                           }
@@ -988,51 +1066,44 @@ export default function UrunTakipZinciriPage() {
         {sekme === "dus" && (
           <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-sm font-bold text-slate-600">
-              Zimmet düşmek için ürün barkodunu yeniden okutun.
+              Zimmet düşmek için ürün barkodunu okutun.
             </p>
+
+            <BarcodeScanner onDetected={(value) => void dusBarkodIsle(value)} />
 
             <label className="block">
               <span className="mb-1 block text-xs font-black uppercase text-slate-500">
-                Barkod Oku / Barkod Gir
+                Barkod (fiziksel okuyucu)
               </span>
               <input
                 ref={dusBarkodRef}
                 className={inputSinifi}
                 value={dusBarkod}
-                onChange={(e) => void dusBarkodIsle(e.target.value)}
-                placeholder="SERINO|MODEL"
+                onChange={(e) => {
+                  setDusBarkod(e.target.value)
+                  if (dusBarkodDogrulandi) setDusBarkodDogrulandi(false)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault()
+                    void dusBarkodIsle(e.currentTarget.value)
+                  }
+                }}
+                placeholder="Barkod okutun"
                 autoComplete="off"
+                enterKeyHint="go"
               />
             </label>
 
-            <BarcodeScanner onDetected={(kod) => void dusBarkodIsle(kod)} />
+            <button
+              type="button"
+              onClick={() => void dusBarkodIsle(dusBarkod)}
+              className={`${btnSinifi} bg-blue-700 py-5 text-lg text-white`}
+            >
+              Barkodu İşle
+            </button>
 
-            {dusSeriNo && dusModel && (
-              <div
-                className={`rounded-2xl border p-3 text-sm font-semibold ${
-                  dusBarkodDogrulandi
-                    ? "border-emerald-300 bg-emerald-50 text-emerald-950"
-                    : "border-red-300 bg-red-50 text-red-950"
-                }`}
-              >
-                <p>
-                  <span className="font-black">Seri:</span> {dusSeriNo}
-                </p>
-                <p className="mt-1">
-                  <span className="font-black">Model:</span> {dusModel}
-                </p>
-                <p className="mt-2 font-black">
-                  {dusBarkodDogrulandi ? "Barkod doğrulandı ✓" : "Doğrulama bekleniyor"}
-                </p>
-              </div>
-            )}
-
-            {dusUrun && dusBarkodDogrulandi && (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold">
-                <p>Fiş: {dusUrun.fis_no}</p>
-                <p className="mt-1">Durum: {DURUM_ETIKET[dusUrun.durum] || dusUrun.durum}</p>
-              </div>
-            )}
+            {dusBarkodDogrulandi && <BarkodDogrulamaKarti />}
 
             <label className="block">
               <span className="mb-1 block text-xs font-black uppercase text-slate-500">
@@ -1071,19 +1142,21 @@ export default function UrunTakipZinciriPage() {
           ) : aktifZimmetler.length === 0 ? (
             <p className="mt-3 text-sm font-bold text-slate-600">Aktif zimmetiniz yok.</p>
           ) : (
-            <div className="mt-3 space-y-3">
+            <div className="mt-4 space-y-4">
               {aktifZimmetler.map((z) => (
                 <div
                   key={z.id}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold"
+                  className="rounded-3xl border-2 border-slate-200 bg-white p-5 shadow-sm"
                 >
-                  <p className="font-black">{z.model}</p>
-                  <p className="mt-1 text-xs text-slate-600">Seri: {z.seri_no}</p>
-                  <p className="text-xs text-slate-600">Fiş: {z.fis_no}</p>
-                  <p className="mt-2">
-                    {DURUM_ETIKET[z.durum] || z.durum} · {tarihFormat(z.son_islem_at || z.created_at)}
+                  <p className="text-xl font-black leading-tight text-slate-900">{z.model}</p>
+                  <p className="mt-2 text-base font-semibold text-slate-700">Fiş: {z.fis_no}</p>
+                  <p className="mt-3 text-base font-bold text-slate-800">
+                    {DURUM_ETIKET[z.durum] || z.durum}
                   </p>
-                  <p className="mt-2 text-xs font-bold text-slate-500">
+                  <p className="mt-1 text-sm font-semibold text-slate-500">
+                    {tarihFormat(z.son_islem_at || z.created_at)}
+                  </p>
+                  <p className="mt-4 rounded-2xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-600">
                     Zimmet düşmek için barkod okutun
                   </p>
                 </div>

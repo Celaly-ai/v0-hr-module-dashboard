@@ -6,6 +6,12 @@ import { createClient } from "@/lib/supabase/client"
 import { sirketKunyesiKontrolEt } from "@/lib/services/sirket-kunye-service"
 import type { SirketKunyeKontrolSonuc } from "@/lib/types/sirket-kunye"
 import {
+  PERSONEL_STANDART_MODUL_KODLARI,
+  PORTAL_MODULE_DEFINITIONS,
+  personelStandartModulleriniGarantiEt,
+  type PortalModul,
+} from "@/lib/modules"
+import {
   Activity,
   AlertTriangle,
   BarChart3,
@@ -34,15 +40,7 @@ import {
   WalletCards,
 } from "lucide-react"
 
-type Modul = {
-  kod: string
-  ad: string
-  aciklama: string | null
-  kategori: string
-  standart: boolean
-  aktif: boolean
-  sira: number
-}
+type Modul = PortalModul
 
 type Personel = {
   id: string
@@ -56,17 +54,6 @@ type Personel = {
 }
 
 const ADMIN_ROLLERI = ["admin", "ceo"]
-
-const PERFORMANSIM_MODULU: Modul = {
-  kod: "performansim",
-  ad: "Performansım",
-  aciklama:
-    "Kişisel performans puanınızı, sıralamanızı ve gelişim alanlarınızı görüntüleyin.",
-  kategori: "standart",
-  standart: true,
-  aktif: true,
-  sira: 6,
-}
 
 const PERFORMANS_YONETIM_ROLLERI = new Set([
   "admin",
@@ -114,15 +101,6 @@ const PERFORMANS_VERI_GIRISI_MODULU = PERFORMANS_YONETIM_MODULLERI.find(
 
 const PERFORMANS_YONETIM_ESKI_KODLARI = new Set(["hizli_performans"])
 
-const PERSONEL_STANDART_MODUL_KODLARI = [
-  "mesai",
-  "izin",
-  "talepler",
-  "iletisim",
-  "adres_konum_teyit",
-  "performansim",
-] as const
-
 const PERSONEL_GIZLI_MODUL_KODLARI = new Set([
   "ana_sayfa",
   "profil",
@@ -146,6 +124,7 @@ const modulYollari: Record<string, string> = {
   iletisim: "/portal/iletisim",
   adres_konum_teyit: "/portal/adres-konum-teyit",
   performansim: "/portal/performansim",
+  ai_kanitli_yazisma_asistani: "/portal/ai-kanitli-yazisma-asistani",
   performans_yonetim_v2: "/portal/performans-yonetim-v2",
   performans_eslestirme: "/portal/performans-eslestirme",
   performans_veri_girisi: "/portal/hizli-performans",
@@ -187,6 +166,12 @@ const modulYollari: Record<string, string> = {
   belge_arsivi: "/portal/belge-arsivi",
 }
 
+function portalModulYolu(kod: string) {
+  const yol = modulYollari[kod]
+  if (yol) return yol
+  return PORTAL_MODULE_DEFINITIONS[kod]?.route ?? ""
+}
+
 const modulIkonlari: Record<string, any> = {
   ana_sayfa: Home,
   mesai: LogIn,
@@ -198,6 +183,7 @@ const modulIkonlari: Record<string, any> = {
   iletisim: MessageCircle,
   adres_konum_teyit: MapPin,
   performansim: Trophy,
+  ai_kanitli_yazisma_asistani: Bot,
   performans_yonetim_v2: BarChart3,
   performans_eslestirme: Link2,
   performans_veri_girisi: Gauge,
@@ -264,31 +250,6 @@ function kategoriBaslik(kategori: string) {
   if (kategori === "finans") return "Finans"
 
   return kategori
-}
-
-function performansModulunuGarantiEt(moduller: Modul[]) {
-  const performansModuluVar = moduller.some(
-    (modul) => modul.kod === PERFORMANSIM_MODULU.kod,
-  )
-
-  if (performansModuluVar) {
-    return moduller.map((modul) => {
-      if (modul.kod !== PERFORMANSIM_MODULU.kod) {
-        return modul
-      }
-
-      return {
-        ...modul,
-        ad: PERFORMANSIM_MODULU.ad,
-        aciklama: PERFORMANSIM_MODULU.aciklama,
-        kategori: "standart",
-        standart: true,
-        aktif: true,
-      }
-    })
-  }
-
-  return [...moduller, PERFORMANSIM_MODULU]
 }
 
 function performansYonetimRoluMu(rol?: string | null) {
@@ -466,7 +427,7 @@ export default function PortalPage() {
       return
     }
 
-    const garantiModuller = performansModulunuGarantiEt(
+    const garantiModuller = personelStandartModulleriniGarantiEt(
       (modulData || []) as Modul[],
     )
     const rolTabanliModuller = performansYonetimModulleriniEkle(
@@ -601,7 +562,7 @@ export default function PortalPage() {
   }
 
   function modulAc(modul: Modul) {
-    const yol = modulYollari[modul.kod]
+    const yol = portalModulYolu(modul.kod)
 
     if (!yol) return
 
@@ -616,7 +577,7 @@ export default function PortalPage() {
     opsiyonel?: boolean
   }) {
     const Ikon = modulIkonlari[modul.kod] || Package
-    const tiklanabilir = Boolean(modulYollari[modul.kod])
+    const tiklanabilir = Boolean(portalModulYolu(modul.kod))
     const performansModulu = modul.kod === "performansim"
 
     return (
@@ -702,10 +663,11 @@ export default function PortalPage() {
           </h2>
 
           <p className="mt-2 text-sm font-bold">
-            Giriş/Çıkış, izin, talepler, iletişim, adres/konum teyidi ve
-            kişisel Performansım merkezi tüm personellerde standarttır.
-            Vardiya bilgileri Giriş/Çıkış ekranında görüntülenir. Diğer
-            modüller admin tarafından kişi bazlı açılır.
+            Giriş/Çıkış, izin, talepler, iletişim, adres/konum teyidi,
+            AI Kurumsal Yazışma Asistanı ve kişisel Performansım merkezi
+            tüm personellerde standarttır. Vardiya bilgileri Giriş/Çıkış
+            ekranında görüntülenir. Diğer modüller admin tarafından kişi
+            bazlı açılır.
           </p>
         </div>
 

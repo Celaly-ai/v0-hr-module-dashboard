@@ -110,3 +110,22 @@ Aktarıldı: 142/142
 ARON açık fiş verileri başarıyla aktarıldı.
 
 Çalışıyor: scripts/aron-operasyon-havuzu.mjs
+Çalışıyor: scripts/aron-import.mjs
+Okunan kayıt: 142
+Aktarılacak kayıt: 142
+Aktarıldı: 100/142
+Aktarıldı: 142/142
+ARON açık fiş verileri başarıyla aktarıldı.
+
+Çalışıyor: scripts/aron-operasyon-havuzu.mjs
+Toplam ham kayıt: 539
+Operasyon kapsamına giren: 300
+Atama bekleyen: 52
+Atanmış izleme: 248
+aktif_operasyon_havuzu_v2 aktarımı tamamlandı.
+
+Çalışıyor: scripts/ai-ekip-oneri-v1.mjs
+Atama bekleyen iş: 52
+Öneri üretilen iş: 52
+
+Çalışıyor: scripts/aron-07-planlama.mjs

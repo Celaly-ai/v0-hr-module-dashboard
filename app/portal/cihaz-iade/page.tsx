@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import FotoYukleyici from "@/components/foto-yukleyici"
-import BarcodeScanner from "@/components/barcode-scanner"
+import { FeyRouteBarcodeEngine } from "@/components/core/feyroute-barcode-engine"
 
 const IADE_NEDENLERI = [
   "Arıza",
@@ -41,6 +41,7 @@ export default function CihazIadePage() {
   const [islem, setIslem] = useState(false)
   const [hata, setHata] = useState("")
   const [basari, setBasari] = useState("")
+  const [barkodFotoBilgi, setBarkodFotoBilgi] = useState("")
 
   async function iadeEt() {
     setIslem(true)
@@ -133,7 +134,21 @@ export default function CihazIadePage() {
         )}
 
         <div className="rounded-3xl border bg-white p-5 shadow-sm space-y-4">
-          <BarcodeScanner onDetected={(value) => setBarkod(value)} />
+          <FeyRouteBarcodeEngine
+            onDetected={(value) => {
+              setBarkod(value)
+              setBarkodFotoBilgi("")
+            }}
+            onPhotoFallback={() => {
+              setBarkodFotoBilgi("Barkod fotoğrafı alındı; barkod metni okunamadı.")
+            }}
+          />
+
+          {barkodFotoBilgi && (
+            <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm font-black text-amber-950">
+              {barkodFotoBilgi}
+            </div>
+          )}
 
           <Field label="Barkod">
             <input value={barkod} onChange={(e) => setBarkod(e.target.value)} placeholder="Barkod okut / gir" className="field" />

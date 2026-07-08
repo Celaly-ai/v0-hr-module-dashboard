@@ -61,6 +61,55 @@ interface ZXingReader {
     videoElement: HTMLVideoElement,
     callback: (result: { getText: () => string } | undefined, error: unknown) => void,
   ) => Promise<ZXingControls>
+  decodeFromConstraints?: (
+    constraints: MediaStreamConstraints,
+    videoElement: HTMLVideoElement,
+    callback: (result: { getText: () => string } | undefined, error: unknown) => void,
+  ) => Promise<ZXingControls>
+}
+
+const KAMERA_IZIN_HATASI =
+  "Kamera açılamadı. Telefon tarayıcısından kamera iznini kontrol edip tekrar deneyin."
+
+const ARKA_KAMERA_CONSTRAINTS: MediaStreamConstraints = {
+  video: { facingMode: { ideal: "environment" } },
+}
+
+function canEnumerateDevices(): boolean {
+  if (typeof navigator === "undefined") return false
+  return Boolean(
+    navigator.mediaDevices &&
+      typeof navigator.mediaDevices.enumerateDevices === "function",
+  )
+}
+
+function isCameraPermissionError(err: unknown): boolean {
+  const name = (err as { name?: string }).name
+  return name === "NotAllowedError" || name === "PermissionDeniedError"
+}
+
+function isEnumerateRelatedError(err: unknown): boolean {
+  const message = String((err as { message?: string }).message || err || "")
+  return /enumerate devices|enumerateDevices|method not supported/i.test(message)
+}
+
+async function loadVideoDevicesOptional(): Promise<MediaDeviceInfo[]> {
+  if (!canEnumerateDevices()) return []
+
+  try {
+    const all = await navigator.mediaDevices.enumerateDevices()
+    return all.filter((device) => device.kind === "videoinput")
+  } catch {
+    return []
+  }
+}
+
+function pickBackCameraId(cams: MediaDeviceInfo[]): string | undefined {
+  if (cams.length === 0) return undefined
+  const back =
+    cams.find((camera) => /back|rear|environment/i.test(camera.label)) ??
+    cams[cams.length - 1]
+  return back.deviceId || undefined
 }
 
 export function BarcodeScannerDialog({
@@ -120,7 +169,6 @@ export function BarcodeScannerDialog({
       setErrorMessage(null)
 
       try {
-        // zxing'i yalnizca istemcide, tarama basladiginda yukle.
         const { BrowserMultiFormatReader } = await import("@zxing/browser")
         const reader = new BrowserMultiFormatReader() as unknown as ZXingReader
         readerRef.current = reader
@@ -130,35 +178,27 @@ export function BarcodeScannerDialog({
           throw new Error("Video elementi hazir degil")
         }
 
-        // Kamera listesini bir kez cek (izin verilmezse burada patlar).
-        if (devices.length === 0) {
-          try {
-            const all = await navigator.mediaDevices.enumerateDevices()
-            const cams = all.filter((d) => d.kind === "videoinput")
-            setDevices(cams)
-            if (!deviceId && cams.length > 0) {
-              // Arka kamerayi tercih et (mobil cihazlarda).
-              const back =
-                cams.find((c) => /back|rear|environment/i.test(c.label)) ??
-                cams[cams.length - 1]
-              deviceId = back.deviceId
-              setSelectedDeviceId(deviceId)
-            }
-          } catch {
-            // Bazi tarayicilar enumerate icin izin ister; gormezden gelip devam ediyoruz.
+        void loadVideoDevicesOptional().then((cams) => {
+          if (cams.length === 0) return
+          setDevices(cams)
+          if (!deviceId) {
+            const backCameraId = pickBackCameraId(cams)
+            if (backCameraId) setSelectedDeviceId(backCameraId)
           }
-        }
+        })
 
-        const controls = await reader.decodeFromVideoDevice(
-          deviceId,
-          video,
-          (result, err) => {
+        const beginDecode = async (resolvedDeviceId?: string): Promise<ZXingControls> => {
+          let controls: ZXingControls
+
+          const handleFrame = (
+            result: { getText: () => string } | undefined,
+            err: unknown,
+          ) => {
             if (result) {
               const text = result.getText()
-              if (text && text !== lastDetected) {
+              if (text) {
                 setLastDetected(text)
                 setPhase("detected")
-                // Cift okumayi engellemek icin durduralim.
                 try {
                   controls.stop()
                 } catch {
@@ -167,33 +207,97 @@ export function BarcodeScannerDialog({
                 onDetected(text, "camera")
               }
             }
-            // ZXing okunamayan her karede bir NotFoundException dusurur -> sessizce gecilir.
             if (err && (err as { name?: string }).name !== "NotFoundException") {
-              // Baska bir hata olursa da loglamayalim, aksi halde konsol kirlenir.
+              // ZXing okunamayan karelerde NotFoundException dusurur; sessizce gecilir.
             }
-          },
-        )
+          }
+
+          if (resolvedDeviceId) {
+            controls = await reader.decodeFromVideoDevice(resolvedDeviceId, video, handleFrame)
+            return controls
+          }
+
+          if (reader.decodeFromConstraints) {
+            try {
+              controls = await reader.decodeFromConstraints(
+                ARKA_KAMERA_CONSTRAINTS,
+                video,
+                handleFrame,
+              )
+              return controls
+            } catch (constraintsErr) {
+              if (!isEnumerateRelatedError(constraintsErr)) throw constraintsErr
+            }
+          }
+
+          controls = await reader.decodeFromVideoDevice(undefined, video, handleFrame)
+          return controls
+        }
+
+        let controls: ZXingControls
+        try {
+          controls = await beginDecode(deviceId)
+        } catch (firstErr) {
+          if (isEnumerateRelatedError(firstErr) || deviceId) {
+            controls = await beginDecode(undefined)
+          } else {
+            throw firstErr
+          }
+        }
+
         controlsRef.current = controls
         setPhase("scanning")
       } catch (err) {
-        const name = (err as { name?: string }).name
-        let msg =
-          "Kamera baslatilamadi. Manuel giris yapabilir veya tekrar deneyebilirsiniz."
-        if (name === "NotAllowedError" || name === "PermissionDeniedError") {
-          msg =
-            "Kamera izni reddedildi. Tarayici ayarlarindan izin vererek tekrar deneyin veya manuel giris yapin."
-        } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
-          msg =
-            "Kullanilabilir bir kamera bulunamadi. Manuel giris yapabilirsiniz."
-        } else if (name === "NotReadableError" || name === "TrackStartError") {
-          msg =
-            "Kamera baska bir uygulama tarafindan kullaniliyor olabilir. Manuel giris yapabilirsiniz."
+        if (isEnumerateRelatedError(err)) {
+          try {
+            const video = videoRef.current
+            const reader = readerRef.current
+            if (video && reader) {
+              let controls: ZXingControls
+              const handleFrame = (
+                result: { getText: () => string } | undefined,
+                frameErr: unknown,
+              ) => {
+                if (result) {
+                  const text = result.getText()
+                  if (text) {
+                    setLastDetected(text)
+                    setPhase("detected")
+                    try {
+                      controls.stop()
+                    } catch {
+                      // noop
+                    }
+                    onDetected(text, "camera")
+                  }
+                }
+                if (frameErr && (frameErr as { name?: string }).name !== "NotFoundException") {
+                  // noop
+                }
+              }
+              controls = await reader.decodeFromVideoDevice(undefined, video, handleFrame)
+              controlsRef.current = controls
+              setPhase("scanning")
+              return
+            }
+          } catch (fallbackErr) {
+            if (isCameraPermissionError(fallbackErr)) {
+              setPhase("error")
+              setErrorMessage(KAMERA_IZIN_HATASI)
+            }
+          }
+          return
+        }
+        if (isCameraPermissionError(err)) {
+          setPhase("error")
+          setErrorMessage(KAMERA_IZIN_HATASI)
+          return
         }
         setPhase("error")
-        setErrorMessage(msg)
+        setErrorMessage(null)
       }
     },
-    [cameraSupported, devices.length, lastDetected, onDetected],
+    [cameraSupported, onDetected],
   )
 
   // Dialog acildiginda taramayi baslat, kapandiginda kamerayi serbest birak.

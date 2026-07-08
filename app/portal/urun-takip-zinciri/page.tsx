@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
-import BarcodeScanner from "@/components/barcode-scanner"
+import { FeyRouteBarcodeEngine } from "@/components/core/feyroute-barcode-engine"
 
 type PersonelOzet = {
   id: string
@@ -200,9 +200,7 @@ export default function UrunTakipZinciriPage() {
   const [dusIslem, setDusIslem] = useState<ZimmetDusIslem>("nakliye")
 
   const alBarkodRef = useRef<HTMLInputElement>(null)
-  const alBarkodFotoInputRef = useRef<HTMLInputElement>(null)
   const dusBarkodRef = useRef<HTMLInputElement>(null)
-  const dusBarkodFotoInputRef = useRef<HTMLInputElement>(null)
   const hasarFotoInputRef = useRef<HTMLInputElement>(null)
 
   const zimmetAkisiAcik = useMemo(() => {
@@ -990,37 +988,11 @@ export default function UrunTakipZinciriPage() {
               />
             </label>
 
-            <BarcodeScanner onDetected={(value) => void alBarkodIsle(value)} />
-
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
-              <span className="mb-2 block text-xs font-black uppercase text-slate-500">
-                Barkod fotoğrafı çek (fallback)
-              </span>
-              <input
-                ref={alBarkodFotoInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                disabled={alBarkodFotoYukleniyor}
-                className="sr-only"
-                onChange={(e) => {
-                  const dosya = e.target.files?.[0]
-                  void alBarkodFotoSec(dosya)
-                  e.target.value = ""
-                }}
-              />
-              <button
-                type="button"
-                disabled={alBarkodFotoYukleniyor}
-                onClick={() => alBarkodFotoInputRef.current?.click()}
-                className={`${btnSinifi} bg-slate-800 text-white`}
-              >
-                {alBarkodFotoYukleniyor ? "Yükleniyor..." : "Barkod Fotoğrafı Çek"}
-              </button>
-              <p className="mt-2 text-xs font-semibold text-slate-600">
-                Kamera taraması çalışmazsa barkod fotoğrafı ile devam edin.
-              </p>
-            </div>
+            <FeyRouteBarcodeEngine
+              label="Barkod okut"
+              onDetected={(value) => void alBarkodIsle(value)}
+              onPhotoFallback={(file) => void alBarkodFotoSec(file)}
+            />
 
             <label className="block">
               <span className="mb-1 block text-xs font-black uppercase text-slate-500">
@@ -1250,41 +1222,17 @@ export default function UrunTakipZinciriPage() {
               Zimmet düşmek için ürün barkodunu okutun.
             </p>
 
-            <BarcodeScanner onDetected={(value) => void dusBarkodIsle(value)} />
-
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
-              <span className="mb-2 block text-xs font-black uppercase text-slate-500">
-                Barkod fotoğrafı çek (fallback)
-              </span>
-              <input
-                ref={dusBarkodFotoInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                disabled={dusBarkodFotoYukleniyor || !dusUrun}
-                className="sr-only"
-                onChange={(e) => {
-                  const dosya = e.target.files?.[0]
-                  void dusBarkodFotoSec(dosya)
-                  e.target.value = ""
-                }}
-              />
-              <button
-                type="button"
-                disabled={dusBarkodFotoYukleniyor || !dusUrun}
-                onClick={() => dusBarkodFotoInputRef.current?.click()}
-                className={`${btnSinifi} bg-slate-800 text-white`}
-              >
-                {dusBarkodFotoYukleniyor
-                  ? "Yükleniyor..."
-                  : dusUrun
-                    ? "Barkod Fotoğrafı Çek"
-                    : "Önce ürün seçin"}
-              </button>
-              <p className="mt-2 text-xs font-semibold text-slate-600">
-                Canlı okuma başarısızsa ürün seçip barkod fotoğrafı çekin.
-              </p>
-            </div>
+            <FeyRouteBarcodeEngine
+              label="Barkod okut"
+              onDetected={(value) => void dusBarkodIsle(value)}
+              onPhotoFallback={(file) => {
+                if (!dusUrun) {
+                  setMesaj({ tip: "hata", metin: "Önce düşülecek ürünü listeden seçin." })
+                  return
+                }
+                void dusBarkodFotoSec(file)
+              }}
+            />
 
             {!dusBarkodMetinOkundu && (
               <div className="space-y-3">

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import BarcodeScanner from "@/components/barcode-scanner"
+import { FeyRouteBarcodeEngine } from "@/components/core/feyroute-barcode-engine"
 
 function konumAl(): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
@@ -28,6 +28,7 @@ export default function CihazTeslimPage() {
   const [islem, setIslem] = useState(false)
   const [hata, setHata] = useState("")
   const [basari, setBasari] = useState("")
+  const [barkodFotoBilgi, setBarkodFotoBilgi] = useState("")
 
   async function teslimEt() {
     setIslem(true)
@@ -124,7 +125,21 @@ export default function CihazTeslimPage() {
         )}
 
         <div className="rounded-3xl border bg-white p-5 shadow-sm space-y-4">
-          <BarcodeScanner onDetected={(value) => setBarkod(value)} />
+          <FeyRouteBarcodeEngine
+            onDetected={(value) => {
+              setBarkod(value)
+              setBarkodFotoBilgi("")
+            }}
+            onPhotoFallback={() => {
+              setBarkodFotoBilgi("Barkod fotoğrafı alındı; barkod metni okunamadı.")
+            }}
+          />
+
+          {barkodFotoBilgi && (
+            <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm font-black text-amber-950">
+              {barkodFotoBilgi}
+            </div>
+          )}
 
           <Field label="Barkod">
             <input

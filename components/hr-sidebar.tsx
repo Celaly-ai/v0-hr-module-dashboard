@@ -379,8 +379,8 @@ const navigationItems: NavGroup[] = [
       {
         title: "KYM",
         icon: ShieldCheck,
-        href: "/kym",
-        allowedRoles: YONETICI_ROLLER,
+        href: "/portal/kym",
+        allowedRoles: SERVIS_YONETIM_ROLLERI,
       },
 
       {

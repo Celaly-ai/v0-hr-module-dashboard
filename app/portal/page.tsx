@@ -8,6 +8,8 @@ import type { SirketKunyeKontrolSonuc } from "@/lib/types/sirket-kunye"
 import {
   PERSONEL_STANDART_MODUL_KODLARI,
   PORTAL_MODULE_DEFINITIONS,
+  kymPortalModuluGoster,
+  kymPortalModulunuGarantiEt,
   personelStandartModulleriniGarantiEt,
   type PortalModul,
 } from "@/lib/modules"
@@ -166,6 +168,7 @@ const modulYollari: Record<string, string> = {
 
   muhasebe: "/portal/muhasebe",
   belge_arsivi: "/portal/belge-arsivi",
+  kym: "/portal/kym",
 }
 
 function portalModulYolu(kod: string) {
@@ -226,6 +229,7 @@ const modulIkonlari: Record<string, any> = {
 
   muhasebe: WalletCards,
   belge_arsivi: FileSpreadsheet,
+  kym: ShieldCheck,
 }
 
 function normalizeRol(value?: string | null) {
@@ -252,6 +256,7 @@ function kategoriBaslik(kategori: string) {
   if (kategori === "anket") return "Anket"
   if (kategori === "ai") return "AI"
   if (kategori === "finans") return "Finans"
+  if (kategori === "kurumsal") return "Kurumsal Yönetim"
 
   return kategori
 }
@@ -434,9 +439,10 @@ export default function PortalPage() {
     const garantiModuller = personelStandartModulleriniGarantiEt(
       (modulData || []) as Modul[],
     )
-    const rolTabanliModuller = performansYonetimModulleriniEkle(
-      garantiModuller,
+    const rolTabanliModuller = kymPortalModulunuGarantiEt(
+      performansYonetimModulleriniEkle(garantiModuller, aktifRol),
       aktifRol,
+      adminMi,
     )
 
     let yetkiKodlari: string[] = []
@@ -508,6 +514,10 @@ export default function PortalPage() {
         return false
       }
 
+      if (modul.kod === "kym") {
+        return kymPortalModuluGoster(personel?.rol, isAdmin)
+      }
+
       if (
         modul.kod === PERFORMANS_VERI_GIRISI_MODULU.kod &&
         (performansYonetimGorebilir || isAdmin)
@@ -540,6 +550,7 @@ export default function PortalPage() {
   const opsiyonelGruplar = useMemo(() => {
     const kategoriSirasi = [
       "performans",
+      "kurumsal",
       "yonetim",
       "operasyon",
       "anket",

@@ -190,8 +190,6 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, ModuleSlug[]> = {
     "Adres Konum Rapor",
     "Yonetici Bildirimleri",
 
-    "KYM",
-
     "Raporlar",
     "Bildirimler",
     "Ayarlar",
@@ -291,6 +289,12 @@ export const PORTAL_MODULE_DEFINITIONS: Record<string, PortalModuleDefinition> =
     aciklama:
       "Performans matris verilerini yükleyin ve normalize kayıtları yönetin.",
   },
+  kym: {
+    kod: "kym",
+    ad: "KYM",
+    route: "/portal/kym",
+    aciklama: "Kurumsal yükümlülük yönetimi ve uyum merkezi.",
+  },
 }
 
 export type PortalModul = {
@@ -301,6 +305,50 @@ export type PortalModul = {
   standart: boolean
   aktif: boolean
   sira: number
+}
+
+/** Portal kartlarında gösterilen KYM modül tanımı (DB kaydı yoksa garanti edilir). */
+export const KYM_PORTAL_MODUL: PortalModul = {
+  kod: "kym",
+  ad: "KYM",
+  aciklama: "Kurumsal yükümlülük yönetimi ve uyum merkezi.",
+  kategori: "kurumsal",
+  standart: false,
+  aktif: true,
+  sira: 25,
+}
+
+export function kymPortalModuluGoster(rol?: string | null, adminMi = false) {
+  if (adminMi) return true
+  const r = (rol || "").trim().toLocaleLowerCase("tr-TR")
+  return r === "servis_yoneticisi" || r === "admin" || r === "ceo"
+}
+
+export function kymPortalModulunuGarantiEt(
+  moduller: PortalModul[],
+  rol?: string | null,
+  adminMi = false,
+): PortalModul[] {
+  if (!kymPortalModuluGoster(rol, adminMi)) {
+    return moduller.filter((modul) => modul.kod !== "kym")
+  }
+
+  const mevcut = moduller.find((modul) => modul.kod === "kym")
+  if (mevcut) {
+    return moduller.map((modul) =>
+      modul.kod === "kym"
+        ? {
+            ...KYM_PORTAL_MODUL,
+            ...modul,
+            kategori: "kurumsal",
+            standart: false,
+            aktif: true,
+          }
+        : modul,
+    )
+  }
+
+  return [...moduller, KYM_PORTAL_MODUL]
 }
 
 /** Personel portalında zorunlu (standart) modül kodları — sıra önemlidir. */

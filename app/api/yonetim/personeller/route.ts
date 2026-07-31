@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
-export async function GET() {
+export async function GET(request: Request) {
+  const durumFiltre = new URL(request.url).searchParams.get("durum")?.trim() || null
+
   const supabaseUrl =
     process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ||
     process.env.SUPABASE_URL?.trim()
@@ -30,10 +32,16 @@ export async function GET() {
     },
   })
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("personeller")
     .select("id, sirket_id, personel_kodu, ad, soyad, tel, telefon_normalized, auth_id, kullanici_id, rol, durum, lokasyon, bolge, ise_giris_tarihi, notlar")
     .order("ad", { ascending: true })
+
+  if (durumFiltre) {
+    query = query.eq("durum", durumFiltre)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     return NextResponse.json(

@@ -99,7 +99,7 @@ export default function VardiyaPage() {
 
   async function personelleriYukle() {
     try {
-      const response = await fetch("/api/yonetim/personeller", {
+      const response = await fetch("/api/yonetim/personeller?durum=aktif", {
         cache: "no-store",
       })
 
@@ -124,10 +124,7 @@ export default function VardiyaPage() {
 
   const seciliPersoneller = useMemo(() => {
     if (seciliPersonel === TUM_PERSONELLER) {
-      return personeller.filter((p) => {
-        const durum = String(p.durum || "").toLocaleLowerCase("tr-TR")
-        return !durum.includes("pasif") && !durum.includes("isten_ayrildi")
-      })
+      return personeller
     }
 
     return personeller.filter((p) => p.id === seciliPersonel)
